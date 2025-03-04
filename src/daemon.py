@@ -415,6 +415,16 @@ class CommandProcessor:
             logger.warning("Empty command received")
             notify_error("Empty command received")
             return
+            
+        # Check for dictation mode command first
+        if clean_text.startswith("dictate") or "start dictation" in clean_text:
+            logger.info("Detected dictation command")
+            print("DEBUG: Voice command triggered dictation mode")
+            
+            # Start dictation mode through the same path the hotkey would use
+            # Use threading to avoid blocking this function
+            threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
+            return
         
         # Use LLM interpretation if enabled
         if self.use_llm and self.llm_interpreter.llm is not None:
@@ -462,6 +472,9 @@ class CommandProcessor:
                     return
                 elif action == "type" and params:
                     self.type_text(params)
+                    return
+                elif action == "dictate" or action == "dictation":
+                    threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
                     return
             
             # If we still haven't found a command, fall back to simple parsing
@@ -1173,7 +1186,6 @@ if __name__ == "__main__":
         
         logger.info("=== Voice Control Ready ===")
         logger.info(f"COMMAND MODE: Press {command_hotkey_str} to start recording voice commands")
-        logger.info(f"DICTATION MODE: Press {dictation_hotkey_str} to dictate text")
         logger.info(f"MUTE TOGGLE: Press Ctrl+Alt+M to mute/unmute voice control")
         logger.info("")
         logger.info("Example commands:")
@@ -1181,6 +1193,7 @@ if __name__ == "__main__":
         logger.info("  'maximize window'")
         logger.info("  'open terminal'")
         logger.info("  'focus chrome'")
+        logger.info("  'dictate' (switches to dictation mode)")
         logger.info("")
         logger.info("Press Ctrl+C or ESC to exit")
         
@@ -1188,7 +1201,7 @@ if __name__ == "__main__":
         from toast_notifications import send_notification
         send_notification(
             "Voice Control Ready", 
-            f"Commands: {command_hotkey_str} | Dictation: {dictation_hotkey_str} | Mute: Ctrl+Alt+M",
+            f"Commands: {command_hotkey_str} | Say 'dictate' for dictation | Mute: Ctrl+Alt+M",
             "whisper-voice-ready",
             10,
             True
