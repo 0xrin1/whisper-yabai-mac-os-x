@@ -7,3 +7,7 @@ python-dotenv
 llama-cpp-python
 requests
 pyperclip
+# These dependencies are not strictly required but enhance functionality
+# For speech synthesis and assistant features
+pyttsx3
+pyaudio

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Voice command daemon using Whisper and Yabai for Mac OS X control.
+Now includes JARVIS-style conversational assistant capabilities.
 """
 
 import os
@@ -23,6 +24,9 @@ from dotenv import load_dotenv
 
 # Import our LLM interpreter
 from llm_interpreter import CommandInterpreter
+# Import assistant module (for JARVIS-like functionality)
+import assistant
+import speech_synthesis as tts
 # Import toast notifications
 from toast_notifications import (
     notify_listening, 
@@ -1422,10 +1426,22 @@ def process_trigger_audio(audio_file):
             "start dictation", "dictate this", "write this", "take notes", "ti", "ty", "tai"
         ]
         
-        # Add strong debugging for trigger detection
-        print(f"DEBUG: Dictation trigger word check for: '{transcription}'")
+        # Check for JARVIS assistant trigger
+        jarvis_variations = ["jarvis", "hey jarvis", "hi jarvis", "hello jarvis", "ok jarvis"]
+        contains_jarvis_trigger = False
         
-        # More robust detection - looking for exact word matches or the word embedded in a phrase
+        # Check for Jarvis trigger in the transcription
+        for variation in jarvis_variations:
+            if variation in transcription.lower():
+                print(f"DEBUG: JARVIS TRIGGER MATCH found for '{variation}' in '{transcription}'")
+                contains_jarvis_trigger = True
+                break
+                
+        # Add strong debugging for trigger detection
+        print(f"DEBUG: Trigger word check for: '{transcription}'")
+        print(f"DEBUG: Command trigger: {contains_command_trigger}, Dictation trigger: {contains_dictation_trigger}, JARVIS trigger: {contains_jarvis_trigger}")
+        
+        # More robust detection for dictation - looking for exact word matches or the word embedded in a phrase
         contains_dictation_trigger = False
         for variation in dictation_variations:
             # Full exact match
@@ -1451,8 +1467,32 @@ def process_trigger_audio(audio_file):
         # Log trigger detection result
         print(f"DEBUG: Dictation trigger detected: {contains_dictation_trigger}")
         
-        # Process dictation trigger first (higher priority)
-        if contains_dictation_trigger:
+        # Process JARVIS assistant trigger first (highest priority)
+        if contains_jarvis_trigger:
+            print(f"DEBUG: JARVIS ASSISTANT TRIGGER DETECTED: '{transcription}'")
+            print("DEBUG: ========== ACTIVATING JARVIS ASSISTANT ==========")
+            logger.info(f"JARVIS assistant trigger detected: '{transcription}'")
+            TRIGGER_DETECTED = True
+            
+            # Play a notification sound
+            try:
+                subprocess.run(["afplay", "/System/Library/Sounds/Submarine.aiff"], check=False)
+            except Exception as e:
+                print(f"DEBUG: Failed to play JARVIS notification sound: {e}")
+                
+            # Forward to the assistant module
+            try:
+                assistant.process_voice_command(transcription)
+                print("DEBUG: Voice command processed by JARVIS assistant")
+                return True
+            except Exception as e:
+                print(f"DEBUG: Error processing JARVIS command: {e}")
+                import traceback
+                print(f"DEBUG: {traceback.format_exc()}")
+                return False
+        
+        # Process dictation trigger next (medium priority)
+        elif contains_dictation_trigger:
             print(f"DEBUG: DICTATION TRIGGER DETECTED: '{DICTATION_TRIGGER}'")
             print("DEBUG: ========== STARTING DICTATION MODE DIRECTLY ==========")
             logger.info(f"Dictation trigger word detected: '{DICTATION_TRIGGER}'")
@@ -1486,7 +1526,7 @@ def process_trigger_audio(audio_file):
             print("DEBUG: Dictation recording thread started")
             return True
             
-        # Otherwise check for command trigger
+        # Otherwise check for command trigger (lowest priority)
         elif contains_command_trigger:
             print(f"DEBUG: COMMAND TRIGGER DETECTED: '{COMMAND_TRIGGER}'")
             print("DEBUG: ========== STARTING FULL COMMAND RECORDING ==========")
@@ -1746,6 +1786,10 @@ def process_audio_buffer():
         command_variations = [COMMAND_TRIGGER.lower(), "hay", "he", "hey", "hi", "okay", "ok"]
         contains_command_trigger = any(variation in transcription.lower() for variation in command_variations)
         
+        # Check for JARVIS assistant trigger
+        jarvis_variations = ["jarvis", "hey jarvis", "hi jarvis", "hello jarvis", "ok jarvis"]
+        contains_jarvis_trigger = any(variation in transcription.lower() for variation in jarvis_variations)
+        
         # Check for dictation trigger with robust detection
         dictation_variations = [
             DICTATION_TRIGGER.lower(), "typing", "write", "note", "text", "speech to text",
@@ -1765,7 +1809,44 @@ def process_audio_buffer():
                 break
         
         # Process trigger detections
-        if contains_dictation_trigger:
+        # First check for JARVIS assistant trigger (highest priority)
+        if contains_jarvis_trigger:
+            print(f"DEBUG: JARVIS ASSISTANT TRIGGER DETECTED in buffer: '{transcription}'")
+            logger.info(f"JARVIS assistant trigger detected in buffered audio")
+            
+            # Play distinctive feedback sound
+            try:
+                subprocess.run(["afplay", "/System/Library/Sounds/Submarine.aiff"], check=False)
+            except Exception as e:
+                print(f"DEBUG: Failed to play JARVIS notification sound: {e}")
+                
+            # Show notification
+            try:
+                from toast_notifications import send_notification
+                send_notification(
+                    "JARVIS Activated", 
+                    "How can I help you?",
+                    "whisper-jarvis-buffer",
+                    3,
+                    True
+                )
+            except Exception as e:
+                print(f"DEBUG: Failed to show JARVIS notification: {e}")
+                
+            # Forward the transcription to the assistant module
+            try:
+                assistant.process_voice_command(transcription)
+                print("DEBUG: Voice command processed by JARVIS assistant")
+            except Exception as e:
+                print(f"DEBUG: Error processing JARVIS command: {e}")
+                import traceback
+                print(f"DEBUG: {traceback.format_exc()}")
+            
+            # Reset recording flag after processing
+            RECORDING = False
+            
+        # Then check for dictation trigger (medium priority)    
+        elif contains_dictation_trigger:
             print(f"DEBUG: DICTATION TRIGGER DETECTED in buffer: '{transcription}'")
             logger.info(f"Dictation trigger detected in buffered audio")
             
@@ -1792,6 +1873,7 @@ def process_audio_buffer():
             time.sleep(0.5)
             start_recording_thread('dictation', force=True)
             
+        # Finally check for command trigger (lowest priority)
         elif contains_command_trigger:
             print(f"DEBUG: COMMAND TRIGGER DETECTED in buffer: '{transcription}'")
             logger.info(f"Command trigger detected in buffered audio")
@@ -1826,7 +1908,7 @@ def process_audio_buffer():
             print(f"DEBUG: Failed to delete temp file: {e}")
         
         # If no trigger was detected, we need to reset the RECORDING flag
-        if not contains_command_trigger and not contains_dictation_trigger:
+        if not contains_command_trigger and not contains_dictation_trigger and not contains_jarvis_trigger:
             print("DEBUG: No trigger words detected in buffer, returning to listening mode")
             RECORDING = False
             
@@ -1972,6 +2054,29 @@ if __name__ == "__main__":
         logger.info("Initializing audio recorder...")
         recorder = AudioRecorder()
         
+        # Initialize JARVIS assistant
+        logger.info("Initializing JARVIS assistant...")
+        try:
+            assistant.init_assistant()
+            logger.info("JARVIS assistant initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing JARVIS assistant: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # Continue without JARVIS if it fails to initialize
+        
+        # Test the speech synthesis system
+        logger.info("Testing speech synthesis...")
+        try:
+            # Quick test of speech synthesis with minimal output
+            tts.speak("Voice assistant initialized", block=True)
+            logger.info("Speech synthesis working correctly")
+        except Exception as e:
+            logger.error(f"Error testing speech synthesis: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # Continue without speech if it fails
+        
         # Check if whisper model can be loaded
         try:
             logger.info(f"Testing Whisper model load: {MODEL_SIZE}")
@@ -1998,9 +2103,10 @@ if __name__ == "__main__":
         
         logger.info("=== Voice Control Ready ===")
         logger.info("ALWAYS LISTENING with ROLLING BUFFER")
-        logger.info("TWO TRIGGER WORDS for TWO SEPARATE MODES:")
+        logger.info("THREE TRIGGER WORDS:")
         logger.info(f"1. COMMAND TRIGGER: Say '{COMMAND_TRIGGER}' to activate command mode")
         logger.info(f"2. DICTATION TRIGGER: Say '{DICTATION_TRIGGER}' to activate dictation mode")
+        logger.info(f"3. ASSISTANT TRIGGER: Say 'hey Jarvis' to activate conversational assistant")
         logger.info(f"MUTE TOGGLE: Press Ctrl+Shift+M to mute/unmute voice control")
         logger.info("")
         logger.info("HOW IT WORKS:")
@@ -2017,11 +2123,16 @@ if __name__ == "__main__":
         logger.info("   Everything you say after will be typed at the cursor position")
         logger.info("   To exit dictation mode, stop speaking for 4 seconds")
         logger.info("")
+        logger.info("JARVIS ASSISTANT MODE: Talk to a conversational assistant")
+        logger.info("   Say 'hey Jarvis' to activate the conversational assistant")
+        logger.info("   Ask questions like 'what time is it' or 'tell me a joke'")
+        logger.info("   Say 'go to sleep' to exit assistant mode")
+        logger.info("")
         logger.info("Press Ctrl+C or ESC to exit")
         
         # Wait longer before starting continuous listening to make sure everything is initialized
         logger.info("Waiting 5 seconds before starting continuous listening mode...")
-        print(f"DEBUG: System will begin listening for trigger words '{COMMAND_TRIGGER}' or '{DICTATION_TRIGGER}' in 5 seconds")
+        print(f"DEBUG: System will begin listening for trigger words '{COMMAND_TRIGGER}', '{DICTATION_TRIGGER}', or 'hey Jarvis' in 5 seconds")
         
         def delayed_start():
             # Wait 5 seconds for all subsystems to initialize
