@@ -1,9 +1,9 @@
 # Whisper Voice Control Coding Guidelines
 
 ## Commands
-- Run daemon: `python src/daemon.py`
-- Run refactored daemon: `python src/daemon_refactored.py`
+- Run daemon: `python src/daemon.py`  # Now uses unified modular architecture
 - Run simplified daemon: `python src/simple_dictation.py`
+- Run ultra simplified version: `python src/ultra_simple_dictation.py`
 - Check permissions: `python src/permissions_check.py`
 - Test specific module: `python src/test_*.py`
 - Install deps: `pip install -r requirements.txt`
@@ -57,7 +57,7 @@
   - Minimum recording duration: 3 seconds
   - Silence thresholds: 300 (command), 400 (dictation), 500 (trigger)
 
-## Refactored System Architecture
+## Current System Architecture (Unified)
 - **Modular Components**:
   - `state_manager.py`: Centralized state management
   - `audio_recorder.py`: Audio recording functionality
@@ -66,7 +66,7 @@
   - `dictation.py`: Dictation processing
   - `hotkey_manager.py`: Keyboard hotkey handling
   - `continuous_recorder.py`: Continuous audio recording with buffer
-  - `daemon_refactored.py`: Main daemon with simplified logic
+  - `daemon.py`: Main daemon with modular architecture
 
 - **Recommended LLM Models**:
   - Qwen2-0.5B-Instruct: Lightweight, fast response
@@ -83,20 +83,19 @@
   - Dictation not working (multiple fixes for "dictate" command recognition)
   - LLM response parsing errors (try different model architecture)
 
-## Recent Refactoring Project
+## Recent System Unification Project
 - **What we accomplished**:
-  - Created modular architecture by splitting monolithic daemon.py
-  - Enhanced LLM interpreter to support better models
-  - Improved prompt engineering for command interpretation
-  - Added better support for multiple model architectures
-  - Fixed import statements to ensure proper module resolution
+  - Unified daemon.py with modular architecture (removed duplicate code)
+  - Created a simpler version for users who need minimal functionality
+  - Ensured all tests work with the new unified architecture
+  - Improved import path handling for better module resolution
+  - Maintained backward compatibility with existing scripts
 
 - **Files modified**:
-  - Created/refactored: state_manager.py, audio_recorder.py, audio_processor.py, 
-    trigger_detection.py, dictation.py, hotkey_manager.py, continuous_recorder.py, 
-    daemon_refactored.py
-  - Enhanced: llm_interpreter.py
-  - Updated docs: models/README.md
+  - Updated: daemon.py to use modular architecture
+  - Created: ultra_simple_dictation.py for minimal functionality
+  - Removed: daemon_refactored.py (merged into daemon.py)
+  - Updated docs: CLAUDE.md
 
 ## Enhanced Voice Model Implementation
 
