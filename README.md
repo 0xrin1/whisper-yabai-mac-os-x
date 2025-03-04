@@ -154,32 +154,50 @@ The system uses an advanced voice model based on your voice characteristics:
 
 For truly lifelike voice that sounds like you:
 
-1. Record voice samples as above
+1. Record voice samples as above (40+ samples recommended for best quality)
 
-2. Train a maximum-quality neural model on GPU:
+2. Configure your GPU server details in `.env` file:
    ```
-   cd gpu_scripts
-   ./neural_voice_trainer.sh --samples-dir ../training_samples --epochs 5000
+   GPU_SERVER_HOST=your-gpu-server-ip
+   GPU_SERVER_PORT=22
+   GPU_SERVER_USER=your-username
+   GPU_SERVER_PASSWORD=your-password
    ```
-   This creates a maximum-quality GlowTTS model (512 hidden channels, 24 blocks, 8 layers)
 
-3. Start the neural voice server on your GPU machine:
+3. Set up neural voice environment on GPU server:
    ```
+   ./setup_neural_voice.sh
+   ```
+   This transfers your samples and sets up the environment on your GPU server
+
+4. Train a high-performance neural model directly on your GPU server:
+   ```
+   ssh your-username@your-gpu-server-ip
+   cd neural_voice_model/code
+   python train_neural_voice.py --samples-dir ../samples --output-dir ../models --epochs 5000
+   ```
+   This creates a maximum-quality Tacotron2 model utilizing the full power of your RTX 3090 GPU
+
+5. Start the neural voice server on your GPU machine:
+   ```
+   cd neural_voice_model/code
    ./start_neural_server.sh
    ```
-   The server will provide high-quality voice synthesis via HTTP API
+   The server will provide high-quality voice synthesis via HTTP API on port 5001
 
-4. On your client machine, configure the neural server address:
+6. On your client machine, configure the neural server address:
    ```
-   export NEURAL_SERVER=http://your-gpu-server-ip:5000
+   export NEURAL_SERVER="http://your-gpu-server-ip:5001"
    ```
 
-5. Test your neural voice:
+7. Test your neural voice:
    ```
-   python -c "import src.neural_voice_client as nvc; nvc.speak('This is my neural voice speaking')"
+   python test_neural_voice.py
    ```
 
 The system will automatically use the best available voice, prioritizing the GPU-based neural model when available and falling back to parameter-based voice when the GPU server is offline.
+
+For detailed setup instructions, see `NEURAL_VOICE_GUIDE.md`
 
 ## Voice Commands
 
@@ -358,23 +376,27 @@ Examples of commands that work with LLM interpretation:
 #### Neural Voice Model Issues
 
 - If the neural voice client can't connect to the server:
-  - Check that the GPU server is running with `./gpu_scripts/start_neural_server.sh`
+  - Check that the GPU server is running with `./start_neural_server.sh` on the GPU server
   - Verify the server URL is correct in the `NEURAL_SERVER` environment variable
-  - Check that port 5000 is open on the GPU server's firewall
-  - Ensure the client can reach the server (try `curl http://your-gpu-server:5000/info`)
+  - Check that port 5001 is open on the GPU server's firewall
+  - Ensure the client can reach the server (try `curl http://your-gpu-server-ip:5001/info`)
+  - Verify the GPU server is on the same network or properly port-forwarded
 
 - If the neural voice quality is not good enough:
-  - Increase the model size in `gpu_scripts/neural_voice_trainer.py`
-  - Increase the number of training epochs (5000+ recommended)
+  - Increase the training epochs to 10000 for extended training
+  - Check GPU logs to ensure full GPU utilization during training
   - Provide more voice samples (40+ high-quality samples recommended)
-  - Try different audio preprocessing parameters
-  - Ensure your GPU has enough VRAM (10GB+ recommended)
+  - Make sure samples include diverse speech patterns and intonations
+  - Ensure your GPU has enough VRAM (RTX 3090 with 24GB recommended)
+  - Try adjusting the model configuration parameters in `train_neural_voice.py`
 
 - Server performance issues:
-  - Use a dedicated GPU for inference (RTX 3070 or better recommended)
-  - Increase the server's cache size in `gpu_scripts/neural_voice_server.py`
+  - Use a dedicated GPU for inference (RTX 3090 or better recommended)
+  - Check GPU memory usage with `nvidia-smi` while the server is running
+  - Increase the server's cache size in `neural_voice_server.py`
   - Use a faster network connection between client and server
   - Consider running the server on the same network as the client to reduce latency
+  - Try increasing the batch size for faster inference if your GPU has sufficient memory
 
 ### LLM Troubleshooting
 
