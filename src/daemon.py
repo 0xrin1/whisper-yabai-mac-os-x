@@ -21,6 +21,12 @@ import whisper
 import pyautogui
 from pynput import keyboard
 from dotenv import load_dotenv
+# Import torch for memory management
+try:
+    import torch
+except ImportError:
+    # If torch is not available, provide a fallback
+    torch = None
 
 # Import our LLM interpreter
 from llm_interpreter import CommandInterpreter
@@ -205,16 +211,17 @@ class AudioRecorder:
         
         # For silence detection - adjust thresholds based on mode
         # Lower threshold means more audio will be considered "speech" rather than "silence"
+        # Lowering thresholds to better detect quiet voices and distant microphones
         if trigger_mode:
-            SILENCE_THRESHOLD = 500  # Standard for trigger detection
-            max_silence_seconds = 0.5  # Quick timeout for trigger detection
+            SILENCE_THRESHOLD = 200  # Significantly lower for better trigger detection
+            max_silence_seconds = 0.7  # Slightly longer timeout for trigger detection
         elif dictation_mode:
-            SILENCE_THRESHOLD = 350  # Even lower for dictation to catch softer speech
-            max_silence_seconds = 4.0  # Longer timeout for dictation to avoid premature cutoff
+            SILENCE_THRESHOLD = 150  # Much lower for dictation to catch softer speech
+            max_silence_seconds = 4.5  # Longer timeout for dictation to avoid premature cutoff
         else:
             # For command mode, use even lower threshold and longer timeout
-            SILENCE_THRESHOLD = 250  # Much lower threshold to avoid cutting off commands
-            max_silence_seconds = 5.0  # Much longer timeout for commands (5 seconds)
+            SILENCE_THRESHOLD = 120  # Extremely low threshold to avoid cutting off commands
+            max_silence_seconds = 5.5  # Much longer timeout for commands (5.5 seconds)
             
         silence_frames = 0
         max_silence_frames = int(frames_per_second * max_silence_seconds)
@@ -916,11 +923,35 @@ def process_audio():
                     AUDIO_QUEUE.task_done()
                     continue
                 
-                # Normal transcription for command/dictation modes
-                result = WHISPER_MODEL.transcribe(audio_file)
-                transcription = result["text"].strip()
-                confidence = result.get("confidence", 1.0)
-                print(f"DEBUG: Transcription: '{transcription}', confidence: {confidence:.2f}")
+                # Normal transcription for command/dictation modes with context clearing
+                try:
+                    # Create fresh transcription context each time
+                    result = WHISPER_MODEL.transcribe(
+                        audio_file,
+                        initial_prompt=None  # Explicitly clear prompt context
+                    )
+                    # Force memory cleanup to prevent context accumulation
+                    torch.cuda.empty_cache() if hasattr(torch, 'cuda') and torch is not None else None
+                    
+                    transcription = result["text"].strip()
+                    confidence = result.get("confidence", 1.0)
+                    print(f"DEBUG: Transcription: '{transcription}', confidence: {confidence:.2f}")
+                except Exception as e:
+                    print(f"DEBUG: Error during audio transcription: {e}")
+                    # Try to reload the model if transcription failed
+                    try:
+                        print("DEBUG: Attempting to reload Whisper model due to error")
+                        WHISPER_MODEL = whisper.load_model(MODEL_SIZE)
+                        # Retry transcription with fresh model
+                        result = WHISPER_MODEL.transcribe(audio_file)
+                        transcription = result["text"].strip()
+                        confidence = result.get("confidence", 1.0)
+                        print(f"DEBUG: Transcription (after reload): '{transcription}', confidence: {confidence:.2f}")
+                    except Exception as reload_err:
+                        print(f"DEBUG: Failed to reload model: {reload_err}")
+                        notify_error("Speech recognition failed. Please try again.")
+                        AUDIO_QUEUE.task_done()
+                        continue
                 
                 # Clean up the audio file
                 try:
@@ -1386,7 +1417,7 @@ def process_trigger_audio(audio_file):
     Returns:
         bool: True if trigger word detected, False otherwise
     """
-    global TRIGGER_DETECTED, COMMAND_TRIGGER, DICTATION_TRIGGER, RECORDING
+    global TRIGGER_DETECTED, COMMAND_TRIGGER, DICTATION_TRIGGER, RECORDING, WHISPER_MODEL
     
     # Add a marker for debugging
     print("DEBUG: ========== TRIGGER DETECTION STARTED ==========")
@@ -1415,12 +1446,43 @@ def process_trigger_audio(audio_file):
             print(f"DEBUG: Trigger audio file too small ({file_size} bytes), likely no speech")
             return False
         
-        # Use the same model but with a shorter output
-        result = WHISPER_MODEL.transcribe(
-            audio_file, 
-            language="en",
-            fp16=False  # Use more precise but slower processing for trigger detection
-        )
+        # CRITICAL FIX: Clear Whisper's internal context between calls to prevent garbled detection
+        # This is important as the Whisper model can accumulate context between calls
+        if WHISPER_MODEL is not None:
+            # Force a new transcription context by creating fresh options
+            # This prevents context accumulation between detection attempts
+            options = whisper.DecodingOptions(language="en", fp16=False)
+            
+            # Transcribe with fresh context each time
+            try:
+                # Use transcribe with explicit options to ensure context reset
+                result = WHISPER_MODEL.transcribe(
+                    audio_file, 
+                    language="en",
+                    fp16=False,  # Use more precise but slower processing for trigger detection
+                    initial_prompt=None,  # Explicitly clear any prompt context
+                )
+                # Force model to release any memory that might be accumulating
+                torch.cuda.empty_cache() if hasattr(torch, 'cuda') else None
+            except Exception as model_err:
+                print(f"DEBUG: Error during model transcription: {model_err}")
+                # Try to reload the model if transcription failed
+                try:
+                    print("DEBUG: Attempting to reload Whisper model due to error")
+                    WHISPER_MODEL = whisper.load_model(MODEL_SIZE)
+                    # Retry transcription with fresh model
+                    result = WHISPER_MODEL.transcribe(
+                        audio_file,
+                        language="en",
+                        fp16=False
+                    )
+                except Exception as reload_err:
+                    print(f"DEBUG: Failed to reload model: {reload_err}")
+                    return False
+        else:
+            print("DEBUG: WARNING - Whisper model not loaded, cannot transcribe")
+            return False
+            
         transcription = result["text"].strip().lower()
         
         print(f"DEBUG: Trigger detection heard: '{transcription}'")
@@ -1639,9 +1701,9 @@ def continuous_recording_thread():
         p = pyaudio.PyAudio()
         
         # Initialize energy detection variables
-        energy_threshold = 300  # Threshold for detecting voice activity
+        energy_threshold = 120  # Much lower threshold for detecting voice activity (making it more sensitive)
         silence_frames = 0
-        max_silence_frames = int(rate / chunk * 0.5)  # 0.5 seconds of silence
+        max_silence_frames = int(rate / chunk * 0.8)  # 0.8 seconds of silence (slightly longer before deciding speech is over)
         has_speech = False
         
         # Calculate buffer size
@@ -1784,13 +1846,35 @@ def process_audio_buffer():
         
         print(f"DEBUG: Audio buffer saved to {temp_filename}")
         
-        # Use Whisper to transcribe the buffer
-        result = WHISPER_MODEL.transcribe(
-            temp_filename,
-            language="en",
-            fp16=False
-        )
-        transcription = result["text"].strip().lower()
+        # Use Whisper to transcribe the buffer with context clearing
+        try:
+            # Create fresh transcription options to prevent context accumulation
+            result = WHISPER_MODEL.transcribe(
+                temp_filename,
+                language="en",
+                fp16=False,
+                initial_prompt=None  # Explicitly clear prompt context
+            )
+            # Force memory cleanup to prevent context accumulation
+            torch.cuda.empty_cache() if hasattr(torch, 'cuda') and torch is not None else None
+            transcription = result["text"].strip().lower()
+        except Exception as e:
+            print(f"DEBUG: Error during buffer transcription: {e}")
+            # Try to reload the model if transcription failed
+            try:
+                print("DEBUG: Attempting to reload Whisper model due to error")
+                WHISPER_MODEL = whisper.load_model(MODEL_SIZE)
+                # Retry transcription with fresh model
+                result = WHISPER_MODEL.transcribe(
+                    temp_filename,
+                    language="en",
+                    fp16=False
+                )
+                transcription = result["text"].strip().lower()
+            except Exception as reload_err:
+                print(f"DEBUG: Failed to reload model: {reload_err}")
+                RECORDING = False
+                return
         
         print(f"DEBUG: Buffer transcription: '{transcription}'")
         

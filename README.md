@@ -9,11 +9,13 @@ A voice command daemon that uses OpenAI's Whisper model locally to control your 
 - Audio feedback with sounds for recording start/stop and completion
 - Yabai window manager integration for advanced window management
 - Continuous listening mode that automatically processes commands
-- LLM-powered natural language command interpretation
+- LLM-powered natural language command interpretation with multiple model support
 - Dynamic response generation for ambiguous commands
 - Ability to open applications, type text, manipulate windows, and more
 - Extensible command system
 - Support for non-standard keyboard layouts during dictation
+- Modular, refactored architecture for easier maintenance
+- Support for multiple LLM architectures (Qwen, DeepSeek, LLaMA)
 
 ## Prerequisites
 
@@ -272,12 +274,16 @@ Examples of commands that work with LLM interpretation:
   - You have sufficient RAM for the model size you're using
 - If LLM inference is slow, try:
   - Using a smaller, more quantized model (e.g., Q4_K_M instead of Q8_0)
+  - Recommended lightweight models: Qwen2-0.5B or DeepSeek-Coder-1.3B
   - Increasing the number of threads in `.env` if you have more CPU cores
+  - Enabling GPU acceleration if available
   - Setting `USE_LLM=false` to disable LLM features if performance is critical
 - If commands aren't being interpreted correctly:
   - Try different phrasings
   - Check logs to see the LLM's interpretation
-  - Consider trying a different model if available
+  - Try a different model architecture (Qwen, DeepSeek, LLaMA)
+  - Adjust model parameters in the `.env` file
+  - Check models/README.md for recommended models and configurations
 
 ## License
 

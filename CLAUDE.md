@@ -2,6 +2,7 @@
 
 ## Commands
 - Run daemon: `python src/daemon.py`
+- Run refactored daemon: `python src/daemon_refactored.py`
 - Run simplified daemon: `python src/simple_dictation.py`
 - Check permissions: `python src/permissions_check.py`
 - Test specific module: `python src/test_*.py`
@@ -19,6 +20,7 @@
 - Exception handling with specific exception types
 - Log errors with appropriate logging levels
 - Use f-strings for string formatting
+- Use absolute imports with `src.` prefix (e.g., `from src.module import X`)
 
 ## System Architecture
 - **Dual-Mode Operation**:
@@ -41,12 +43,35 @@
   - Processes audio asynchronously in worker thread
   - Detects commands through multiple parsing methods
 
+- **LLM Command Interpretation**:
+  - Supports multiple model architectures (Qwen, DeepSeek, LLaMA)
+  - Model-specific prompt formats
+  - Improved JSON parsing and error handling
+  - Supports 4096 token context window
+  - GPU acceleration support
+
 - **Key Parameters**:
   - Trigger word: "hey"
   - Default command recording: 7 seconds
   - Default dictation recording: 10 seconds 
   - Minimum recording duration: 3 seconds
   - Silence thresholds: 300 (command), 400 (dictation), 500 (trigger)
+
+## Refactored System Architecture
+- **Modular Components**:
+  - `state_manager.py`: Centralized state management
+  - `audio_recorder.py`: Audio recording functionality
+  - `audio_processor.py`: Audio processing and transcription
+  - `trigger_detection.py`: Trigger word detection
+  - `dictation.py`: Dictation processing
+  - `hotkey_manager.py`: Keyboard hotkey handling
+  - `continuous_recorder.py`: Continuous audio recording with buffer
+  - `daemon_refactored.py`: Main daemon with simplified logic
+
+- **Recommended LLM Models**:
+  - Qwen2-0.5B-Instruct: Lightweight, fast response
+  - DeepSeek-Coder-1.3B-Instruct: Better command interpretation
+  - See models/README.md for installation instructions
 
 ## Troubleshooting
 - Mute toggle with Ctrl+Shift+M if system gets stuck
@@ -56,3 +81,25 @@
   - Recording stops too early (fixed with longer min duration)
   - Whisper model loading issues (check installation)
   - Dictation not working (multiple fixes for "dictate" command recognition)
+  - LLM response parsing errors (try different model architecture)
+
+## Recent Refactoring Project
+- **What we accomplished**:
+  - Created modular architecture by splitting monolithic daemon.py
+  - Enhanced LLM interpreter to support better models
+  - Improved prompt engineering for command interpretation
+  - Added better support for multiple model architectures
+  - Fixed import statements to ensure proper module resolution
+
+- **Files modified**:
+  - Created/refactored: state_manager.py, audio_recorder.py, audio_processor.py, 
+    trigger_detection.py, dictation.py, hotkey_manager.py, continuous_recorder.py, 
+    daemon_refactored.py
+  - Enhanced: llm_interpreter.py
+  - Updated docs: models/README.md
+
+- **Next steps**:
+  - Test refactored system end-to-end
+  - Download and test recommended Qwen2/DeepSeek models
+  - Optimize test suite
+  - Perform comparison testing between original and refactored systems
