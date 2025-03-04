@@ -123,7 +123,11 @@ There are two versions of the daemon:
 
 ### Creating an Enhanced Custom Voice Model
 
-The system uses an advanced voice model based on your voice characteristics for natural-sounding responses:
+The system supports two types of voice models:
+
+#### 1. Parameter-Based Voice Model (Simple)
+
+The system uses an advanced voice model based on your voice characteristics:
 
 1. Record voice samples with the training utility:
    ```
@@ -142,19 +146,40 @@ The system uses an advanced voice model based on your voice characteristics for 
 
 3. Test your custom voice:
    ```
-   python test_neural_voice.py
+   python -c "import src.speech_synthesis as speech; speech.test_voices()"
    ```
    This compares your custom voice with standard system voices.
 
-4. The system automatically uses your custom voice for all responses with:
-   - Dynamic pitch and rate adjustments
-   - Context-aware voice changes (questions, statements, exclamations)
-   - Personalized voice characteristics
+#### 2. GPU-Accelerated Neural Voice Model (Advanced)
 
-5. To switch back to default system voices:
+For truly lifelike voice that sounds like you:
+
+1. Record voice samples as above
+
+2. Train a maximum-quality neural model on GPU:
    ```
-   rm voice_models/active_model.json
+   cd gpu_scripts
+   ./neural_voice_trainer.sh --samples-dir ../training_samples --epochs 5000
    ```
+   This creates a maximum-quality GlowTTS model (512 hidden channels, 24 blocks, 8 layers)
+
+3. Start the neural voice server on your GPU machine:
+   ```
+   ./start_neural_server.sh
+   ```
+   The server will provide high-quality voice synthesis via HTTP API
+
+4. On your client machine, configure the neural server address:
+   ```
+   export NEURAL_SERVER=http://your-gpu-server-ip:5000
+   ```
+
+5. Test your neural voice:
+   ```
+   python -c "import src.neural_voice_client as nvc; nvc.speak('This is my neural voice speaking')"
+   ```
+
+The system will automatically use the best available voice, prioritizing the GPU-based neural model when available and falling back to parameter-based voice when the GPU server is offline.
 
 ## Voice Commands
 
@@ -306,33 +331,50 @@ Examples of commands that work with LLM interpretation:
   - Try clicking on the text field before dictating
   - For non-standard keyboard layouts, the clipboard-based paste approach should work
 
-### Enhanced Voice Model Troubleshooting
+### Voice Model Troubleshooting
+
+#### Parameter-Based Voice Model Issues
 
 - If the custom voice isn't working properly:
   - Check that `voice_models/active_model.json` exists and points to a valid model
   - Verify the voice profile was created correctly in the metadata.json file
-  - Run `python test_neural_voice.py` to compare with system voices
+  - Run `python -c "import src.speech_synthesis as speech; speech.test_voices()"` to test voices
   - Try `python src/speech_synthesis.py` to test individual voices
 
-- For better voice quality:
+- For better parameter-based voice quality:
   - Record at least 40+ voice samples with diverse speech patterns
   - Include a mix of commands, dictation, and natural speech
   - Record in a quiet environment with a good microphone
   - Use varied intonation for different types of phrases
   - Record some questions, statements, and exclamations
 
-- Fine-tuning your voice model:
+- Fine-tuning your parameter-based voice model:
   - Customize parameters in `speech_synthesis.py` for your specific voice
   - Adjust base voice selection (`Daniel`, `Samantha`, `Alex` work best)
   - Try different pitch modifiers (0.92-0.98 range)
   - Modify rate parameters for more natural speed
   - Create a new model with `./create_voice_model.sh` after making changes
 
-- Advanced customization:
-  - The system now uses dynamic voice adjustments based on context
-  - Questions automatically use different parameters than statements
-  - Advanced analysis extracts voice characteristics from your recordings
-  - Voice profiles intelligently select optimal parameters
+#### Neural Voice Model Issues
+
+- If the neural voice client can't connect to the server:
+  - Check that the GPU server is running with `./gpu_scripts/start_neural_server.sh`
+  - Verify the server URL is correct in the `NEURAL_SERVER` environment variable
+  - Check that port 5000 is open on the GPU server's firewall
+  - Ensure the client can reach the server (try `curl http://your-gpu-server:5000/info`)
+
+- If the neural voice quality is not good enough:
+  - Increase the model size in `gpu_scripts/neural_voice_trainer.py`
+  - Increase the number of training epochs (5000+ recommended)
+  - Provide more voice samples (40+ high-quality samples recommended)
+  - Try different audio preprocessing parameters
+  - Ensure your GPU has enough VRAM (10GB+ recommended)
+
+- Server performance issues:
+  - Use a dedicated GPU for inference (RTX 3070 or better recommended)
+  - Increase the server's cache size in `gpu_scripts/neural_voice_server.py`
+  - Use a faster network connection between client and server
+  - Consider running the server on the same network as the client to reduce latency
 
 ### LLM Troubleshooting
 
