@@ -54,8 +54,15 @@ dictation_log.txt
 # Temporary files
 *.tmp
 
-# Test files
-src/test_*.py
+# Test files (except for JARVIS test which should be included)
+src/test_clipboard.py
+src/test_dictation_flag.py
+src/test_e2e.py
+src/test_keyboard.py
+src/test_notifications.py
+src/test_trigger_words.py
+src/test_type_command.py
+src/test_typing_methods.py
 src/simple_dictation.py
 src/direct_typing.py
 src/direct_dictation.py

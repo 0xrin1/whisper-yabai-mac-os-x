@@ -12,12 +12,18 @@ import threading
 import random
 import datetime
 import re
+import shutil
 from typing import Dict, List, Optional, Tuple, Any
 
 # Import our own modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src import speech_synthesis as tts
 from src.toast_notifications import send_notification
+
+# Status display constants
+STATUS_LINE = 0
+STATUS_PREFIX = "JARVIS STATUS: "
+last_status = ""
 
 # Constants for assistant behavior
 ASSISTANT_NAME = "JARVIS"
@@ -177,50 +183,67 @@ def activate_assistant(voice: str = None) -> None:
     assistant_state["conversational_mode"] = True
     assistant_state["last_interaction_time"] = time.time()
     
-    # Speak a greeting immediately to provide feedback
-    tts.speak(
-        random.choice(RESPONSES["greeting"]), 
-        voice=assistant_state["voice"],
-        block=True  # Block until speech is complete
-    )
+    # Update the console status (instead of printing a new line)
+    update_status(f"{ASSISTANT_NAME} activated")
     
-    # Play a distinct sound to indicate active listening
+    # Play a distinct sound to indicate activation
     try:
-        subprocess.run(["afplay", "/System/Library/Sounds/Blow.aiff"], check=False)
+        subprocess.run(["afplay", "/System/Library/Sounds/Submarine.aiff"], check=False)
     except Exception:
         pass
+        
+    # Small pause to make sure sound is heard
+    time.sleep(0.3)
     
-    # Show notification
-    send_notification(
-        f"{ASSISTANT_NAME} Active",
-        "Voice assistant is now listening",
-        timeout=3
-    )
+    # Proactively ask what the user wants (starting the conversation)
+    question = random.choice([
+        f"How can I assist you today, {USER_NAME}?",
+        f"What can I help you with, {USER_NAME}?",
+        f"I'm at your service. What do you need?",
+        f"Ready and listening. What would you like me to do?"
+    ])
     
-    # Announce that we're listening
-    print(f"DEBUG: {ASSISTANT_NAME} activated and listening for commands")
+    # Speak the question
+    update_status(f"{ASSISTANT_NAME} speaking: '{question}'")
+    tts.speak(question, voice=assistant_state["voice"], block=True)
+    
+    # Add to conversation memory
+    add_to_memory("assistant", question)
+    
+    # Indicate we're now listening
+    update_status(f"{ASSISTANT_NAME} listening for command")
+    
+    # No notification needed here - the voice is feedback enough
 
 def deactivate_assistant() -> None:
     """Deactivate the assistant with a farewell message."""
     if not assistant_state["active"]:
         return
-        
+    
+    # Update status display    
+    update_status("Deactivating assistant")
+    
     # Speak a farewell message
+    farewell = random.choice(RESPONSES["farewell"])
+    update_status(f"Speaking farewell: '{farewell}'")
     tts.speak(
-        random.choice(RESPONSES["farewell"]),
-        voice=assistant_state["voice"]
+        farewell,
+        voice=assistant_state["voice"],
+        block=True  # Wait for farewell to complete
     )
     
     # Update state
     assistant_state["active"] = False
     assistant_state["conversational_mode"] = False
     
-    # Show notification
-    send_notification(
-        f"{ASSISTANT_NAME} Deactivated",
-        "Voice assistant is now in standby mode",
-        timeout=3
-    )
+    # Clear status line but don't send a notification
+    update_status("Assistant deactivated - standby mode")
+    
+    # Play a sound to indicate deactivation
+    try:
+        subprocess.run(["afplay", "/System/Library/Sounds/Submarine.aiff"], check=False)
+    except Exception:
+        pass
 
 def handle_user_input(text: str) -> str:
     """Process user input and generate appropriate response.
@@ -351,13 +374,43 @@ def list_abilities() -> str:
     
     return f"Here's what I can do: {'. '.join(capabilities)}."
 
+def update_status(status: str) -> None:
+    """Update the status display in the terminal.
+    
+    Args:
+        status: The status message to display
+    """
+    global last_status
+    
+    # Only update if status changed
+    if status == last_status:
+        return
+        
+    last_status = status
+    
+    # Get terminal size
+    terminal_width = shutil.get_terminal_size().columns
+    
+    # Create full status line with padding
+    full_status = f"{STATUS_PREFIX}{status}"
+    padding = " " * (terminal_width - len(full_status))
+    padded_status = full_status + padding
+    
+    # Move cursor to status line, print status, and return cursor
+    sys.stdout.write(f"\033[s")  # Save cursor position
+    sys.stdout.write(f"\033[{STATUS_LINE};0H")  # Move to status line
+    sys.stdout.write(f"\033[K")  # Clear line
+    sys.stdout.write(f"\033[1;32m{padded_status}\033[0m")  # Print green status
+    sys.stdout.write(f"\033[u")  # Restore cursor position
+    sys.stdout.flush()
+
 def process_voice_command(transcription: str) -> None:
     """Process a voice command from the main voice control system.
     
     Args:
         transcription: The transcribed user speech
     """
-    print(f"DEBUG: JARVIS processing: '{transcription}'")
+    update_status(f"Processing: '{transcription}'")
     
     # Only process in active conversational mode
     if not assistant_state["active"] or not assistant_state["conversational_mode"]:
@@ -375,22 +428,16 @@ def process_voice_command(transcription: str) -> None:
             # Remove wake word before processing
             clean_text = re.sub(r'^hey\s+|jarvis\s+', '', transcription.lower()).strip()
             if clean_text:  # If there's remaining text
-                print(f"DEBUG: Processing command after wake word: '{clean_text}'")
-                # Add small delay to ensure wake sound completes
-                time.sleep(0.3)
+                update_status(f"Processing command: '{clean_text}'")
                 # Process the command
                 response = handle_user_input(clean_text)
+                update_status(f"Speaking: '{response}'")
                 tts.speak(response, voice=assistant_state["voice"], block=True)
-                
-                # Play a sound to indicate we're done and listening again
-                try:
-                    subprocess.run(["afplay", "/System/Library/Sounds/Blow.aiff"], check=False)
-                except Exception:
-                    pass
+                update_status("Listening for next command")
         return
     
     # Process transcription and respond with clear audio feedback
-    print(f"DEBUG: Processing command in active mode: '{transcription}'")
+    update_status(f"Processing command: '{transcription}'")
     
     # First play an acknowledgment sound so user knows we heard them
     try:
@@ -398,21 +445,13 @@ def process_voice_command(transcription: str) -> None:
     except Exception:
         pass
     
-    # Small delay to let sound finish
-    time.sleep(0.2)
-    
     # Generate response
     response = handle_user_input(transcription)
     
     # Speak response and block until complete
-    print(f"DEBUG: JARVIS response: '{response}'")
+    update_status(f"Speaking: '{response}'")
     tts.speak(response, voice=assistant_state["voice"], block=True)
-    
-    # Play a sound to indicate we're listening again
-    try:
-        subprocess.run(["afplay", "/System/Library/Sounds/Blow.aiff"], check=False)
-    except Exception:
-        pass
+    update_status("Listening for next command")
     
     # Update last interaction time
     assistant_state["last_interaction_time"] = time.time()
@@ -427,58 +466,138 @@ def should_timeout() -> bool:
         return False
         
     # Check if it's been too long since the last interaction
-    timeout_seconds = 60  # 1 minute without interaction (reduced from 2 minutes)
+    timeout_seconds = 60  # 1 minute without interaction
     time_since_last = time.time() - assistant_state["last_interaction_time"]
     
     # Log timeout status for debugging
-    if time_since_last > 30:  # If we're halfway to timeout, log it
-        print(f"DEBUG: JARVIS timeout in {timeout_seconds - time_since_last:.1f} seconds if no interaction")
+    if time_since_last > 30 and time_since_last < 31:  # Only log once when we cross 30 seconds
+        update_status(f"Timeout in {timeout_seconds - time_since_last:.1f} seconds if no interaction")
+    elif time_since_last > 45 and time_since_last < 46:  # Only log once when we cross 45 seconds
+        update_status(f"Timeout imminent in {timeout_seconds - time_since_last:.1f} seconds")
     
     return time_since_last > timeout_seconds
 
 def check_timeout_thread() -> None:
     """Thread to check for assistant timeouts."""
     while True:
-        if should_timeout():
-            print("Assistant timed out due to inactivity")
-            deactivate_assistant()
-        
-        # Check every 30 seconds
-        time.sleep(30)
+        try:
+            if should_timeout():
+                update_status("Timing out due to inactivity")
+                deactivate_assistant()
+            
+            # Check more frequently for more responsive timeout messages
+            time.sleep(1)
+        except Exception as e:
+            # Don't let exceptions in the timeout thread crash the program
+            update_status(f"Error in timeout thread: {e}")
+            time.sleep(5)  # Longer sleep on error
 
 def init_assistant() -> None:
     """Initialize the assistant module."""
+    # Clear terminal and set up status line
+    sys.stdout.write("\033[2J")  # Clear screen
+    sys.stdout.write("\033[H")   # Move cursor to home position
+    
+    # Print header for status display
+    terminal_width = shutil.get_terminal_size().columns
+    header = f"=== {ASSISTANT_NAME} VOICE ASSISTANT ==="
+    padding = "=" * ((terminal_width - len(header)) // 2)
+    sys.stdout.write(f"\033[1;34m{padding}{header}{padding}\033[0m\n\n")
+    sys.stdout.flush()
+    
+    # Show initial status
+    update_status("Initializing")
+    
     # Start timeout checking thread
     timeout_thread = threading.Thread(target=check_timeout_thread, daemon=True)
     timeout_thread.start()
     
-    print(f"{ASSISTANT_NAME} initialized and ready")
+    update_status(f"Assistant initialized and ready - say 'Hey {ASSISTANT_NAME}' to begin")
 
 def test_assistant() -> None:
-    """Test the assistant functionality."""
-    print("Testing assistant module...")
+    """Run comprehensive tests for the assistant functionality.
     
-    # Activate
-    activate_assistant()
-    time.sleep(1)
+    This implements a TDD approach to verify all functionality works.
+    """
+    # Init screen for status display
+    sys.stdout.write("\033[2J")  # Clear screen
+    sys.stdout.write("\033[H")   # Move cursor to home position
+    sys.stdout.write("\033[1;33m=== JARVIS ASSISTANT TEST SUITE ===\033[0m\n\n")
     
-    # Test a few commands
-    test_commands = [
-        "What time is it?",
-        "Tell me a joke",
-        "What can you do?",
-        "How are you today?",
-        "Go to sleep"
-    ]
+    def run_test(name, func):
+        """Run a single test and report results"""
+        update_status(f"Running test: {name}")
+        try:
+            func()
+            sys.stdout.write(f"\033[1;32m✓ {name}\033[0m\n")
+        except Exception as e:
+            sys.stdout.write(f"\033[1;31m✗ {name}: {e}\033[0m\n")
+            import traceback
+            sys.stdout.write(f"{traceback.format_exc()}\n")
     
-    for cmd in test_commands:
-        print(f"\nTesting: '{cmd}'")
-        response = handle_user_input(cmd)
-        print(f"Assistant: {response}")
-        tts.speak(response, voice=assistant_state["voice"], block=True)
-        time.sleep(0.5)
+    # Test 1: Status display
+    def test_status_display():
+        for status in ["Test status 1", "Test status 2", "A longer test status that should be displayed properly"]:
+            update_status(status)
+            time.sleep(0.5)
+        assert last_status == "A longer test status that should be displayed properly"
     
-    print("\nAssistant test complete")
+    # Test 2: Activation sequence
+    def test_activation():
+        # Reset assistant state
+        assistant_state["active"] = False
+        assistant_state["conversational_mode"] = False
+        
+        # Activate and check state
+        activate_assistant()
+        assert assistant_state["active"] == True
+        assert assistant_state["conversational_mode"] == True
+    
+    # Test 3: Command processing
+    def test_command_processing():
+        test_commands = [
+            "What time is it?",
+            "Tell me a joke",
+            "What can you do?",
+            "How are you today?"
+        ]
+        
+        for cmd in test_commands:
+            update_status(f"Testing command: '{cmd}'")
+            response = handle_user_input(cmd)
+            update_status(f"Response: {response}")
+            # Speak the response but don't block test execution
+            tts.speak(response, voice=assistant_state["voice"], block=False)
+            time.sleep(0.5)
+            # Verify response isn't empty
+            assert response and len(response) > 0
+    
+    # Test 4: Deactivation
+    def test_deactivation():
+        deactivate_assistant()
+        assert assistant_state["active"] == False
+        assert assistant_state["conversational_mode"] == False
+    
+    # Test 5: Timeout mechanism
+    def test_timeout():
+        # Activate, then force timeout
+        activate_assistant()
+        original_time = assistant_state["last_interaction_time"]
+        # Directly modify last interaction time to simulate inactivity
+        assistant_state["last_interaction_time"] = time.time() - 61
+        assert should_timeout() == True
+        # Reset for other tests
+        assistant_state["last_interaction_time"] = original_time
+    
+    # Run all tests
+    run_test("Status Display", test_status_display)
+    run_test("Activation", test_activation)
+    run_test("Command Processing", test_command_processing)  
+    run_test("Deactivation", test_deactivation)
+    run_test("Timeout Mechanism", test_timeout)
+    
+    update_status("All tests complete")
+    sys.stdout.write("\n\033[1;33m=== TEST SUITE COMPLETE ===\033[0m\n")
 
 if __name__ == "__main__":
     # Test the assistant if run directly

@@ -1482,8 +1482,6 @@ def process_trigger_audio(audio_file):
         
         # Process JARVIS assistant trigger first (highest priority)
         if contains_jarvis_trigger:
-            print(f"DEBUG: JARVIS ASSISTANT TRIGGER DETECTED: '{transcription}'")
-            print("DEBUG: ========== ACTIVATING JARVIS ASSISTANT ==========")
             logger.info(f"JARVIS assistant trigger detected: '{transcription}'")
             TRIGGER_DETECTED = True
             
@@ -1491,17 +1489,18 @@ def process_trigger_audio(audio_file):
             try:
                 subprocess.run(["afplay", "/System/Library/Sounds/Submarine.aiff"], check=False)
             except Exception as e:
-                print(f"DEBUG: Failed to play JARVIS notification sound: {e}")
+                logger.error(f"Failed to play JARVIS notification sound: {e}")
                 
             # Forward to the assistant module
             try:
+                # No need for additional debug output or notifications
+                # The assistant will handle all feedback
                 assistant.process_voice_command(transcription)
-                print("DEBUG: Voice command processed by JARVIS assistant")
                 return True
             except Exception as e:
-                print(f"DEBUG: Error processing JARVIS command: {e}")
+                logger.error(f"Error processing JARVIS command: {e}")
                 import traceback
-                print(f"DEBUG: {traceback.format_exc()}")
+                logger.error(traceback.format_exc())
                 return False
         
         # Process dictation trigger next (medium priority)
@@ -1824,36 +1823,23 @@ def process_audio_buffer():
         # Process trigger detections
         # First check for JARVIS assistant trigger (highest priority)
         if contains_jarvis_trigger:
-            print(f"DEBUG: JARVIS ASSISTANT TRIGGER DETECTED in buffer: '{transcription}'")
             logger.info(f"JARVIS assistant trigger detected in buffered audio")
             
             # Play distinctive feedback sound
             try:
                 subprocess.run(["afplay", "/System/Library/Sounds/Submarine.aiff"], check=False)
             except Exception as e:
-                print(f"DEBUG: Failed to play JARVIS notification sound: {e}")
-                
-            # Show notification
-            try:
-                from toast_notifications import send_notification
-                send_notification(
-                    "JARVIS Activated", 
-                    "How can I help you?",
-                    "whisper-jarvis-buffer",
-                    3,
-                    True
-                )
-            except Exception as e:
-                print(f"DEBUG: Failed to show JARVIS notification: {e}")
-                
+                logger.error(f"Failed to play JARVIS notification sound: {e}")
+            
             # Forward the transcription to the assistant module
             try:
+                # No toast notifications - speech feedback is sufficient
+                # The assistant module will handle all user interaction
                 assistant.process_voice_command(transcription)
-                print("DEBUG: Voice command processed by JARVIS assistant")
             except Exception as e:
-                print(f"DEBUG: Error processing JARVIS command: {e}")
+                logger.error(f"Error processing JARVIS command: {e}")
                 import traceback
-                print(f"DEBUG: {traceback.format_exc()}")
+                logger.error(traceback.format_exc())
             
             # Reset recording flag after processing
             RECORDING = False
