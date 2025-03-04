@@ -794,6 +794,14 @@ def process_audio():
             
             AUDIO_QUEUE.task_done()
             
+            # After processing, if continuous listening is enabled and not muted, 
+            # start listening again after a short delay
+            if CONTINUOUS_LISTENING and not MUTED:
+                print("DEBUG: Restarting continuous listening after processing")
+                # Add a small delay to avoid CPU overuse
+                time.sleep(0.5)
+                threading.Thread(target=start_continuous_listening, daemon=True).start()
+            
         except Exception as e:
             logger.error(f"Error in audio processing: {e}")
             notify_error(f"Error processing audio: {str(e)}")
@@ -931,8 +939,9 @@ SPACE_PRESSED = False
 D_PRESSED = False
 M_PRESSED = False  # For mute toggle
 
-# Mute state
+# System states
 MUTED = False
+CONTINUOUS_LISTENING = True  # Always listen unless muted
 
 def start_recording_thread(mode):
     """Start a recording thread with specified mode.
@@ -992,17 +1001,18 @@ def start_recording_thread(mode):
     # This prevents immediate return of the function
     time.sleep(0.2)
 
-def hotkey_command_callback():
-    """Callback for command mode hotkey."""
-    start_recording_thread('command')
-
-def hotkey_dictation_callback():
-    """Callback for dictation mode hotkey."""
-    start_recording_thread('dictation')
+# We've now removed keyboard shortcuts for recording and only use the mute toggle
 
 def toggle_mute_callback():
     """Toggle mute state."""
-    global MUTED
+    global MUTED, RECORDING
+    
+    # If currently recording, stop it
+    if RECORDING:
+        RECORDING = False
+        logger.info("Stopping active recording due to mute toggle")
+    
+    # Toggle mute state
     MUTED = not MUTED
     
     # Show notification of current mute state
@@ -1031,6 +1041,23 @@ def toggle_mute_callback():
         logger.error(f"Could not show mute notification: {e}")
         # Still log the status change
         print(f"DEBUG: Microphone is now {status}")
+        
+    # If unmuted, start continuous listening
+    if not MUTED and CONTINUOUS_LISTENING:
+        # Start listening in a separate thread to avoid blocking
+        threading.Thread(target=start_continuous_listening, daemon=True).start()
+
+
+def start_continuous_listening():
+    """Start continuous listening for voice commands."""
+    if MUTED or RECORDING:
+        return
+        
+    logger.info("Starting continuous listening...")
+    print("DEBUG: Starting continuous listening")
+    
+    # Start recording in command mode (we'll handle dictation via command detection)
+    start_recording_thread('command')
 
 def on_press(key):
     """Handle key press events."""
@@ -1085,22 +1112,6 @@ def on_press(key):
                 print(f"DEBUG: Error in mute toggle: {e}")
                 logger.error(f"Error toggling mute: {e}")
             return  # Process this hotkey and return
-            
-        # If muted, don't process other hotkeys
-        if MUTED:
-            return
-            
-        # Check for command hotkey (Ctrl+Shift+Space)
-        if CTRL_PRESSED and SHIFT_PRESSED and SPACE_PRESSED:
-            print("DEBUG: Command hotkey detected: Ctrl+Shift+Space")
-            logger.info("Command hotkey detected: Ctrl+Shift+Space")
-            hotkey_command_callback()
-            
-        # Check for dictation hotkey: Ctrl+Shift+D
-        if CTRL_PRESSED and SHIFT_PRESSED and D_PRESSED:
-            print("DEBUG: Dictation hotkey detected: Ctrl+Shift+D")
-            logger.info("Dictation hotkey detected: Ctrl+Shift+D")
-            hotkey_dictation_callback()
             
     except Exception as e:
         logger.error(f"Error in key press handler: {e}")
@@ -1182,20 +1193,15 @@ if __name__ == "__main__":
         audio_thread.daemon = True
         audio_thread.start()
 
-        # Set up hotkey listeners
-        command_hotkey_str = os.getenv('VOICE_CONTROL_HOTKEY', 'ctrl+shift+space')
-        dictation_hotkey_str = os.getenv('VOICE_DICTATION_HOTKEY', 'ctrl+shift+d')
-        
-        logger.info(f"Setting up command hotkey: {command_hotkey_str}")
-        logger.info(f"Setting up dictation hotkey: {dictation_hotkey_str}")
-        logger.info("Also adding alternative dictation hotkey: Alt+Shift+V")
+        # Only mute toggle hotkey is used now (Ctrl+Shift+M)
+        logger.info("Setting up mute toggle hotkey: Ctrl+Shift+M")
         
         # Start keyboard listener
         listener = keyboard.Listener(on_press=on_press, on_release=on_release)
         listener.start()
         
         logger.info("=== Voice Control Ready ===")
-        logger.info(f"COMMAND MODE: Press {command_hotkey_str} to start recording voice commands")
+        logger.info("ALWAYS LISTENING MODE: Voice control is always active unless muted")
         logger.info(f"MUTE TOGGLE: Press Ctrl+Shift+M to mute/unmute voice control")
         logger.info("")
         logger.info("Example commands:")
@@ -1207,12 +1213,17 @@ if __name__ == "__main__":
         logger.info("")
         logger.info("Press Ctrl+C or ESC to exit")
         
+        # Start continuous listening on startup
+        if CONTINUOUS_LISTENING and not MUTED:
+            logger.info("Starting continuous listening mode...")
+            threading.Thread(target=start_continuous_listening, daemon=True).start()
+        
         try:
             # Send a notification that we're ready
             from toast_notifications import send_notification
             send_notification(
                 "Voice Control Ready", 
-                f"Commands: {command_hotkey_str} | Say 'dictate' for dictation | Mute: Ctrl+Shift+M",
+                "Always listening mode active | Say 'dictate' for dictation | Mute: Ctrl+Shift+M",
                 "whisper-voice-ready",
                 10,
                 True
