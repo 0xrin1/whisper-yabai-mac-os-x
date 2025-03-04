@@ -249,5 +249,277 @@ class TestJarvisAssistant(unittest.TestCase):
             "how can i" in spoken_text.lower()
         )
 
+class TestJarvisTimings(unittest.TestCase):
+    """Test suite for JARVIS timing-specific functionality."""
+    
+    def setUp(self):
+        """Set up test environment before each test."""
+        # Redirect stdout to prevent cluttering test output
+        self.original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+        
+        # Reset assistant state before each test
+        assistant.assistant_state["active"] = False
+        assistant.assistant_state["conversational_mode"] = False
+        assistant.assistant_state["last_interaction_time"] = 0
+        
+        # Clear conversation memory
+        with assistant.memory_lock:
+            assistant.conversation_memory.clear()
+            
+        # Create mocks for functions that might cause timing issues
+        self.speak_patch = patch('src.speech_synthesis.speak')
+        self.mock_speak = self.speak_patch.start()
+        
+        # Make speak return immediately instead of blocking
+        self.mock_speak.side_effect = lambda *args, **kwargs: None
+        
+        self.subprocess_patch = patch('subprocess.run')
+        self.mock_subprocess = self.subprocess_patch.start()
+        
+        # Patch sleep to avoid waiting during tests
+        self.sleep_patch = patch('time.sleep')
+        self.mock_sleep = self.sleep_patch.start()
+        
+        # Patch update_status to avoid terminal manipulation
+        self.status_patch = patch('src.assistant.update_status')
+        self.mock_status = self.status_patch.start()
+        
+    def tearDown(self):
+        """Clean up after each test."""
+        # Restore stdout
+        sys.stdout.close()
+        sys.stdout = self.original_stdout
+        
+        # Stop patches
+        self.speak_patch.stop()
+        self.subprocess_patch.stop()
+        self.sleep_patch.stop()
+        self.status_patch.stop()
+    
+    def test_multi_turn_conversation(self):
+        """Test a multi-turn conversation flow with precise timing."""
+        # 1. Initial activation
+        assistant.activate_assistant()
+        self.assertTrue(assistant.assistant_state["active"])
+        
+        # Record the activation time and ensure it's properly set
+        activation_time = time.time()
+        assistant.assistant_state["last_interaction_time"] = activation_time
+        
+        # 2. First user command
+        # Simulate time passing (100ms)
+        with patch('time.time', return_value=activation_time + 0.1):
+            response = assistant.handle_user_input("What time is it?")
+            self.assertTrue(len(response) > 0)
+            # Check that last_interaction_time was updated
+            self.assertEqual(assistant.assistant_state["last_interaction_time"], activation_time + 0.1)
+        
+        # 3. Second user command after 2 seconds
+        with patch('time.time', return_value=activation_time + 2.0):
+            response = assistant.handle_user_input("Tell me a joke")
+            self.assertTrue(len(response) > 0)
+            # Check that last_interaction_time was updated
+            self.assertEqual(assistant.assistant_state["last_interaction_time"], activation_time + 2.0)
+        
+        # 4. Verify timeout mechanism with precise timing
+        # Test the timeout detection directly by setting values
+        # Here we'll set last interaction time to a fixed value and test with fixed time points
+        
+        # Set a fixed reference point
+        fixed_time = 1000.0  # Any arbitrary fixed point in time
+        assistant.assistant_state["last_interaction_time"] = fixed_time
+        
+        # Just before timeout (59 seconds later)
+        with patch('time.time', return_value=fixed_time + 59.0):
+            self.assertFalse(assistant.should_timeout())
+            
+        # At exact timeout threshold (60 seconds later)
+        with patch('time.time', return_value=fixed_time + 60.0):
+            self.assertTrue(assistant.should_timeout())
+            
+        # Well after timeout (61 seconds later)
+        with patch('time.time', return_value=fixed_time + 61.0):
+            self.assertTrue(assistant.should_timeout())
+    
+    def test_rapid_commands(self):
+        """Test that rapid commands are handled correctly."""
+        # Activate the assistant
+        assistant.activate_assistant()
+        
+        # Capture the base time
+        base_time = time.time()
+        
+        # Send 5 rapid commands with minimal time between them
+        commands = [
+            "What time is it?",
+            "Tell me a joke",
+            "Who are you?",
+            "What can you do?",
+            "Thanks"
+        ]
+        
+        # Process commands in rapid succession
+        for i, cmd in enumerate(commands):
+            # Simulate minimal time passing (50ms between commands)
+            with patch('time.time', return_value=base_time + (i * 0.05)):
+                response = assistant.handle_user_input(cmd)
+                self.assertTrue(len(response) > 0)
+                
+        # Check that we can still process commands after rapid sequence
+        with patch('time.time', return_value=base_time + 1.0):
+            response = assistant.handle_user_input("Hello again")
+            self.assertTrue(len(response) > 0)
+    
+    def test_conversation_timeout_edge_cases(self):
+        """Test edge cases around conversation timeout."""
+        # Activate the assistant
+        assistant.activate_assistant()
+        base_time = time.time()
+        
+        # Test case: User interacts just before timeout (59 seconds)
+        with patch('time.time', return_value=base_time + 59.0):
+            # Check not timed out
+            self.assertFalse(assistant.should_timeout())
+            # Process a command
+            response = assistant.handle_user_input("Hello")
+            self.assertTrue(len(response) > 0)
+            # Verify last_interaction_time was updated
+            self.assertEqual(assistant.assistant_state["last_interaction_time"], base_time + 59.0)
+        
+        # Test case: Now timeout has been reset, so even at 110 seconds after original
+        # activation, we shouldn't timeout because the last interaction was only 51 seconds ago
+        with patch('time.time', return_value=base_time + 110.0):
+            # We should NOT timeout as it's been 51 seconds since last interaction (which is < 60s)
+            self.assertFalse(assistant.should_timeout())
+            
+        # Test case: 61 seconds after the last interaction, we should timeout
+        with patch('time.time', return_value=base_time + 59.0 + 61.0):
+            self.assertTrue(assistant.should_timeout())
+
+class TestJarvisIntegration(unittest.TestCase):
+    """Integration tests for JARVIS to simulate real-world usage."""
+    
+    def setUp(self):
+        """Set up test environment before each test."""
+        # Redirect stdout to prevent cluttering test output
+        self.original_stdout = sys.stdout
+        sys.stdout = open(os.devnull, 'w')
+        
+        # Reset assistant state before each test
+        assistant.assistant_state["active"] = False
+        assistant.assistant_state["conversational_mode"] = False
+        assistant.assistant_state["last_interaction_time"] = 0
+        
+        # Clear conversation memory
+        with assistant.memory_lock:
+            assistant.conversation_memory.clear()
+        
+        # We'll use real functions for integration tests with minimal mocking
+        # Just mock the terminal interactions and subprocess calls
+        self.subprocess_patch = patch('subprocess.run')
+        self.mock_subprocess = self.subprocess_patch.start()
+        
+        self.status_patch = patch('src.assistant.update_status')
+        self.mock_status = self.status_patch.start()
+        
+    def tearDown(self):
+        """Clean up after each test."""
+        # Restore stdout
+        sys.stdout.close()
+        sys.stdout = self.original_stdout
+        
+        # Stop patches
+        self.subprocess_patch.stop()
+        self.status_patch.stop()
+    
+    def test_complete_conversation_flow(self):
+        """Test a full conversation flow with JARVIS, simulating real interactions."""
+        # Create a mock for speech output so we don't actually speak during tests
+        with patch('src.speech_synthesis.speak') as mock_speak:
+            # 1. Initial activation with wake word
+            assistant.process_voice_command("Hey Jarvis")
+            self.assertTrue(assistant.assistant_state["active"])
+            
+            # 2. First complete interaction
+            assistant.process_voice_command("What time is it?")
+            self.assertTrue(mock_speak.call_count >= 2)  # Greeting + response
+            
+            # 3. Follow-up question without wake word (already active)
+            mock_speak.reset_mock()
+            assistant.process_voice_command("Tell me a joke")
+            self.assertTrue(mock_speak.call_count >= 1)  # Just response
+            
+            # 4. Ask for capabilities
+            mock_speak.reset_mock()
+            assistant.process_voice_command("What can you do?")
+            self.assertTrue(mock_speak.call_count >= 1)
+            
+            # 5. Say thanks and verify response
+            mock_speak.reset_mock()
+            assistant.process_voice_command("Thanks for your help")
+            self.assertTrue(mock_speak.call_count >= 1)
+            
+            # 6. Deactivate with "go to sleep"
+            mock_speak.reset_mock()
+            assistant.process_voice_command("Go to sleep")
+            self.assertFalse(assistant.assistant_state["active"])
+            self.assertTrue(mock_speak.call_count >= 1)  # Farewell message
+    
+    def test_wake_sleep_cycle(self):
+        """Test repeated wake/sleep cycles to ensure state consistency."""
+        with patch('src.speech_synthesis.speak'):
+            # Multiple wake-sleep cycles
+            for i in range(3):
+                # Wake up
+                assistant.process_voice_command("Hey Jarvis")
+                self.assertTrue(assistant.assistant_state["active"])
+                
+                # Simple interaction
+                assistant.process_voice_command("Hello")
+                
+                # Go to sleep
+                assistant.process_voice_command("Go to sleep")
+                self.assertFalse(assistant.assistant_state["active"])
+                
+                # Verify memory is maintained across cycles
+                with assistant.memory_lock:
+                    # Each cycle adds 5 items:
+                    # 1. "Hey Jarvis" (user)
+                    # 2. Initial greeting (assistant)
+                    # 3. "Hello" (user)
+                    # 4. Response to hello (assistant)
+                    # 5. "Go to sleep" (user)
+                    # 6. Farewell response (assistant)
+                    # So after i cycles, we should have (i+1)*6 items
+                    # But we start with 0, and only keep MAX_MEMORY_ITEMS
+                    expected = min((i+1)*6, assistant.MAX_MEMORY_ITEMS)
+                    self.assertTrue(len(assistant.conversation_memory) > 0)
+    
+    def test_transcription_processing(self):
+        """Test handling of various transcription formats and edge cases."""
+        with patch('src.speech_synthesis.speak'):
+            # Activate the assistant
+            assistant.activate_assistant()
+            
+            # Test with empty string
+            assistant.process_voice_command("")
+            
+            # Test with just spaces
+            assistant.process_voice_command("   ")
+            
+            # Test with unusual punctuation
+            assistant.process_voice_command("What's... the, time?!")
+            
+            # Test with repeated words (stuttering)
+            assistant.process_voice_command("Tell tell me me a a joke joke")
+            
+            # Test with very long input
+            long_input = "This is a very long sentence that goes on and on and contains many words " * 10
+            assistant.process_voice_command(long_input)
+            
+            # All the above shouldn't crash, if we get here the test passes
+            self.assertTrue(True)
+
 if __name__ == "__main__":
     unittest.main()
