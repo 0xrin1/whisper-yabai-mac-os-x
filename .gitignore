@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment
+venv/
+ENV/
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Project specific
+# Don't commit whisper models or GGUF models (they're large)
+models/*.gguf
+models/*.pt
+models/*.bin
+
+# Don't include log files with potentially personal data
+dictation_log.txt
+
+# Environment variables
+.env
+
+# Temporary files
+*.tmp
+
+# Test files
+src/test_*.py
+src/simple_dictation.py
+src/direct_typing.py
+src/direct_dictation.py

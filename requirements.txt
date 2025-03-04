@@ -1,0 +1,9 @@
+openai-whisper
+pyobjc-framework-ApplicationServices
+pyobjc-framework-Quartz
+pyautogui
+pynput
+python-dotenv
+llama-cpp-python
+requests
+pyperclip
