@@ -793,6 +793,11 @@ def process_dictation(transcription):
             logger.info("Using AppleScript keystroke method...")
             print("DEBUG: Trying AppleScript method")
             
+            # Remove any leading 'v' character that might be added mistakenly
+            if transcription.startswith('v') or transcription.startswith('V'):
+                transcription = transcription[1:].lstrip()
+                print(f"DEBUG: Removed leading 'v' character, new text: '{transcription}'")
+            
             # Save to temp file for AppleScript
             tmp_file = "/tmp/dictation_text.txt"
             with open(tmp_file, "w") as f:
