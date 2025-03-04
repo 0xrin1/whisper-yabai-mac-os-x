@@ -69,3 +69,8 @@ src/direct_dictation.py
 
 # Test logs
 test_logs_*/
+
+# Ignore voice training samples and temp files
+training_samples/*.wav
+voice_models/**/samples/*.wav
+voice_models/**/temp/*.aiff
