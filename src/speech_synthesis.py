@@ -15,13 +15,12 @@ from typing import Optional, List, Dict
 AVAILABLE_VOICES = {
     "samantha": {"gender": "female", "accent": "american", "personality": "friendly"},
     "daniel": {"gender": "male", "accent": "british", "personality": "professional"},
-    "karen": {"gender": "female", "accent": "australian", "personality": "warm"},
-    "alex": {"gender": "male", "accent": "american", "personality": "natural"},
-    "allison": {"gender": "female", "accent": "american", "personality": "professional"}
+    "karen": {"gender": "female", "accent": "australian", "personality": "warm"}
+    # Note: alex and allison voices were removed as they aren't available on all macOS versions
 }
 
 # Default voice to use
-DEFAULT_VOICE = "samantha"
+DEFAULT_VOICE = "daniel"  # Use Daniel as default for JARVIS-like experience
 
 # Speaking rate (words per minute)
 DEFAULT_RATE = 180
