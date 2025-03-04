@@ -177,11 +177,18 @@ def activate_assistant(voice: str = None) -> None:
     assistant_state["conversational_mode"] = True
     assistant_state["last_interaction_time"] = time.time()
     
-    # Speak a greeting
+    # Speak a greeting immediately to provide feedback
     tts.speak(
         random.choice(RESPONSES["greeting"]), 
-        voice=assistant_state["voice"]
+        voice=assistant_state["voice"],
+        block=True  # Block until speech is complete
     )
+    
+    # Play a distinct sound to indicate active listening
+    try:
+        subprocess.run(["afplay", "/System/Library/Sounds/Blow.aiff"], check=False)
+    except Exception:
+        pass
     
     # Show notification
     send_notification(
@@ -189,6 +196,9 @@ def activate_assistant(voice: str = None) -> None:
         "Voice assistant is now listening",
         timeout=3
     )
+    
+    # Announce that we're listening
+    print(f"DEBUG: {ASSISTANT_NAME} activated and listening for commands")
 
 def deactivate_assistant() -> None:
     """Deactivate the assistant with a farewell message."""
@@ -347,21 +357,62 @@ def process_voice_command(transcription: str) -> None:
     Args:
         transcription: The transcribed user speech
     """
+    print(f"DEBUG: JARVIS processing: '{transcription}'")
+    
     # Only process in active conversational mode
     if not assistant_state["active"] or not assistant_state["conversational_mode"]:
         # Check if this is a wake command
         if transcription.lower().startswith(WAKE_WORD) or "jarvis" in transcription.lower():
+            # Play sound to indicate we heard the wake word
+            try:
+                subprocess.run(["afplay", "/System/Library/Sounds/Pop.aiff"], check=False)
+            except Exception:
+                pass
+                
+            # Activate assistant
             activate_assistant()
+            
             # Remove wake word before processing
             clean_text = re.sub(r'^hey\s+|jarvis\s+', '', transcription.lower()).strip()
             if clean_text:  # If there's remaining text
+                print(f"DEBUG: Processing command after wake word: '{clean_text}'")
+                # Add small delay to ensure wake sound completes
+                time.sleep(0.3)
+                # Process the command
                 response = handle_user_input(clean_text)
-                tts.speak(response, voice=assistant_state["voice"])
+                tts.speak(response, voice=assistant_state["voice"], block=True)
+                
+                # Play a sound to indicate we're done and listening again
+                try:
+                    subprocess.run(["afplay", "/System/Library/Sounds/Blow.aiff"], check=False)
+                except Exception:
+                    pass
         return
     
-    # Process transcription and respond
+    # Process transcription and respond with clear audio feedback
+    print(f"DEBUG: Processing command in active mode: '{transcription}'")
+    
+    # First play an acknowledgment sound so user knows we heard them
+    try:
+        subprocess.run(["afplay", "/System/Library/Sounds/Pop.aiff"], check=False)
+    except Exception:
+        pass
+    
+    # Small delay to let sound finish
+    time.sleep(0.2)
+    
+    # Generate response
     response = handle_user_input(transcription)
-    tts.speak(response, voice=assistant_state["voice"])
+    
+    # Speak response and block until complete
+    print(f"DEBUG: JARVIS response: '{response}'")
+    tts.speak(response, voice=assistant_state["voice"], block=True)
+    
+    # Play a sound to indicate we're listening again
+    try:
+        subprocess.run(["afplay", "/System/Library/Sounds/Blow.aiff"], check=False)
+    except Exception:
+        pass
     
     # Update last interaction time
     assistant_state["last_interaction_time"] = time.time()
@@ -376,8 +427,12 @@ def should_timeout() -> bool:
         return False
         
     # Check if it's been too long since the last interaction
-    timeout_seconds = 120  # 2 minutes without interaction
+    timeout_seconds = 60  # 1 minute without interaction (reduced from 2 minutes)
     time_since_last = time.time() - assistant_state["last_interaction_time"]
+    
+    # Log timeout status for debugging
+    if time_since_last > 30:  # If we're halfway to timeout, log it
+        print(f"DEBUG: JARVIS timeout in {timeout_seconds - time_since_last:.1f} seconds if no interaction")
     
     return time_since_last > timeout_seconds
 

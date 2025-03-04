@@ -1209,6 +1209,9 @@ AUDIO_BUFFER = []  # Stores audio chunks
 AUDIO_BUFFER_SECONDS = 5  # Keep last 5 seconds of audio
 AUDIO_BUFFER_LOCK = threading.Lock()  # Mutex for audio buffer
 
+# Track recording start time for timeout handling
+recording_start_time = 0  # Track when recording started to prevent getting stuck
+
 def start_recording_thread(mode, force=False):
     """Start a recording thread with specified mode.
     
@@ -1286,7 +1289,9 @@ def start_recording_thread(mode, force=False):
     # Set the RECORDING flag to True before starting the thread
     # This helps avoid race conditions where the thread might not set it in time
     print(f"DEBUG: Setting RECORDING flag to True before starting {mode} recording thread")
+    global recording_start_time
     RECORDING = True
+    recording_start_time = time.time()  # Track when we started recording
     
     def recording_thread_func():
         print(f"DEBUG: Starting {mode_name.lower()} recording")
@@ -1389,12 +1394,20 @@ def process_trigger_audio(audio_file):
     # Double-check that we're not already recording (safety check)
     if RECORDING:
         print("DEBUG: Already recording, skipping trigger detection")
-        return False
+        # Force reset the recording flag if it's been on for too long
+        # This prevents getting stuck in recording mode
+        recording_time = time.time() - recording_start_time if recording_start_time else 30
+        if recording_time > 20:  # If we've been "recording" for more than 20 seconds
+            print("DEBUG: WARNING - Recording flag has been on for too long, force resetting")
+            RECORDING = False
+        else:
+            return False
     
     try:
         # Check if file exists and has reasonable size
         if not os.path.exists(audio_file):
             print(f"DEBUG: Trigger audio file not found: {audio_file}")
+            RECORDING = False  # Reset recording flag as a precaution
             return False
             
         file_size = os.path.getsize(audio_file)
@@ -1918,6 +1931,9 @@ def process_audio_buffer():
         print(f"DEBUG: {traceback.format_exc()}")
         # Always make sure to reset RECORDING flag in case of error
         RECORDING = False
+        # Also update recording_start_time to prevent false timeouts
+        global recording_start_time
+        recording_start_time = 0
 
 def start_continuous_listening():
     """Start continuous listening for voice commands."""
