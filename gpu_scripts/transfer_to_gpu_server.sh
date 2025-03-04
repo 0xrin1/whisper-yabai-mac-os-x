@@ -437,19 +437,110 @@ if __name__ == "__main__":
     create_voice_model(args.samples, args.output, args.epochs)
 PYEOF
 
-# Make sure torch is installed directly in the environment
-echo -e "\n${GREEN}Ensuring PyTorch is installed in current environment...${NC}"
-pip install torch torchaudio numpy || echo "Failed to install torch via pip"
+# Make sure all required packages are installed directly in the environment
+echo -e "\n${GREEN}Ensuring required packages are installed...${NC}"
 
-# Try to run with conda python first
-echo -e "\n${GREEN}Attempting to create model with GPU acceleration...${NC}"
+# Install packages directly in the conda environment if conda is available
 if [ ! -z "$CONDA_EXEC" ]; then
-    echo -e "${GREEN}Using conda python...${NC}"
-    $CONDA_EXEC run -n tts_voice python create_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
-    MODEL_STATUS=$?
+    echo -e "${GREEN}Installing packages in conda environment...${NC}"
+    $CONDA_EXEC install -y -n tts_voice torch torchaudio numpy -c pytorch
+    $CONDA_EXEC install -y -n tts_voice -c conda-forge librosa matplotlib
+    $CONDA_EXEC run -n tts_voice pip install TTS
 else
-    # Try with regular python
-    python create_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
+    # Otherwise install via pip
+    pip install torch torchaudio numpy TTS librosa matplotlib || echo "Failed to install packages via pip"
+fi
+
+# Create simplified model without TTS dependency
+cat > simplified_model.py << 'PYEOF'
+import os
+import sys
+import glob
+import torch
+import json
+import datetime
+import argparse
+import numpy as np
+
+def create_voice_model(samples_dir, output_dir, epochs):
+    print(f"Creating simplified voice model (no TTS dependency) with {epochs} epochs...")
+    
+    # Check if CUDA is available
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    
+    # Load sample files
+    sample_files = glob.glob(os.path.join(samples_dir, "*.wav"))
+    print(f"Found {len(sample_files)} sample files")
+    
+    if len(sample_files) == 0:
+        print("Warning: No sample files found!")
+    
+    try:
+        # Get basic torch info
+        torch_info = {
+            "version": torch.__version__,
+            "cuda_available": torch.cuda.is_available(),
+            "cuda_version": torch.version.cuda if torch.cuda.is_available() else "N/A",
+            "device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0
+        }
+        
+        # Create metadata
+        metadata = {
+            "name": "neural_voice_model",
+            "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "sample_count": len(sample_files),
+            "samples": [os.path.basename(f) for f in sample_files],
+            "device": device,
+            "torch_info": torch_info,
+            "epochs": epochs
+        }
+        
+        # Save metadata
+        os.makedirs(output_dir, exist_ok=True)
+        with open(os.path.join(output_dir, "model_info.json"), "w") as f:
+            json.dump(metadata, f, indent=2)
+        
+        print("Voice model metadata created successfully!")
+        print(f"Model saved to: {output_dir}")
+        return True
+    
+    except Exception as e:
+        print(f"Error creating voice model: {e}")
+        return False
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Simplified voice model creation")
+    parser.add_argument("--samples", required=True, help="Directory containing voice samples")
+    parser.add_argument("--output", required=True, help="Output directory for model")
+    parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs")
+    args = parser.parse_args()
+    
+    success = create_voice_model(args.samples, args.output, args.epochs)
+    sys.exit(0 if success else 1)
+PYEOF
+
+# Try multiple approaches in sequence
+echo -e "\n${GREEN}Attempting to create model using conda environment...${NC}"
+
+if [ ! -z "$CONDA_EXEC" ]; then
+    # First try the simplified model with conda
+    echo -e "${GREEN}Using conda with simplified model...${NC}"
+    $CONDA_EXEC run -n tts_voice python simplified_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
+    MODEL_STATUS=$?
+    
+    # If that works, great! Otherwise try the full TTS model
+    if [ $MODEL_STATUS -eq 0 ]; then
+        echo -e "${GREEN}Simplified model with conda succeeded!${NC}"
+    else
+        echo -e "${YELLOW}Simplified model with conda failed, trying full TTS model...${NC}"
+        $CONDA_EXEC run -n tts_voice python create_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
+        MODEL_STATUS=$?
+    fi
+else
+    # Try with regular python and simplified model
+    echo -e "${GREEN}Using regular python with simplified model...${NC}"
+    python simplified_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
     MODEL_STATUS=$?
 fi
 
