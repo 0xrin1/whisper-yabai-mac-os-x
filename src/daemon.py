@@ -82,7 +82,7 @@ class AudioRecorder:
         except Exception as e:
             logger.error(f"Could not play stop sound: {e}")
             
-    def start_recording(self, duration=None, dictation_mode=False, trigger_mode=False):
+    def start_recording(self, duration=None, dictation_mode=False, trigger_mode=False, force=False):
         """
         Start recording audio for specified duration.
         
@@ -91,10 +91,18 @@ class AudioRecorder:
             dictation_mode (bool): If True, recorded audio will be transcribed directly to text
                                   rather than interpreted as a command
             trigger_mode (bool): If True, this is a short recording to detect trigger words
+            force (bool): If True, will force recording even if RECORDING flag is True
         """
         global RECORDING, TRIGGER_DETECTED, TRIGGER_BUFFER
         
-        if RECORDING and not trigger_mode:
+        # If force is True, reset the RECORDING flag before continuing
+        if RECORDING and force:
+            print("DEBUG: Force flag set - resetting RECORDING flag in start_recording")
+            RECORDING = False
+            time.sleep(0.1)  # Brief pause to ensure flag propagation
+        
+        # Now check if still recording
+        if RECORDING and not trigger_mode and not force:
             print("DEBUG: Already recording, ignoring request")
             return
             
@@ -499,7 +507,7 @@ class CommandProcessor:
             # Start dictation mode through the same path the hotkey would use
             # Use threading to avoid blocking this function
             time.sleep(0.5)  # Add a short delay before starting dictation
-            threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
+            threading.Thread(target=start_recording_thread, args=('dictation', True), daemon=True).start()
             return
         
         # Use LLM interpretation if enabled
@@ -572,7 +580,7 @@ class CommandProcessor:
                         
                     # Add a slight delay before starting dictation
                     time.sleep(0.5)
-                    threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
+                    threading.Thread(target=start_recording_thread, args=('dictation', True), daemon=True).start()
                     return
             
             # If we still haven't found a command, fall back to simple parsing
@@ -625,7 +633,7 @@ class CommandProcessor:
                     
                 # Start dictation mode directly
                 time.sleep(0.5)  # Add a short delay before starting dictation
-                threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
+                threading.Thread(target=start_recording_thread, args=('dictation', True), daemon=True).start()
                 return
         
         # Standard command processing
@@ -1019,6 +1027,10 @@ def process_dictation(transcription):
     Args:
         transcription (str): The text to type
     """
+    # Add more prominent logging
+    print("========== DICTATION TEXT RECEIVED ==========")
+    print(f"DICTATION TEXT: '{transcription}'")
+    print("============================================")
     logger.info(f"Dictation mode: typing '{transcription}'")
     
     try:
@@ -1041,7 +1053,7 @@ def process_dictation(transcription):
                 f.write(transcription)
             print(f"DEBUG: Saved text to {tmp_file}")
             
-            # AppleScript to keystroke the text
+            # AppleScript to keystroke the text - with better error handling
             script = '''
             set the_text to (do shell script "cat /tmp/dictation_text.txt")
             tell application "System Events"
@@ -1051,15 +1063,25 @@ def process_dictation(transcription):
             '''
             
             print("DEBUG: Running AppleScript")
-            subprocess.run(["osascript", "-e", script], check=True)
-            success = True
-            print("DEBUG: AppleScript succeeded")
+            result = subprocess.run(["osascript", "-e", script], 
+                                  check=False, 
+                                  capture_output=True,
+                                  text=True)
+            
+            if result.returncode == 0:
+                success = True
+                print("DEBUG: AppleScript succeeded")
+            else:
+                print(f"DEBUG: AppleScript returned non-zero exit code: {result.returncode}")
+                print(f"DEBUG: AppleScript stderr: {result.stderr}")
             
             # Clean up temp file
             os.remove(tmp_file)
         except Exception as e1:
             logger.error(f"AppleScript method failed: {e1}")
             print(f"DEBUG: AppleScript method failed: {e1}")
+            import traceback
+            print(f"DEBUG: {traceback.format_exc()}")
             
         # Method 2: pbcopy + cmd+v (fallback)
         if not success:
@@ -1080,6 +1102,8 @@ def process_dictation(transcription):
             except Exception as e2:
                 logger.warning(f"Clipboard method failed: {e2}")
                 print(f"DEBUG: Clipboard method failed: {e2}")
+                import traceback
+                print(f"DEBUG: {traceback.format_exc()}")
             
         # Method 3: Direct typing as last resort
         if not success:
@@ -1092,28 +1116,49 @@ def process_dictation(transcription):
             except Exception as e3:
                 logger.error(f"Direct typing failed: {e3}")
                 print(f"DEBUG: Direct typing failed: {e3}")
-                raise Exception("All typing methods failed")
+                import traceback
+                print(f"DEBUG: {traceback.format_exc()}")
+                # Don't raise here, just log the error
+                print("DEBUG: All typing methods failed")
         
-        # Save to log file
+        # ALWAYS save to log file, even if typing methods failed
         try:
+            print(f"DEBUG: Writing to dictation log: '{transcription}'")
             with open('dictation_log.txt', 'a') as f:
                 f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: {transcription}\n")
+            print("DEBUG: Successfully wrote to dictation log")
         except Exception as log_err:
             logger.error(f"Failed to write to log: {log_err}")
+            print(f"DEBUG: Failed to write to dictation log: {log_err}")
         
         # Play completion sound
         try:
+            print("DEBUG: Playing completion sound")
             subprocess.run(["afplay", "/System/Library/Sounds/Pop.aiff"], check=False)
-        except Exception:
-            pass
+        except Exception as sound_err:
+            print(f"DEBUG: Failed to play completion sound: {sound_err}")
             
         # Show success notification
-        notify_command_executed(f"Transcribed: {transcription}")
+        try:
+            print("DEBUG: Showing dictation success notification")
+            notify_command_executed(f"Transcribed: {transcription}")
+        except Exception as notif_err:
+            print(f"DEBUG: Failed to show notification: {notif_err}")
+            
         logger.info("Dictation completed successfully")
+        print("DEBUG: Dictation processing completed successfully")
+        print("========== END DICTATION PROCESSING ==========")
         
     except Exception as e:
         logger.error(f"Failed to process dictation: {e}")
-        notify_error(f"Failed to process dictation: {str(e)}")
+        print(f"ERROR: Failed to process dictation: {e}")
+        import traceback
+        print(f"DEBUG: {traceback.format_exc()}")
+        
+        try:
+            notify_error(f"Failed to process dictation: {str(e)}")
+        except:
+            print("DEBUG: Also failed to show error notification")
 
 
 def signal_handler(sig, frame):
@@ -1160,11 +1205,12 @@ AUDIO_BUFFER = []  # Stores audio chunks
 AUDIO_BUFFER_SECONDS = 5  # Keep last 5 seconds of audio
 AUDIO_BUFFER_LOCK = threading.Lock()  # Mutex for audio buffer
 
-def start_recording_thread(mode):
+def start_recording_thread(mode, force=False):
     """Start a recording thread with specified mode.
     
     Args:
         mode (str): Either 'command' or 'dictation'
+        force (bool): If True, will force start a new recording even if one is in progress
         
     IMPORTANT DIFFERENCE BETWEEN MODES:
     - Command mode: System listens for voice commands to control your computer
@@ -1201,6 +1247,17 @@ def start_recording_thread(mode):
         RECORDING = False
         return
     
+    # Check if already recording and not forced
+    if RECORDING and not force:
+        print(f"DEBUG: Already recording, ignoring {mode} request (set force=True to override)")
+        return
+        
+    # If we're force-starting a new recording, reset the RECORDING flag first
+    if RECORDING and force:
+        print(f"DEBUG: Force-resetting RECORDING flag before starting new {mode} recording")
+        RECORDING = False
+        time.sleep(0.2)  # Small delay to ensure flag is reset
+    
     is_dictation = (mode == 'dictation')
     mode_name = "Dictation" if is_dictation else "Command"
     
@@ -1222,19 +1279,18 @@ def start_recording_thread(mode):
     print(f"DEBUG: {mode_name} mode triggered")
     logger.info(f"{mode_name} mode triggered - starting voice recording...")
     
+    # Set the RECORDING flag to True before starting the thread
+    # This helps avoid race conditions where the thread might not set it in time
+    print(f"DEBUG: Setting RECORDING flag to True before starting {mode} recording thread")
+    RECORDING = True
+    
     def recording_thread_func():
         print(f"DEBUG: Starting {mode_name.lower()} recording")
-        
-        # RECORDING flag should already be set at this point, this is just a safety check
-        global RECORDING
-        if not RECORDING:
-            print("DEBUG: Setting RECORDING flag to True in recording thread")
-            RECORDING = True
         
         try:
             # Ensure recording completes before this function returns
             print(f"DEBUG: About to start {mode_name} recording via recorder...")
-            result = recorder.start_recording(dictation_mode=is_dictation)
+            result = recorder.start_recording(dictation_mode=is_dictation, force=True)
             print(f"DEBUG: {mode_name} recording completed, audio file: {result}")
             
             # Verify the file was created and has content before continuing
@@ -1261,7 +1317,7 @@ def start_recording_thread(mode):
     
     # IMPORTANT: Add a small delay to ensure thread starts properly
     # This prevents immediate return of the function
-    time.sleep(0.5)  # Increased from 0.2 to 0.5 for more reliable startup
+    time.sleep(0.7)  # Increased from 0.5 to 0.7 for more reliable startup
 
 # We've now removed keyboard shortcuts for recording and only use the mute toggle
 
@@ -1357,10 +1413,13 @@ def process_trigger_audio(audio_file):
         contains_command_trigger = any(variation in transcription.lower() for variation in command_variations)
         
         # Check for dictation trigger variations (type, etc.)
-        # Add more variations of "type" specifically
+        # Use a much longer list of variations to improve detection
         dictation_variations = [
             DICTATION_TRIGGER.lower(), "typing", "write", "note", "text", "speech to text",
-            "tight", "tipe", "types", "typed", "typ", "tape", "time", "tip", "tie"
+            "tight", "tipe", "types", "typed", "typ", "tape", "time", "tip", "tie",
+            "type please", "please type", "start typing", "begin typing", "activate typing",
+            "time please", "time this", "type this", "dictate", "dictation", "take dictation",
+            "start dictation", "dictate this", "write this", "take notes", "ti", "ty", "tai"
         ]
         
         # Add strong debugging for trigger detection
@@ -1423,7 +1482,7 @@ def process_trigger_audio(audio_file):
             
             # Start dictation mode directly
             print("DEBUG: Starting dictation recording after trigger detection")
-            start_recording_thread('dictation')
+            start_recording_thread('dictation', force=True)
             print("DEBUG: Dictation recording thread started")
             return True
             
@@ -1458,7 +1517,7 @@ def process_trigger_audio(audio_file):
             
             # Start full recording for command mode
             print("DEBUG: Starting command recording after trigger detection")
-            start_recording_thread('command')
+            start_recording_thread('command', force=True)
             print("DEBUG: Command recording thread started")
             return True
     except Exception as e:
@@ -1731,7 +1790,7 @@ def process_audio_buffer():
                 
             # Start dictation mode
             time.sleep(0.5)
-            start_recording_thread('dictation')
+            start_recording_thread('dictation', force=True)
             
         elif contains_command_trigger:
             print(f"DEBUG: COMMAND TRIGGER DETECTED in buffer: '{transcription}'")
@@ -1758,7 +1817,7 @@ def process_audio_buffer():
                 
             # Start command mode
             time.sleep(0.3)
-            start_recording_thread('command')
+            start_recording_thread('command', force=True)
         
         # Clean up the temporary file
         try:

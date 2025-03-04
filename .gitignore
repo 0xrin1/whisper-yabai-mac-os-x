@@ -59,3 +59,6 @@ src/test_*.py
 src/simple_dictation.py
 src/direct_typing.py
 src/direct_dictation.py
+
+# Test logs
+test_logs_*/
