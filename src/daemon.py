@@ -175,9 +175,17 @@ class AudioRecorder:
         
         frames_recorded = 0
         start_time = time.time()
+        # Make sure we record for the full duration
+        seconds_recorded = 0.0
+        frames_per_second = self.rate / self.chunk
+        target_frames = int(frames_per_second * duration)
+
+        print(f"DEBUG: Beginning recording loop for {duration} seconds ({target_frames} frames)")
+        
         try:
-            # Use a more reliable approach with a time-based loop
+            # Use a strictly time-based approach 
             end_time = start_time + duration
+            
             while time.time() < end_time and RECORDING:
                 try:
                     # Read audio with a timeout to ensure we don't get stuck
@@ -186,14 +194,33 @@ class AudioRecorder:
                     frames_recorded += 1
                     
                     # Print progress every second (approximate)
-                    if frames_recorded % int(self.rate / self.chunk) == 0:
-                        seconds_elapsed = time.time() - start_time
-                        seconds_remaining = max(0, duration - seconds_elapsed)
-                        print(f"DEBUG: Recorded {seconds_elapsed:.1f} sec, {seconds_remaining:.1f} sec remaining ({frames_recorded} frames)")
+                    if frames_recorded % int(frames_per_second) == 0:
+                        seconds_recorded = frames_recorded / frames_per_second
+                        seconds_remaining = max(0, duration - seconds_recorded)
+                        current_time = time.time()
+                        elapsed_real = current_time - start_time
                         
+                        print(f"DEBUG: Recorded {seconds_recorded:.1f} sec (real: {elapsed_real:.1f}s), " 
+                              f"{seconds_remaining:.1f} sec remaining ({frames_recorded}/{target_frames} frames)")
+                        
+                        # If we're running too fast, add a small delay to maintain timing accuracy
+                        if seconds_recorded > elapsed_real + 0.1:
+                            sleep_time = min(0.1, seconds_recorded - elapsed_real)
+                            time.sleep(sleep_time)
+                            
                 except Exception as rec_err:
                     print(f"DEBUG: Error reading audio frame: {rec_err}")
                     time.sleep(0.01)  # Small delay to avoid tight loop on error
+                
+            # Check if we ended early
+            if time.time() < end_time and not RECORDING:
+                print("DEBUG: Recording stopped early by user")
+            
+            # If we need to force completion of the duration 
+            remaining_time = end_time - time.time()
+            if remaining_time > 0.1:
+                print(f"DEBUG: Waiting {remaining_time:.1f}s to complete full duration")
+                time.sleep(remaining_time)
                 
         except KeyboardInterrupt:
             print("DEBUG: Recording interrupted by user")
@@ -257,6 +284,9 @@ class AudioRecorder:
             print(f"DEBUG: Adding to queue as command: {temp_filename}")
             AUDIO_QUEUE.put(temp_filename)
             print("DEBUG: Item added to queue")
+            
+        # Return the filename so caller can check it
+        return temp_filename
     
     def stop_recording(self):
         """Stop the current recording."""
@@ -670,9 +700,13 @@ def process_audio():
                 
                 # Process based on mode
                 if is_dictation_mode:
+                    print(f"DEBUG: Processing as dictation text: '{transcription}'")
                     process_dictation(transcription)
+                    print("DEBUG: Dictation processing completed")
                 elif confidence >= min_confidence_threshold:
+                    print(f"DEBUG: Processing as command: '{transcription}'")
                     command_processor.execute_command(transcription)
+                    print("DEBUG: Command processing completed")
                 else:
                     logger.warning(f"Low confidence command: {confidence:.2f} < {min_confidence_threshold}")
                     notify_error(f"Low confidence: {transcription}")
@@ -827,13 +861,27 @@ def start_recording_thread(mode):
     
     def recording_thread_func():
         print(f"DEBUG: Starting {mode_name.lower()} recording")
-        recorder.start_recording(dictation_mode=is_dictation)
-        print(f"DEBUG: {mode_name} recording completed")
+        # Ensure recording completes before this function returns
+        result = recorder.start_recording(dictation_mode=is_dictation)
+        print(f"DEBUG: {mode_name} recording completed, audio file: {result}")
+        
+        # Verify the file was created and has content before continuing
+        if result and os.path.exists(result):
+            size = os.path.getsize(result)
+            print(f"DEBUG: Audio file size: {size} bytes")
+            if size < 1000:
+                print("WARNING: Audio file suspiciously small, may not contain speech")
     
+    # Create a thread that will block until recording is complete
     thread = threading.Thread(target=recording_thread_func)
     thread.daemon = True
     thread.start()
+    
     print(f"DEBUG: {mode_name} recording thread started: {thread.name}")
+    
+    # IMPORTANT: Add a small delay to ensure thread starts properly
+    # This prevents immediate return of the function
+    time.sleep(0.2)
 
 def hotkey_command_callback():
     """Callback for command mode hotkey."""
