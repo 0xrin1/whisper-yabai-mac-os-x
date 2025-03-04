@@ -590,6 +590,7 @@ def process_audio():
     print("DEBUG: Audio processing thread starting...")
     logger.info(f"Loading Whisper model: {MODEL_SIZE}")
     
+    # Load the Whisper model
     try:
         print(f"DEBUG: Loading Whisper model '{MODEL_SIZE}'")
         start_time = time.time()
@@ -605,213 +606,180 @@ def process_audio():
     
     # Set minimum confidence threshold for command processing
     min_confidence_threshold = float(os.getenv('MIN_CONFIDENCE', '0.5'))
-    noise_threshold = float(os.getenv('NOISE_THRESHOLD', '0.2'))
-    logger.info(f"Using minimum confidence threshold: {min_confidence_threshold}")
-    print(f"DEBUG: Confidence threshold: {min_confidence_threshold}, Noise threshold: {noise_threshold}")
+    print(f"DEBUG: Confidence threshold: {min_confidence_threshold}")
     print("DEBUG: Audio processing thread ready and listening for queue items...")
     
+    # Main processing loop
     while True:
+        audio_file = None
+        
         try:
             # Get the next audio file from the queue
             print("DEBUG: Waiting for item in audio queue...")
             audio_item = AUDIO_QUEUE.get()
-            print(f"DEBUG: Got item from queue: {type(audio_item)}")
             
             if audio_item is None:
                 print("DEBUG: Found None in queue, exiting thread")
                 break
             
-            # Check if this is a tuple (for dictation mode)
+            # Process audio item - determine mode and extract file path
             is_dictation_mode = False
-            audio_file = audio_item
             
-            if isinstance(audio_item, tuple):
+            if isinstance(audio_item, tuple) and len(audio_item) == 2:
+                # Format: (file_path, is_dictation)
                 audio_file = audio_item[0]
-                is_dictation_mode = audio_item[1]
-                print(f"DEBUG: Processing as dictation mode: {is_dictation_mode}")
+                is_dictation_mode = bool(audio_item[1])
+                print(f"DEBUG: Processing audio in {'dictation' if is_dictation_mode else 'command'} mode")
+            elif isinstance(audio_item, str):
+                # Simple file path - command mode
+                audio_file = audio_item
+                print("DEBUG: Processing audio in command mode")
             else:
-                print("DEBUG: Not a tuple, processing as command mode")
+                print(f"DEBUG: Unknown audio queue item format: {type(audio_item)}")
+                AUDIO_QUEUE.task_done()
+                continue
+                
+            if not os.path.exists(audio_file):
+                print(f"ERROR: Audio file not found: {audio_file}")
+                AUDIO_QUEUE.task_done()
+                continue
                 
             logger.info(f"Processing audio file: {audio_file}")
-            print(f"DEBUG: Audio file path: {audio_file}")
-            
-            # Show notification that we're processing speech
             notify_processing()
             
+            # Transcribe audio using Whisper
             try:
-                # Transcribe using Whisper
                 print(f"DEBUG: Starting Whisper transcription of {audio_file}")
                 result = WHISPER_MODEL.transcribe(audio_file)
                 transcription = result["text"].strip()
-                print(f"DEBUG: Whisper transcription complete: '{transcription}'")
-                
-                # Some Whisper versions provide confidence scores
                 confidence = result.get("confidence", 1.0)
-                print(f"DEBUG: Transcription confidence: {confidence}")
+                print(f"DEBUG: Transcription: '{transcription}', confidence: {confidence:.2f}")
                 
-                # Delete temporary file after ensuring successful transcription
+                # Clean up the audio file
                 try:
-                    print(f"DEBUG: Removing temporary audio file {audio_file}")
                     os.unlink(audio_file)
-                    print("DEBUG: Successfully removed temp file")
                 except Exception as unlink_err:
-                    logger.error(f"Error removing temp file: {unlink_err}")
-                    print(f"DEBUG: Could not remove temp file: {unlink_err}")
+                    print(f"DEBUG: Failed to delete temp file: {unlink_err}")
                 
-                if transcription:
-                    # Simple heuristic to detect background noise
-                    if len(transcription) < 3 or all(c.isspace() or c in ".,;!?" for c in transcription):
-                        logger.warning(f"Detected likely noise: '{transcription}'")
-                        continue
-                        
-                    logger.info(f"Transcription: {transcription}")
-                    
-                    # If dictation mode, type the text directly
-                    if is_dictation_mode:
-                        logger.info(f"Dictation mode: typing '{transcription}'")
-                        
-                        try:
-                            # Type text using a reliable and simple clipboard method
-                            logger.info(f"Dictating text using clipboard method: {transcription}")
-                            
-                            # Multiple paste methods in sequence if needed
-                            success = False
-                            
-                            # Method 1: pbcopy + cmd+v (most reliable on macOS)
-                            try:
-                                logger.info("Using pbcopy + cmd+v method...")
-                                print(f"DEBUG: Attempting to copy '{transcription}' to clipboard using pbcopy")
-                                process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
-                                process.communicate(transcription.encode('utf-8'))
-                                print("DEBUG: pbcopy process completed")
-                                time.sleep(1.0)  # Give clipboard time to update - longer delay
-                                
-                                # Paste using command+v
-                                print("DEBUG: Attempting to paste with command+v")
-                                pyautogui.hotkey('command', 'v')
-                                print("DEBUG: Command+v hotkey sent")
-                                time.sleep(0.5) # Wait to ensure paste completes
-                                success = True
-                                logger.info("pbcopy + cmd+v method successful")
-                            except Exception as e1:
-                                logger.warning(f"pbcopy + cmd+v method failed: {e1}")
-                                # Continue to the next method if this one fails
-                                
-                            # Method 2: AppleScript as fallback
-                            if not success:
-                                try:
-                                    logger.info("Using AppleScript keystroke method...")
-                                    print("DEBUG: Trying AppleScript method as fallback")
-                                    
-                                    # Save to a temp file for the AppleScript
-                                    tmp_file = "/tmp/dictation_text.txt"
-                                    with open(tmp_file, "w") as f:
-                                        f.write(transcription)
-                                    print(f"DEBUG: Saved text to {tmp_file}")
-                                    
-                                    # Verify file was written correctly
-                                    with open(tmp_file, "r") as f:
-                                        file_content = f.read()
-                                        print(f"DEBUG: File contains: '{file_content}'")
-                                    
-                                    # AppleScript to keystroke the text
-                                    script = '''
-                                    set the_text to (do shell script "cat /tmp/dictation_text.txt")
-                                    tell application "System Events"
-                                        delay 0.5
-                                        keystroke the_text
-                                    end tell
-                                    '''
-                                    
-                                    # Execute the AppleScript
-                                    print("DEBUG: Executing AppleScript")
-                                    result = subprocess.run(["osascript", "-e", script], 
-                                                          check=True,
-                                                          capture_output=True,
-                                                          text=True)
-                                    print(f"DEBUG: AppleScript stdout: {result.stdout}")
-                                    print(f"DEBUG: AppleScript stderr: {result.stderr}")
-                                    
-                                    success = True
-                                    logger.info("AppleScript keystroke method successful")
-                                    
-                                    # Clean up temp file
-                                    os.remove("/tmp/dictation_text.txt")
-                                    print("DEBUG: Removed temp file")
-                                except Exception as e2:
-                                    logger.error(f"AppleScript keystroke method failed: {e2}")
-                            
-                            # Method 3: Last resort - direct typing with interval
-                            if not success:
-                                try:
-                                    logger.info("Using direct typing as last resort...")
-                                    print("DEBUG: Trying direct typing method as final fallback")
-                                    
-                                    # Use direct typing with a longer interval
-                                    pyautogui.write(transcription, interval=0.03)  # Slower typing, more reliable
-                                    
-                                    success = True
-                                    logger.info("Direct typing method successful")
-                                    print("DEBUG: Direct typing method completed")
-                                except Exception as e3:
-                                    logger.error(f"Direct typing method failed: {e3}")
-                                    print(f"DEBUG: Direct typing error: {e3}")
-                                    raise Exception("All typing methods failed")
-                                
-                            # Save to log file for history
-                            try:
-                                log_path = 'dictation_log.txt'
-                                with open(log_path, 'a') as f:
-                                    f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: {transcription}\n")
-                                print(f"DEBUG: Saved entry to {log_path}")
-                            except Exception as log_err:
-                                print(f"DEBUG: Failed to write to log: {log_err}")
-                            
-                            # Play a sound to indicate successful dictation
-                            try:
-                                # Use macOS built-in 'Pop' sound
-                                sound_file = "/System/Library/Sounds/Pop.aiff"
-                                print(f"DEBUG: Playing completion sound {sound_file}")
-                                subprocess.run(["afplay", sound_file], check=False)
-                                print("DEBUG: Sound played successfully")
-                            except Exception as sound_err:
-                                logger.error(f"Could not play completion sound: {sound_err}")
-                                print(f"DEBUG: Sound error: {sound_err}")
-                                
-                            # Show a notification with the transcribed text
-                            print("DEBUG: Showing notification")
-                            notify_command_executed(f"Transcribed: {transcription}")
-                            
-                            # Final success log
-                            logger.info(f"Typed dictation to cursor and saved to dictation_log.txt: {transcription}")
-                            print("DEBUG: Dictation process COMPLETE")
-                        except Exception as e:
-                            logger.error(f"Failed to process dictation: {e}")
-                            notify_error(f"Failed to process dictation: {str(e)}")
-                            
-                    # Otherwise process as command
-                    elif confidence >= min_confidence_threshold:
-                        command_processor.execute_command(transcription)
-                    else:
-                        logger.warning(f"Ignoring low confidence transcription: {confidence:.2f} < {min_confidence_threshold}")
-                        notify_error(f"Low confidence: {transcription}")
+                # Skip empty or noise transcriptions
+                if not transcription or len(transcription) < 3 or all(c.isspace() or c in ".,;!?" for c in transcription):
+                    logger.warning(f"Empty or noise transcription: '{transcription}'")
+                    notify_error("No clear speech detected")
+                    AUDIO_QUEUE.task_done()
+                    continue
+                
+                # Process based on mode
+                if is_dictation_mode:
+                    process_dictation(transcription)
+                elif confidence >= min_confidence_threshold:
+                    command_processor.execute_command(transcription)
                 else:
-                    logger.warning("No speech detected.")
-                    notify_error("No speech detected")
+                    logger.warning(f"Low confidence command: {confidence:.2f} < {min_confidence_threshold}")
+                    notify_error(f"Low confidence: {transcription}")
+                
             except Exception as e:
                 logger.error(f"Transcription error: {e}")
                 notify_error(f"Failed to transcribe audio: {str(e)}")
-                # Try to delete the temporary file even if transcription failed
-                try:
-                    os.unlink(audio_file)
-                except:
-                    pass
-                
+                # Clean up if error occurred
+                if audio_file and os.path.exists(audio_file):
+                    try:
+                        os.unlink(audio_file)
+                    except:
+                        pass
+            
             AUDIO_QUEUE.task_done()
             
         except Exception as e:
-            logger.error(f"Error processing audio: {e}")
+            logger.error(f"Error in audio processing: {e}")
             notify_error(f"Error processing audio: {str(e)}")
+            # Make sure to call task_done even if an exception occurs
+            AUDIO_QUEUE.task_done()
+
+
+def process_dictation(transcription):
+    """Process dictation by typing text at cursor.
+    
+    Args:
+        transcription (str): The text to type
+    """
+    logger.info(f"Dictation mode: typing '{transcription}'")
+    
+    try:
+        # Try multiple paste methods in sequence
+        success = False
+        
+        # Method 1: pbcopy + cmd+v (most reliable on macOS)
+        try:
+            logger.info("Using pbcopy + cmd+v method...")
+            
+            # Copy text to clipboard using pbcopy
+            process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+            process.communicate(transcription.encode('utf-8'))
+            time.sleep(1.0)  # Give clipboard time to update
+            
+            # Paste using command+v
+            pyautogui.hotkey('command', 'v')
+            success = True
+        except Exception as e1:
+            logger.warning(f"Clipboard method failed: {e1}")
+            
+        # Method 2: AppleScript as fallback
+        if not success:
+            try:
+                logger.info("Using AppleScript keystroke method...")
+                
+                # Save to temp file for AppleScript
+                tmp_file = "/tmp/dictation_text.txt"
+                with open(tmp_file, "w") as f:
+                    f.write(transcription)
+                
+                # AppleScript to keystroke the text
+                script = '''
+                set the_text to (do shell script "cat /tmp/dictation_text.txt")
+                tell application "System Events"
+                    delay 0.5
+                    keystroke the_text
+                end tell
+                '''
+                
+                subprocess.run(["osascript", "-e", script], check=True)
+                success = True
+                
+                # Clean up temp file
+                os.remove(tmp_file)
+            except Exception as e2:
+                logger.error(f"AppleScript method failed: {e2}")
+        
+        # Method 3: Direct typing as last resort
+        if not success:
+            try:
+                logger.info("Using direct typing as last resort...")
+                pyautogui.write(transcription, interval=0.03)
+                success = True
+            except Exception as e3:
+                logger.error(f"Direct typing failed: {e3}")
+                raise Exception("All typing methods failed")
+        
+        # Save to log file
+        try:
+            with open('dictation_log.txt', 'a') as f:
+                f.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: {transcription}\n")
+        except Exception as log_err:
+            logger.error(f"Failed to write to log: {log_err}")
+        
+        # Play completion sound
+        try:
+            subprocess.run(["afplay", "/System/Library/Sounds/Pop.aiff"], check=False)
+        except Exception:
+            pass
+            
+        # Show success notification
+        notify_command_executed(f"Transcribed: {transcription}")
+        logger.info("Dictation completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Failed to process dictation: {e}")
+        notify_error(f"Failed to process dictation: {str(e)}")
 
 
 def signal_handler(sig, frame):
@@ -841,37 +809,39 @@ SPACE_PRESSED = False
 D_PRESSED = False
 V_PRESSED = False  # Alternative dictation key
 
+def start_recording_thread(mode):
+    """Start a recording thread with specified mode.
+    
+    Args:
+        mode (str): Either 'command' or 'dictation'
+    """
+    if RECORDING:
+        print(f"DEBUG: Already recording, ignoring {mode} request")
+        return
+        
+    is_dictation = (mode == 'dictation')
+    mode_name = "Dictation" if is_dictation else "Command"
+    
+    print(f"DEBUG: {mode_name} hotkey triggered")
+    logger.info(f"{mode_name} hotkey triggered - starting voice recording...")
+    
+    def recording_thread_func():
+        print(f"DEBUG: Starting {mode_name.lower()} recording")
+        recorder.start_recording(dictation_mode=is_dictation)
+        print(f"DEBUG: {mode_name} recording completed")
+    
+    thread = threading.Thread(target=recording_thread_func)
+    thread.daemon = True
+    thread.start()
+    print(f"DEBUG: {mode_name} recording thread started: {thread.name}")
+
 def hotkey_command_callback():
     """Callback for command mode hotkey."""
-    if not RECORDING:
-        print("DEBUG: Command hotkey callback triggered")
-        logger.info("Command hotkey triggered - starting voice recording...")
-        
-        def start_command_recording():
-            print("DEBUG: Starting command recording thread")
-            recorder.start_recording(dictation_mode=False)
-            print("DEBUG: Command recording thread completed")
-            
-        thread = threading.Thread(target=start_command_recording)
-        thread.daemon = True
-        thread.start()
-        print(f"DEBUG: Command recording thread started: {thread.name}")
+    start_recording_thread('command')
 
 def hotkey_dictation_callback():
     """Callback for dictation mode hotkey."""
-    if not RECORDING:
-        print("DEBUG: Dictation hotkey callback triggered")
-        logger.info("Dictation hotkey triggered - starting voice recording...")
-        
-        def start_dictation_recording():
-            print("DEBUG: Starting dictation recording thread")
-            recorder.start_recording(dictation_mode=True)
-            print("DEBUG: Dictation recording thread completed")
-            
-        thread = threading.Thread(target=start_dictation_recording)
-        thread.daemon = True
-        thread.start()
-        print(f"DEBUG: Dictation recording thread started: {thread.name}")
+    start_recording_thread('dictation')
 
 def on_press(key):
     """Handle key press events."""
