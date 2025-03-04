@@ -5,7 +5,7 @@
 SERVER_USER="user"
 SERVER_HOST="gpu-server.example.com"
 SERVER_PATH="/home/user/voice-training"
-SAMPLES_DIR="../training_samples"
+SAMPLES_DIR="training_samples"
 REMOTE_SCRIPT_NAME="run_training.sh"
 
 # Colors for output

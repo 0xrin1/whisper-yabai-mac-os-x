@@ -26,9 +26,9 @@ logging.basicConfig(
 logger = logging.getLogger('neural-voice-training')
 
 # Constants
-MODEL_DIR = "../voice_models"
-TRAINING_DIR = "../training_samples"
-OUTPUT_DIR = "../voice_models/neural_voice"
+MODEL_DIR = "voice_models"
+TRAINING_DIR = "training_samples"
+OUTPUT_DIR = "voice_models/neural_voice"
 COQUI_MODEL = "tts_models/en/ljspeech/tacotron2-DDC"  # Base model for fine-tuning
 
 def check_gpu():

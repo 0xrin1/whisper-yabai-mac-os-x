@@ -5,7 +5,7 @@
 SERVER_USER="user"
 SERVER_HOST="gpu-server.example.com" 
 SERVER_PATH="/home/user/voice-training"
-MODEL_DIR="../voice_models/neural_voice"
+MODEL_DIR="voice_models/neural_voice"
 REMOTE_MODEL_PATH="models/neural_voice"
 
 # Colors for output
@@ -67,7 +67,7 @@ fi
 
 # Install model
 echo -e "\n${GREEN}Installing neural voice model...${NC}"
-cat > ../voice_models/active_model.json << EOF
+cat > voice_models/active_model.json << EOF
 {
   "active_model": "neural_voice",
   "path": "$(cd "$MODEL_DIR" && pwd)",
