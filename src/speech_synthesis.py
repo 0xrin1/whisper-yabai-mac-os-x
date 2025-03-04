@@ -15,11 +15,19 @@ from typing import Optional, List, Dict, Any
 
 # Available high-quality macOS voices
 AVAILABLE_VOICES = {
-    "samantha": {"gender": "female", "accent": "american", "personality": "friendly"},
     "daniel": {"gender": "male", "accent": "british", "personality": "professional"},
+    "alex": {"gender": "male", "accent": "american", "personality": "friendly"},
+    "fred": {"gender": "male", "accent": "american", "personality": "authoritative"},
+    "tom": {"gender": "male", "accent": "american", "personality": "deep"},
+    "lee": {"gender": "male", "accent": "australian", "personality": "warm"},
+    # Keeping female voices as fallbacks only
+    "samantha": {"gender": "female", "accent": "american", "personality": "friendly"},
     "karen": {"gender": "female", "accent": "australian", "personality": "warm"}
-    # Note: alex and allison voices were removed as they aren't available on all macOS versions
 }
+
+# Group voices by gender
+MALE_VOICES = ["daniel", "alex", "fred", "tom", "lee"]
+FEMALE_VOICES = ["samantha", "karen"]
 
 # Default voice to use
 DEFAULT_VOICE = "daniel"  # Use Daniel as default for JARVIS-like experience
@@ -223,37 +231,39 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
         if not os.path.exists(temp_dir):
             os.makedirs(temp_dir)
         
-        # Try different high-quality voices as the base
-        # based on the first sample in the user's model
-        
-        # Determine best base voice from sample names
-        samples = ACTIVE_VOICE_MODEL.get("samples", [])
-        
         # Get voice profile from model metadata
         voice_profile = ACTIVE_VOICE_MODEL.get("voice_profile", {})
         
-        # Set default parameters (in case there's no voice profile)
-        base_voice = "Alex"  # Default
-        pitch_modifier = 0.95  # Default
-        speaking_rate_modifier = 1.0  # Default
+        # Set default parameters for a male voice model
+        base_voice = "Daniel"  # Default male voice
+        pitch_modifier = 0.95  # Default male pitch modifier
+        speaking_rate_modifier = 1.0  # Default speaking rate
         
-        # If we have a voice profile, use its parameters
+        # If we have a voice profile, use its parameters (but ensure male voice)
         if voice_profile:
             # Use recommended voice settings from the profile
-            base_voice = voice_profile.get("base_voice", "Daniel")
-            pitch_modifier = voice_profile.get("pitch_modifier", 0.97)
+            base_voice_from_profile = voice_profile.get("base_voice", "Daniel")
+            
+            # Ensure we're using a male voice as base (for JARVIS-like experience)
+            if base_voice_from_profile.lower() in MALE_VOICES:
+                base_voice = base_voice_from_profile
+            else:
+                # Force a male voice if profile specifies female
+                base_voice = "Daniel"
+                
+            pitch_modifier = voice_profile.get("pitch_modifier", 0.95)
             speaking_rate_modifier = voice_profile.get("speaking_rate", 1.0)
-            # Additional parameters could be used here if available
         elif sample_count > 0 and model_name == "user_voice":
             # Fallback if no voice profile but we have samples
             if sample_count > 30:
                 # With many samples, we have better information about the voice
-                base_voice = "Samantha"  # Female base voice
-                pitch_modifier = 0.92    # Deeper tone for more unique sound
+                # Use Alex (American male) for a more energetic sound
+                base_voice = "Alex"
+                pitch_modifier = 0.92
             else:
-                # With fewer samples, use more subtle adjustments
-                base_voice = "Daniel"    # Male base voice
-                pitch_modifier = 0.97    # Slight pitch adjustment
+                # With fewer samples, use more subtle adjustments with Daniel (British male)
+                base_voice = "Daniel"
+                pitch_modifier = 0.94
                 
         # Make the voice sound more like your voice based on training samples
         # Use different base voices for different types of phrases
