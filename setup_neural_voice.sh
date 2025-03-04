@@ -45,6 +45,16 @@ $SSH_BASE "mkdir -p ~/neural_voice_model/code ~/neural_voice_model/models ~/neur
 echo "Transferring voice samples to GPU server..."
 $SCP_BASE training_samples/*.wav "$GPU_SERVER_USER@$GPU_SERVER_HOST:~/neural_voice_model/samples/"
 
+# Transfer GPU training code
+echo "Transferring GPU training scripts..."
+mkdir -p gpu_transfer
+cp gpu_scripts/train_neural_voice.py gpu_transfer/
+cp gpu_scripts/neural_voice_server.py gpu_transfer/
+cp gpu_scripts/start_neural_server.sh gpu_transfer/
+
+$SCP_BASE gpu_transfer/* "$GPU_SERVER_USER@$GPU_SERVER_HOST:~/neural_voice_model/code/"
+rm -rf gpu_transfer
+
 # Create the remote setup script
 echo "Creating remote setup script..."
 cat > setup_remote.sh << 'EOF'

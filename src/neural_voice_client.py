@@ -31,7 +31,7 @@ except ImportError:
     logger.error("Requests library not available. Install with: pip install requests")
 
 # Default settings
-DEFAULT_SERVER = "http://localhost:5000"
+DEFAULT_SERVER = os.environ.get("NEURAL_SERVER", "http://localhost:5001")
 TEMP_DIR = "tmp_neural_audio"
 CACHE_DIR = "neural_cache"
 MAX_CACHE_SIZE = 100  # Maximum number of cached audio files

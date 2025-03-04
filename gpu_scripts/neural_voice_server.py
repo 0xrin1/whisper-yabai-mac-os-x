@@ -61,9 +61,9 @@ except ImportError:
     logger.error("Flask not available - server cannot start. Install with 'pip install flask'")
 
 # Default settings
-DEFAULT_PORT = 5000
+DEFAULT_PORT = 5001
 DEFAULT_HOST = "0.0.0.0"
-DEFAULT_MODEL_PATH = "models/neural_voice"
+DEFAULT_MODEL_PATH = "voice_models/neural_voice"
 AUDIO_OUTPUT_DIR = "audio_cache"
 MAX_CACHE_SIZE = 1000  # Maximum number of cached audio files
 
@@ -102,36 +102,47 @@ def load_model(model_path: str) -> Optional[Dict[str, Any]]:
             
         logger.info(f"Loaded model info: {model_info.get('name', 'unknown')}")
         
-        # For now, we're using a placeholder since we don't have actual model files.
-        # When you have trained the model completely, uncomment this code:
-        """
-        # Get model and vocoder paths
-        model_file = os.path.join(model_path, "tts_model.pth.tar")
+        # Check for actual model files
+        model_file = os.path.join(model_path, "best_model.pth")
         config_file = os.path.join(model_path, "config.json")
-        vocoder_file = os.path.join(model_path, "vocoder_model.pth.tar")
+        vocoder_file = os.path.join(model_path, "vocoder_model.pth")
         vocoder_config = os.path.join(model_path, "vocoder_config.json")
         
-        # Check if files exist
-        if not os.path.exists(model_file) or not os.path.exists(config_file):
-            logger.error(f"Model files not found in {model_path}")
-            return None
-            
         # Initialize synthesizer
-        synthesizer = Synthesizer(
-            tts_checkpoint=model_file,
-            tts_config_path=config_file,
-            vocoder_checkpoint=vocoder_file if os.path.exists(vocoder_file) else None,
-            vocoder_config=vocoder_config if os.path.exists(vocoder_config) else None,
-            use_cuda=torch.cuda.is_available()
-        )
-        """
-        
-        # For now, use a placeholder synthesizer
-        synthesizer = {
-            "model_info": model_info,
-            "use_cuda": torch.cuda.is_available() if TORCH_AVAILABLE else False,
-            "loaded": True
-        }
+        if (os.path.exists(model_file) or os.path.exists(os.path.join(model_path, "best_model.pth.tar"))) and os.path.exists(config_file):
+            logger.info("Found trained model files, loading Coqui TTS synthesizer")
+            
+            # If path has .tar extension
+            if not os.path.exists(model_file) and os.path.exists(os.path.join(model_path, "best_model.pth.tar")):
+                model_file = os.path.join(model_path, "best_model.pth.tar")
+            
+            # Try to load synthesizer
+            try:
+                synthesizer = Synthesizer(
+                    tts_checkpoint=model_file,
+                    tts_config_path=config_file,
+                    vocoder_checkpoint=vocoder_file if os.path.exists(vocoder_file) else None,
+                    vocoder_config=vocoder_config if os.path.exists(vocoder_config) else None,
+                    use_cuda=torch.cuda.is_available()
+                )
+                logger.info("Successfully loaded neural TTS synthesizer")
+            except Exception as e:
+                logger.error(f"Error initializing Coqui TTS synthesizer: {e}")
+                logger.error(traceback.format_exc())
+                # Fall back to placeholder
+                synthesizer = {
+                    "model_info": model_info,
+                    "use_cuda": torch.cuda.is_available() if TORCH_AVAILABLE else False,
+                    "loaded": True
+                }
+        else:
+            logger.warning(f"No trained model files found in {model_path}, using fallback synthesizer")
+            # Use a placeholder synthesizer
+            synthesizer = {
+                "model_info": model_info,
+                "use_cuda": torch.cuda.is_available() if TORCH_AVAILABLE else False,
+                "loaded": True
+            }
         
         return model_info
         
@@ -173,13 +184,73 @@ def synthesize_speech(text: str) -> Optional[str]:
         synthesis_counter += 1
         output_file = os.path.join(AUDIO_OUTPUT_DIR, f"speech_{timestamp}_{synthesis_counter}.wav")
         
-        # If we had a real synthesizer, we would do:
-        # wav = synthesizer.tts(text)
-        # synthesizer.save_wav(wav, output_file)
+        # Try to use neural TTS if available
+        if isinstance(synthesizer, Synthesizer):
+            try:
+                logger.info(f"Using neural TTS for text: {text[:30]}...")
+                start_time = time.time()
+                
+                # Use GPU if available
+                use_cuda = torch.cuda.is_available()
+                device = "cuda" if use_cuda else "cpu"
+                logger.info(f"Synthesizing with device: {device}")
+                
+                # Generate speech with neural TTS
+                wav = synthesizer.tts(text=text)
+                
+                # Save as WAV file
+                import soundfile as sf
+                sf.write(output_file, wav, 22050)
+                
+                end_time = time.time()
+                logger.info(f"Neural synthesis completed in {end_time - start_time:.2f} seconds")
+                
+            except Exception as e:
+                logger.error(f"Error in neural synthesis: {e}")
+                logger.error(traceback.format_exc())
+                # Fall back to alternative method
+                logger.info("Falling back to alternative synthesis method")
+                return synthesize_speech_fallback(text, output_file)
+        else:
+            # Use fallback method
+            return synthesize_speech_fallback(text, output_file)
+                
+        # Add to cache
+        with cache_lock:
+            # Manage cache size
+            if len(audio_cache) >= MAX_CACHE_SIZE:
+                # Remove oldest item
+                oldest_text = next(iter(audio_cache))
+                oldest_file = audio_cache[oldest_text]
+                if os.path.exists(oldest_file):
+                    os.remove(oldest_file)
+                del audio_cache[oldest_text]
+                
+            # Add new item to cache
+            audio_cache[text] = output_file
+            
+        return output_file
         
-        # For now, use macOS say as a placeholder
-        if sys.platform == "darwin":  # macOS
+    except Exception as e:
+        logger.error(f"Error synthesizing speech: {e}")
+        logger.error(traceback.format_exc())
+        return None
+
+def synthesize_speech_fallback(text: str, output_file: str) -> Optional[str]:
+    """Fallback method for speech synthesis when neural TTS fails.
+    
+    Args:
+        text: Text to synthesize
+        output_file: Path to save the output audio
+        
+    Returns:
+        Path to output audio file or None if failed
+    """
+    try:
+        # For macOS, use say command
+        if sys.platform == "darwin":
             # We need to use an intermediate AIFF file since macOS say can't output WAV directly
+            timestamp = int(time.time() * 1000)
             temp_file = os.path.join(AUDIO_OUTPUT_DIR, f"temp_{timestamp}.aiff")
             
             # Get voice parameters from model info
@@ -222,39 +293,50 @@ def synthesize_speech(text: str) -> Optional[str]:
             # Clean up temp file
             if os.path.exists(temp_file):
                 os.remove(temp_file)
-        else:
-            # For non-macOS, generate a simple sine wave as placeholder
-            if TORCH_AVAILABLE:
-                sample_rate = 22050
-                duration = min(10, 0.5 + len(text) * 0.05)  # Rough estimate of duration
-                t = torch.arange(0, duration, 1/sample_rate)
-                wave = torch.sin(2 * np.pi * 440 * t)  # 440 Hz sine wave
                 
-                # Save as WAV
+            return output_file
+                
+        # For non-macOS systems
+        elif TORCH_AVAILABLE:
+            # Generate a simple audio signal based on the text
+            logger.info("Using PyTorch-based audio generation as fallback")
+            
+            sample_rate = 22050
+            
+            # Create a more complex waveform for the fallback audio
+            duration = min(10, 0.5 + len(text) * 0.05)  # Rough estimate of duration
+            t = torch.arange(0, duration, 1/sample_rate)
+            
+            # Generate a mix of frequencies to make it sound more like speech
+            frequencies = [440, 220, 330, 550, 660]
+            amplitudes = [1.0, 0.5, 0.3, 0.2, 0.1]
+            
+            wave = torch.zeros_like(t)
+            for freq, amp in zip(frequencies, amplitudes):
+                wave += amp * torch.sin(2 * np.pi * freq * t)
+            
+            # Normalize
+            wave = wave / torch.max(torch.abs(wave))
+            
+            # Add some amplitude modulation to simulate speech cadence
+            mod_freq = 3  # 3 Hz modulation (syllable rate)
+            modulation = 0.5 + 0.5 * torch.sin(2 * np.pi * mod_freq * t)
+            wave = wave * modulation
+            
+            # Save as WAV
+            try:
                 import scipy.io.wavfile as wav
                 wav.write(output_file, sample_rate, wave.numpy())
-            else:
-                logger.error("Cannot generate audio: PyTorch not available and not on macOS")
+                return output_file
+            except Exception as e:
+                logger.error(f"Error saving fallback audio: {e}")
                 return None
-                
-        # Add to cache
-        with cache_lock:
-            # Manage cache size
-            if len(audio_cache) >= MAX_CACHE_SIZE:
-                # Remove oldest item
-                oldest_text = next(iter(audio_cache))
-                oldest_file = audio_cache[oldest_text]
-                if os.path.exists(oldest_file):
-                    os.remove(oldest_file)
-                del audio_cache[oldest_text]
-                
-            # Add new item to cache
-            audio_cache[text] = output_file
+        else:
+            logger.error("Cannot generate audio: PyTorch not available and not on macOS")
+            return None
             
-        return output_file
-        
     except Exception as e:
-        logger.error(f"Error synthesizing speech: {e}")
+        logger.error(f"Error in fallback synthesis: {e}")
         logger.error(traceback.format_exc())
         return None
 

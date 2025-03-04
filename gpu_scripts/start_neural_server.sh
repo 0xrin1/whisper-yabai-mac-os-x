@@ -16,8 +16,8 @@ echo "==============================================="
 echo -e "${NC}"
 
 # Configuration
-MODEL_DIR="models/neural_voice"
-PORT=5000
+MODEL_DIR="voice_models/neural_voice"
+PORT=5001
 HOST="0.0.0.0"  # Listen on all interfaces
 
 # Load environment variables if .env file exists

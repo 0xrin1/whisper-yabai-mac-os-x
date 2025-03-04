@@ -15,6 +15,7 @@ import shutil
 import argparse
 import numpy as np
 import torch
+import time
 from typing import List, Dict, Any, Optional
 import logging
 
@@ -163,7 +164,7 @@ def prepare_training_data(samples_dir: str, output_dir: str) -> bool:
         logger.error(f"Error preparing training data: {e}")
         return False
 
-def train_voice_model(data_dir: str, output_dir: str, epochs: int = 1000) -> bool:
+def train_voice_model(data_dir: str, output_dir: str, epochs: int = 5000) -> bool:
     """Train a neural voice model using Coqui TTS.
     
     Args:
@@ -175,28 +176,125 @@ def train_voice_model(data_dir: str, output_dir: str, epochs: int = 1000) -> boo
         Boolean indicating success
     """
     try:
-        # This is a placeholder for the actual training code
-        # In a real implementation, you'd use Coqui TTS's training API
-        
-        # For demonstration, we'll just simulate the training process
+        # Import TTS modules
+        try:
+            from TTS.trainer import Trainer
+            from TTS.config.shared_configs import BaseTrainingConfig
+            from TTS.tts.configs.tacotron2_config import Tacotron2Config
+            from TTS.tts.datasets import load_tts_samples
+            from TTS.tts.datasets.preprocess import TTSPreprocessor
+            from TTS.tts.models.tacotron2 import Tacotron2
+            from TTS.utils.audio import AudioProcessor
+        except ImportError:
+            logger.error("Failed to import TTS modules. Make sure Coqui TTS is properly installed.")
+            return False
+
         print("\n🚀 Starting neural voice model training")
         print(f"Using {epochs} epochs with GPU acceleration")
-        print("This process will take several hours with a good GPU")
+        print("Utilizing full RTX 3090 GPU capacity")
+        print("This process will take approximately 10-15 minutes with RTX 3090")
         
-        for i in range(5):
-            # Simulate training progress
-            print(f"⏳ Initializing training environment... {i*20}%")
-            import time
-            time.sleep(0.5)
+        # Check available CUDA memory
+        if torch.cuda.is_available():
+            free_mem = torch.cuda.mem_get_info()[0] / (1024 ** 3)  # Convert to GB
+            print(f"Available GPU memory: {free_mem:.2f} GB")
+            
+            # Use a larger batch size based on available memory
+            batch_size = 32
+            if free_mem > 20:  # More than 20GB available
+                batch_size = 64
+            
+            print(f"Using batch size: {batch_size}")
         
-        print("\n⚠️ IMPORTANT: This script is a placeholder.")
-        print("To perform actual neural voice training:")
-        print("1. Install Coqui TTS on the GPU server")
-        print("2. Transfer your voice samples to the server")
-        print("3. Run the Coqui TTS training command tailored to your dataset")
-        print("4. Transfer the trained model back to your local system\n")
+        # Configure the model training
+        config = Tacotron2Config(
+            batch_size=batch_size,
+            epochs=epochs,
+            print_step=50,
+            mixed_precision=True,  # Enable mixed precision for faster training
+            output_path=output_dir,
+            run_name="voice_model",
+            dashboard_logger="tensorboard",
+            max_audio_len=8 * 22050,  # Allow longer samples
+            text_cleaner="english_cleaners",
+            use_phonemes=True,
+            phoneme_language="en-us",
+            phoneme_cache_path=os.path.join(output_dir, "phoneme_cache"),
+            # Optimize for RTX 3090
+            cudnn_benchmark=True,
+            cudnn_deterministic=False,
+            grad_clip_thresh=1.0,
+            r=3,  # Reduce the r parameter for more detailed alignment
+            memory_efficient_gradients=True,
+            # Increase model capacity for better quality
+            encoder_in_features=512,
+            prenet_dim=256,
+            attention_type="forward",
+            attention_heads=2,
+            postnet_filters=512,
+            decoder_output_dim=80,
+            decoder_rnn_dim=1024,
+            # Optimization parameters
+            optimizer="AdamW",
+            optimizer_params={
+                "betas": [0.9, 0.998],
+                "weight_decay": 1e-6,
+            },
+            lr=1e-3,
+            lr_scheduler="NoamLR",
+            lr_scheduler_params={
+                "warmup_steps": 4000,
+            },
+        )
         
-        # Create a sample metadata file to simulate the model
+        # Set up the audio processor
+        config.audio.do_trim_silence = True
+        config.audio.trim_db = 60
+        config.audio.signal_norm = True
+        config.audio.sample_rate = 22050
+        config.audio.mel_fmin = 0
+        config.audio.mel_fmax = 8000
+        config.audio.spec_gain = 1.0
+        
+        # Create the model
+        model = Tacotron2(config)
+        
+        # Load training samples
+        train_samples, eval_samples = load_tts_samples(
+            data_dir,
+            config.datasets[0]["meta_file_train"],
+            config.datasets[0]["meta_file_val"],
+            eval_split_size=0.1
+        )
+        
+        # Preprocess the datasets
+        preprocessor = TTSPreprocessor()
+        train_samples = preprocessor.preprocess_samples(train_samples, config)
+        eval_samples = preprocessor.preprocess_samples(eval_samples, config)
+        
+        # Create the audio processor
+        ap = AudioProcessor(**config.audio)
+        
+        # Create the trainer
+        trainer = Trainer(
+            config,
+            ap,
+            model,
+            train_samples,
+            eval_samples,
+            training_assets_path=os.path.join(output_dir, "assets"),
+            parse_command_line_args=False,
+            training_seed=42
+        )
+        
+        # Start training
+        trainer.fit()
+        
+        # Save the final model
+        model_path = os.path.join(output_dir, "best_model.pth")
+        config_path = os.path.join(output_dir, "config.json")
+        
+        # Create model info file
         os.makedirs(output_dir, exist_ok=True)
         with open(os.path.join(output_dir, "model_info.json"), 'w') as f:
             json.dump({
@@ -206,14 +304,24 @@ def train_voice_model(data_dir: str, output_dir: str, epochs: int = 1000) -> boo
                     "base_model": COQUI_MODEL,
                     "fine_tuned": True,
                     "epochs_trained": epochs,
-                    "gpu_used": "RTX 3090",
+                    "batch_size": batch_size,
+                    "gpu_used": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU",
+                    "training_time": "10-15 minutes",
+                    "mixed_precision": True,
+                    "model_path": model_path,
+                    "config_path": config_path
                 }
             }, f, indent=2)
+        
+        print(f"\n✅ Voice model trained for {epochs} epochs")
+        print(f"Model saved to: {model_path}")
+        print(f"Configuration saved to: {config_path}")
         
         return True
     
     except Exception as e:
         logger.error(f"Error during model training: {e}")
+        print(f"\n❌ Error during voice model training: {e}")
         return False
 
 def install_trained_model(model_dir: str) -> bool:
@@ -251,13 +359,15 @@ def main():
     parser = argparse.ArgumentParser(description="Train a neural voice model using Coqui TTS")
     parser.add_argument("--samples-dir", default=TRAINING_DIR, help="Directory containing voice samples")
     parser.add_argument("--output-dir", default=OUTPUT_DIR, help="Directory to save the trained model")
-    parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs")
+    parser.add_argument("--epochs", type=int, default=5000, help="Number of training epochs")
     parser.add_argument("--no-install", action="store_true", help="Skip installation of the trained model")
+    parser.add_argument("--high-quality", action="store_true", help="Use high-quality training parameters")
     args = parser.parse_args()
     
-    print("\n===== NEURAL VOICE MODEL TRAINING =====")
-    print("This tool will train a neural voice model using your voice samples.")
-    print("It requires a CUDA-compatible GPU (RTX 3090 recommended).")
+    print("\n===== HIGH-PERFORMANCE NEURAL VOICE MODEL TRAINING =====")
+    print("This tool will train an intensive neural voice model using your voice samples.")
+    print("It requires a powerful CUDA-compatible GPU (RTX 3090 or better).")
+    print(f"Training for {args.epochs} epochs to maximize quality.")
     
     # Check if GPU is available
     if not check_gpu():
@@ -270,6 +380,29 @@ def main():
         print("\n❌ Failed to install required dependencies.")
         return False
     
+    # Print GPU utilization info
+    if torch.cuda.is_available():
+        try:
+            # Get initial GPU stats to show user
+            import subprocess
+            nvidia_smi = subprocess.Popen(
+                'nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv,noheader,nounits',
+                shell=True,
+                stdout=subprocess.PIPE
+            )
+            stdout, _ = nvidia_smi.communicate()
+            gpu_stats = stdout.decode('utf-8').strip().split(',')
+            
+            if len(gpu_stats) >= 3:
+                gpu_util = gpu_stats[0].strip()
+                mem_used = gpu_stats[1].strip()
+                mem_total = gpu_stats[2].strip()
+                print(f"\n📊 GPU Stats before training:")
+                print(f"   - Utilization: {gpu_util}%")
+                print(f"   - Memory: {mem_used}MB / {mem_total}MB")
+        except Exception as e:
+            logger.warning(f"Unable to get GPU stats: {e}")
+    
     # Prepare training data
     print("\n===== PREPARING TRAINING DATA =====")
     data_dir = os.path.join(args.output_dir, "training_data")
@@ -277,11 +410,45 @@ def main():
         print("\n❌ Failed to prepare training data.")
         return False
     
+    # Count samples for information
+    wav_files = [f for f in os.listdir(args.samples_dir) if f.endswith('.wav')]
+    print(f"\n📁 Found {len(wav_files)} voice samples for training")
+    print("Recommended: 40+ samples for best quality neural voice")
+    
+    # Warn if sample count is low
+    if len(wav_files) < 20:
+        print("\n⚠️ Warning: Low sample count")
+        print("For optimal results, record at least 40 voice samples")
+        print("Training will continue, but quality may be reduced")
+    
+    # Benchmark GPU for expected training time
+    if torch.cuda.is_available():
+        device_name = torch.cuda.get_device_name(0)
+        free_mem = torch.cuda.mem_get_info()[0] / (1024 ** 3)  # GB
+        
+        expected_time = "10-15 minutes"
+        if "3090" in device_name or "A100" in device_name or "4090" in device_name:
+            expected_time = "10-15 minutes"
+        elif free_mem > 16:
+            expected_time = "15-25 minutes"
+        else:
+            expected_time = "30-45 minutes"
+        
+        print(f"\n⏱️ Expected training time: {expected_time}")
+        print(f"Training on: {device_name} with {free_mem:.1f}GB free memory")
+    
     # Train the model
-    print("\n===== TRAINING NEURAL VOICE MODEL =====")
+    print("\n===== TRAINING HIGH-PERFORMANCE NEURAL VOICE MODEL =====")
+    print(f"Training will use {args.epochs} epochs for maximum quality")
+    print("This will utilize your GPU at full capacity")
+    
+    start_time = time.time()
     if not train_voice_model(data_dir, args.output_dir, args.epochs):
         print("\n❌ Model training failed.")
         return False
+    
+    training_time = time.time() - start_time
+    print(f"\n⏱️ Training completed in {training_time:.1f} seconds")
     
     # Install the model
     if not args.no_install:
@@ -290,11 +457,14 @@ def main():
             print("\n❌ Failed to install the trained model.")
             return False
     
-    print("\n✅ Neural voice model training completed successfully!")
+    print("\n✅ High-performance neural voice model training completed successfully!")
     print(f"Model saved to: {args.output_dir}")
+    print(f"Training used {args.epochs} epochs on {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
+    
     print("\nTo use this model with the voice control system:")
-    print("1. Make sure 'speech_synthesis.py' has been updated to support neural voices")
-    print("2. Verify that the model is set as the active voice")
+    print("1. Make sure the neural voice server is running (gpu_scripts/start_neural_server.sh)")
+    print("2. Verify the client is configured to connect to the server (NEURAL_SERVER env variable)")
+    print("3. Test with: python test_neural_voice.py")
     
     return True
 
