@@ -785,30 +785,51 @@ def process_dictation(transcription):
         # Try multiple paste methods in sequence
         success = False
         
-        # Method 1: pbcopy + cmd+v (most reliable on macOS)
+        # Add more debug logging to diagnose paste issues
+        print(f"DEBUG: Attempting to paste transcribed text: '{transcription}'")
+        
+        # Method 1: Direct write using pyautogui (simplest and most reliable)
         try:
-            logger.info("Using pbcopy + cmd+v method...")
-            
-            # Copy text to clipboard using pbcopy
-            process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
-            process.communicate(transcription.encode('utf-8'))
-            time.sleep(1.0)  # Give clipboard time to update
-            
-            # Paste using command+v
-            pyautogui.hotkey('command', 'v')
+            logger.info("Using direct typing method...")
+            print("DEBUG: Typing text directly with pyautogui")
+            pyautogui.write(transcription)
             success = True
+            print("DEBUG: Direct typing succeeded")
         except Exception as e1:
-            logger.warning(f"Clipboard method failed: {e1}")
+            logger.warning(f"Direct typing method failed: {e1}")
+            print(f"DEBUG: Direct typing failed: {e1}")
             
-        # Method 2: AppleScript as fallback
+        # Method 2: pbcopy + cmd+v (fallback for macOS)
+        if not success:
+            try:
+                logger.info("Trying pbcopy + cmd+v method...")
+                print("DEBUG: Using pbcopy to copy text to clipboard")
+                
+                # Copy text to clipboard using pbcopy
+                process = subprocess.Popen(['pbcopy'], stdin=subprocess.PIPE)
+                process.communicate(transcription.encode('utf-8'))
+                time.sleep(0.5)  # Give clipboard time to update
+                
+                print("DEBUG: Pasting with cmd+v")
+                # Paste using command+v
+                pyautogui.hotkey('command', 'v')
+                success = True
+                print("DEBUG: Clipboard method succeeded")
+            except Exception as e2:
+                logger.warning(f"Clipboard method failed: {e2}")
+                print(f"DEBUG: Clipboard method failed: {e2}")
+            
+        # Method 3: AppleScript as last resort
         if not success:
             try:
                 logger.info("Using AppleScript keystroke method...")
+                print("DEBUG: Trying AppleScript method")
                 
                 # Save to temp file for AppleScript
                 tmp_file = "/tmp/dictation_text.txt"
                 with open(tmp_file, "w") as f:
                     f.write(transcription)
+                print(f"DEBUG: Saved text to {tmp_file}")
                 
                 # AppleScript to keystroke the text
                 script = '''
@@ -819,22 +840,16 @@ def process_dictation(transcription):
                 end tell
                 '''
                 
+                print("DEBUG: Running AppleScript")
                 subprocess.run(["osascript", "-e", script], check=True)
                 success = True
+                print("DEBUG: AppleScript succeeded")
                 
                 # Clean up temp file
                 os.remove(tmp_file)
-            except Exception as e2:
-                logger.error(f"AppleScript method failed: {e2}")
-        
-        # Method 3: Direct typing as last resort
-        if not success:
-            try:
-                logger.info("Using direct typing as last resort...")
-                pyautogui.write(transcription, interval=0.03)
-                success = True
             except Exception as e3:
-                logger.error(f"Direct typing failed: {e3}")
+                logger.error(f"AppleScript method failed: {e3}")
+                print(f"DEBUG: AppleScript method failed: {e3}")
                 raise Exception("All typing methods failed")
         
         # Save to log file
