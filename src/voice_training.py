@@ -17,6 +17,7 @@ import numpy as np
 import datetime
 import json
 import shutil
+import random
 from typing import List, Dict, Tuple, Optional, Any, Union
 
 # Configure logging
@@ -281,21 +282,46 @@ def collect_trigger_samples() -> List[str]:
     interactive_mode = "--non-interactive" not in sys.argv
     
     try:
-        # Collect "hey" samples
-        for i in range(3):
+        # Collect "hey" samples with different intonations
+        print("\n=== RECORDING 'HEY' TRIGGER SAMPLES ===")
+        print("For best results, vary your intonation slightly between samples.")
+        print("Try saying 'hey' in different ways you naturally use to get attention.")
+        
+        for i in range(5):  # Increased from 3 to 5 samples
+            intonation = "normally"
+            if i == 1:
+                intonation = "with a slightly rising tone"
+            elif i == 2:
+                intonation = "with a slightly deeper voice"
+            elif i == 3:
+                intonation = "slightly louder than normal"
+            elif i == 4:
+                intonation = "a bit softer, as if you're not trying to disturb others"
+                
             sample = record_sample(
-                seconds=2.0,
-                prompt=f"Sample {i+1}/3: Say 'hey' clearly",
+                seconds=2.5,  # Slightly longer recording
+                prompt=f"Sample {i+1}/5: Say 'hey' {intonation}",
                 interactive=interactive_mode
             )
             samples.append(sample)
             time.sleep(1)
         
-        # Collect "type" samples
-        for i in range(3):
+        # Collect "type" and dictation-related samples
+        print("\n=== RECORDING 'TYPE' AND DICTATION TRIGGER SAMPLES ===")
+        print("These samples help the system recognize when you want to dictate text.")
+        
+        dictation_triggers = [
+            "type",
+            "dictate",
+            "write this down",
+            "take notes", 
+            "transcribe"
+        ]
+        
+        for i, phrase in enumerate(dictation_triggers):
             sample = record_sample(
-                seconds=2.0,
-                prompt=f"Sample {i+1}/3: Say 'type' clearly",
+                seconds=3.0,  # Longer for multi-word phrases
+                prompt=f"Sample {i+1}/{len(dictation_triggers)}: Say '{phrase}' naturally",
                 interactive=interactive_mode
             )
             samples.append(sample)
@@ -321,7 +347,33 @@ def collect_command_samples() -> List[str]:
         "open safari", 
         "maximize window", 
         "focus chrome", 
-        "type hello world"
+        "type hello world",
+        "go to the next window",
+        "move window to the left",
+        "resize window to full screen",
+        "focus on terminal",
+        "minimize all windows",
+        "scroll down", 
+        "open finder",
+        "create new document"
+    ]
+    
+    # Add question versions of commands
+    questions = [
+        "what time is it",
+        "what's the weather like today",
+        "can you search for restaurants nearby",
+        "how do I resize a window",
+        "when is my next meeting"
+    ]
+    
+    # Add exclamation versions for more variety
+    exclamations = [
+        "this is amazing!",
+        "great job on that!",
+        "look at this window!",
+        "send this message now!",
+        "hurry up and save this file!"
     ]
     
     samples = []
@@ -331,14 +383,75 @@ def collect_command_samples() -> List[str]:
     interactive_mode = "--non-interactive" not in sys.argv
     
     try:
-        for cmd in commands:
+        # Command recordings
+        print("\n=== RECORDING COMMAND SAMPLES ===")
+        print("These help the system understand your command voice patterns.")
+        print("Speak naturally as if you're telling the computer what to do.")
+        
+        # Select a subset of commands if there are many
+        selected_commands = commands if len(commands) <= 6 else random.sample(commands, 6)
+        
+        for i, cmd in enumerate(selected_commands):
             sample = record_sample(
-                seconds=3.0,
-                prompt=f"Say the command: '{cmd}'",
+                seconds=4.0,  # Longer for more complex commands
+                prompt=f"Command {i+1}/{len(selected_commands)}: Say '{cmd}'",
                 interactive=interactive_mode
             )
             samples.append(sample)
             time.sleep(1)
+        
+        # Question recordings for varied intonation
+        print("\n=== RECORDING QUESTION SAMPLES ===")
+        print("These help the system recognize question intonations in your voice.")
+        print("Use a natural rising tone as you would when asking a question.")
+        
+        selected_questions = questions if len(questions) <= 3 else random.sample(questions, 3)
+        
+        for i, q in enumerate(selected_questions):
+            sample = record_sample(
+                seconds=4.0,
+                prompt=f"Question {i+1}/{len(selected_questions)}: Ask '{q}?'",
+                interactive=interactive_mode
+            )
+            samples.append(sample)
+            time.sleep(1)
+        
+        # Exclamation recordings for energy variation
+        print("\n=== RECORDING EXCLAMATION SAMPLES ===")
+        print("These help capture the energetic aspects of your voice.")
+        print("Speak with a bit more emphasis/energy than your normal voice.")
+        
+        selected_exclamations = exclamations if len(exclamations) <= 3 else random.sample(exclamations, 3)
+        
+        for i, excl in enumerate(selected_exclamations):
+            sample = record_sample(
+                seconds=4.0,
+                prompt=f"Exclamation {i+1}/{len(selected_exclamations)}: Say '{excl}' with emphasis",
+                interactive=interactive_mode
+            )
+            samples.append(sample)
+            time.sleep(1)
+            
+        # Natural speech samples
+        print("\n=== RECORDING NATURAL SPEECH SAMPLES ===")
+        print("These capture your natural speaking rhythm and cadence.")
+        print("Speak as if you're having a conversation with someone.")
+        
+        natural_prompts = [
+            "Describe what you see outside the window right now",
+            "Explain what you had for breakfast today",
+            "Talk about your favorite movie or TV show"
+        ]
+        
+        for i, prompt in enumerate(natural_prompts):
+            sample = record_sample(
+                seconds=8.0,  # Much longer for natural speech
+                prompt=f"Natural speech {i+1}/{len(natural_prompts)}: {prompt}",
+                interactive=interactive_mode
+            )
+            samples.append(sample)
+            time.sleep(1)
+            
     except KeyboardInterrupt:
         print("\nCommand recording interrupted. Using samples collected so far.")
         if not samples:
