@@ -2,11 +2,31 @@
 # Script to transfer voice samples to GPU server and initiate neural voice training
 
 # Configuration
-SERVER_USER="user"
-SERVER_HOST="gpu-server.example.com"
-SERVER_PATH="/home/user/voice-training"
-SAMPLES_DIR="training_samples"
+SAMPLES_DIR="../training_samples"
 REMOTE_SCRIPT_NAME="run_training.sh"
+
+# Load environment variables if .env file exists
+if [ -f ".env" ]; then
+    echo "Loading GPU server configuration from .env file..."
+    source .env
+    SERVER_USER="${GPU_SERVER_USER}"
+    SERVER_HOST="${GPU_SERVER_HOST}"
+    SERVER_PATH="${GPU_SERVER_PATH}"
+elif [ -f "../.env" ]; then
+    echo "Loading GPU server configuration from parent directory .env file..."
+    source "../.env"
+    SERVER_USER="${GPU_SERVER_USER}"
+    SERVER_HOST="${GPU_SERVER_HOST}"
+    SERVER_PATH="${GPU_SERVER_PATH}"
+else
+    # Default values if .env doesn't exist
+    SERVER_USER="user"
+    SERVER_HOST="gpu-server.example.com"
+    SERVER_PATH="/home/user/voice-training"
+fi
+
+# Print server information
+echo "Using GPU server: ${SERVER_USER}@${SERVER_HOST}:${SERVER_PATH}"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -39,17 +59,11 @@ if [ "$WAV_COUNT" -lt 10 ]; then
     fi
 fi
 
-# Request server information if not provided
-if [ "$SERVER_HOST" == "gpu-server.example.com" ]; then
-    echo -e "${YELLOW}Please provide GPU server information:${NC}"
-    read -p "Server hostname or IP: " SERVER_HOST
-    read -p "Username: " SERVER_USER
-    read -p "Remote directory path: " SERVER_PATH
-    
-    if [ -z "$SERVER_HOST" ] || [ -z "$SERVER_USER" ] || [ -z "$SERVER_PATH" ]; then
-        echo -e "${RED}Error: Server information incomplete.${NC}"
-        exit 1
-    fi
+# Verify we have the required server information
+if [ -z "$SERVER_HOST" ] || [ -z "$SERVER_USER" ] || [ -z "$SERVER_PATH" ]; then
+    echo -e "${RED}Error: Server information incomplete.${NC}"
+    echo -e "${YELLOW}Please set GPU_SERVER_HOST, GPU_SERVER_USER, and GPU_SERVER_PATH in .env file.${NC}"
+    exit 1
 fi
 
 # Create remote directory structure
