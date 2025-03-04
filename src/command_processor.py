@@ -160,7 +160,7 @@ class CommandProcessor:
                 logger.info(f"Detected dictation command: '{fragment}' in '{clean_text}'")
                 
                 # Start dictation mode
-                from trigger_detection import TriggerDetector
+                from src.trigger_detection import TriggerDetector
                 detector = TriggerDetector()
                 detector._start_recording_thread('dictation', force=True)
                 return True

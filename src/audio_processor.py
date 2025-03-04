@@ -151,7 +151,7 @@ class AudioProcessor:
                 logger.info(f"Processing audio file: {audio_file}")
                 
                 # Import here to avoid circular imports
-                from toast_notifications import notify_processing
+                from src.toast_notifications import notify_processing
                 notify_processing()
                 
                 # Skip trigger mode files - they're processed by the trigger detector
@@ -193,7 +193,7 @@ class AudioProcessor:
                         logger.error(f"Failed to reload model: {reload_err}")
                         
                         # Import here to avoid circular imports
-                        from toast_notifications import notify_error
+                        from src.toast_notifications import notify_error
                         notify_error("Speech recognition failed. Please try again.")
                         
                         # Clean up if error occurred
@@ -215,7 +215,7 @@ class AudioProcessor:
                     logger.warning(f"Empty or noise transcription: '{transcription}'")
                     
                     # Import here to avoid circular imports
-                    from toast_notifications import notify_error
+                    from src.toast_notifications import notify_error
                     notify_error("No clear speech detected")
                     continue
                 
@@ -235,7 +235,7 @@ class AudioProcessor:
                         
                         # Show a clear notification that the command was recognized 
                         try:
-                            from toast_notifications import send_notification
+                            from src.toast_notifications import send_notification
                             send_notification(
                                 "Command Recognized", 
                                 f"Processing: {transcription}",
@@ -256,14 +256,14 @@ class AudioProcessor:
                     logger.warning(f"Low confidence command: {confidence:.2f} < {self.min_confidence}")
                     
                     # Import here to avoid circular imports
-                    from toast_notifications import notify_error
+                    from src.toast_notifications import notify_error
                     notify_error(f"Low confidence: {transcription}")
                 
             except Exception as e:
                 logger.error(f"Transcription error: {e}")
                 
                 # Import here to avoid circular imports
-                from toast_notifications import notify_error
+                from src.toast_notifications import notify_error
                 notify_error(f"Failed to transcribe audio: {str(e)}")
                 
                 # Clean up if error occurred
@@ -337,7 +337,7 @@ class AudioProcessor:
         """
         try:
             # Visual notification of mode switch
-            from toast_notifications import send_notification
+            from src.toast_notifications import send_notification
             send_notification(
                 "Starting Dictation Mode", 
                 "LLM detected dictation request - will type what you say",
@@ -347,7 +347,7 @@ class AudioProcessor:
             )
             
             # Import here to avoid circular imports
-            from trigger_detection import TriggerDetector
+            from src.trigger_detection import TriggerDetector
             detector = TriggerDetector()
             detector._start_recording_thread('dictation', force=True)
             return True

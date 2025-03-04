@@ -206,7 +206,7 @@ class VoiceControlDaemon:
             if not state.is_muted():
                 # Send a clear notification that we're listening for the trigger word
                 try:
-                    from toast_notifications import send_notification
+                    from src.toast_notifications import send_notification
                     send_notification(
                         "Voice Control Ready",
                         f"Say '{state.command_trigger}' for commands | Say '{state.dictation_trigger}' for dictation",
@@ -224,7 +224,7 @@ class VoiceControlDaemon:
         
         try:
             # Send a notification that we're ready
-            from toast_notifications import send_notification
+            from src.toast_notifications import send_notification
             send_notification(
                 "Voice Control Ready with Rolling Buffer", 
                 f"Just speak: '{state.command_trigger}' for commands | '{state.dictation_trigger}' for dictation | Mute: Ctrl+Shift+M",
