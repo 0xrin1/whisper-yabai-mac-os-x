@@ -63,48 +63,8 @@ class AudioRecorder:
         self.rate = 16000
         self.p = pyaudio.PyAudio()
         
-    def start_recording(self, duration=None, dictation_mode=False):
-        """
-        Start recording audio for specified duration.
-        
-        Args:
-            duration (int, optional): Recording duration in seconds
-            dictation_mode (bool): If True, recorded audio will be transcribed directly to text
-                                  rather than interpreted as a command
-        """
-        global RECORDING
-        
-        if RECORDING:
-            print("DEBUG: Already recording, ignoring request")
-            return
-            
-        # Use environment variable if duration not specified
-        if duration is None:
-            duration = int(os.getenv('RECORDING_DURATION', '5'))
-            
-        print(f"DEBUG: Recording duration set to {duration} seconds")
-        
-        RECORDING = True
-        print("DEBUG: RECORDING flag set to True")
-        
-        # Play a sound to indicate recording has started
-        self._play_start_sound()
-        
-        # Show appropriate notification
-        mode = "Dictation" if dictation_mode else "Command"
-        print(f"DEBUG: {mode} mode activated - recording for {duration} seconds")
-        if dictation_mode:
-            logger.info(f"Dictation mode: Listening for {duration} seconds...")
-            notify_listening(duration)
-        else:
-            logger.info(f"Command mode: Listening for {duration} seconds...")
-            notify_listening(duration)
-        
-        # Create a temporary WAV file
-        temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
-        temp_filename = temp_file.name
-        temp_file.close()
-        print(f"DEBUG: Created temporary WAV file: {temp_filename}")
+    # This method is defined again below with more parameters
+    # Removing this duplicate definition
         
     def _play_start_sound(self):
         """Play a sound to indicate recording has started."""
@@ -141,14 +101,14 @@ class AudioRecorder:
         # Use environment variable if duration not specified
         if duration is None:
             if trigger_mode:
-                # Very short duration for trigger detection
-                duration = 1  # 1 second is enough to detect a trigger word
+                # Shorter duration for trigger detection but not too short
+                duration = 1.5  # 1.5 seconds is better for reliable trigger word detection
             elif dictation_mode:
                 # Longer duration for dictation mode
                 duration = int(os.getenv('DICTATION_DURATION', '10'))
             else:
                 # Standard duration for commands
-                duration = int(os.getenv('RECORDING_DURATION', '5'))
+                duration = int(os.getenv('RECORDING_DURATION', '7'))
             
         print(f"DEBUG: Recording duration set to {duration} seconds")
         
@@ -231,17 +191,34 @@ class AudioRecorder:
         frames = []
         frames_per_second = self.rate / self.chunk
         
-        # For silence detection
-        SILENCE_THRESHOLD = 500  # Adjust based on testing
+        # For silence detection - adjust thresholds based on mode
+        # Lower threshold means more audio will be considered "speech" rather than "silence"
+        if trigger_mode:
+            SILENCE_THRESHOLD = 500  # Standard for trigger detection
+            max_silence_seconds = 0.5  # Quick timeout for trigger detection
+        elif dictation_mode:
+            SILENCE_THRESHOLD = 400  # Lower for dictation to catch softer speech
+            max_silence_seconds = 3.0  # Standard timeout for dictation
+        else:
+            # For command mode, use even lower threshold and longer timeout
+            SILENCE_THRESHOLD = 300  # Lower threshold to avoid cutting off commands
+            max_silence_seconds = 4.0  # Longer timeout for commands (4 seconds)
+            
         silence_frames = 0
-        max_silence_frames = int(frames_per_second * 3)  # 3 seconds of silence
+        max_silence_frames = int(frames_per_second * max_silence_seconds)
         
         # Set maximum recording duration
         max_duration = 60 if dictation_mode else 15  # 60 seconds for dictation, 15 for commands
         total_frames = int(frames_per_second * max_duration)
         
-        # Minimum recording duration 
-        min_duration = 2  # At least 2 seconds of audio
+        # Minimum recording duration - increased to ensure we get enough audio
+        if trigger_mode:
+            min_duration = 1  # Trigger detection can be short
+        elif dictation_mode:
+            min_duration = 3  # At least 3 seconds for dictation
+        else:
+            min_duration = 3  # At least 3 seconds for commands to avoid premature cutoff
+            
         min_frames = int(frames_per_second * min_duration)
         
         print(f"DEBUG: Beginning smart recording (max: {max_duration}s, silence timeout: 3s)")
@@ -285,8 +262,21 @@ class AudioRecorder:
                         silence_frames += 1
                         
                         # If we've recorded enough frames and detected sufficient silence after speech,
-                        # end the recording automatically
+                        # end the recording automatically - but add special handling for command mode
                         if has_speech and frames_recorded > min_frames and silence_frames >= max_silence_frames:
+                            # For regular command mode (not trigger or dictation), we want to be more careful
+                            if not trigger_mode and not dictation_mode:
+                                # Make sure we've captured enough total audio
+                                min_seconds_required = 3.0  # At least 3 seconds
+                                seconds_recorded = frames_recorded / frames_per_second
+                                
+                                if seconds_recorded < min_seconds_required:
+                                    # Keep recording even if silence detected
+                                    print(f"DEBUG: Ignoring silence detection as we need at least {min_seconds_required}s " +
+                                          f"(currently: {seconds_recorded:.1f}s)")
+                                    continue
+                            
+                            # OK to stop recording now
                             print(f"DEBUG: Stopping recording after detecting {silence_frames/frames_per_second:.1f}s of silence")
                             break
                             
@@ -434,10 +424,16 @@ class CommandProcessor:
             notify_error("Empty command received")
             return
             
-        # Check for dictation mode command first
-        if clean_text.startswith("dictate") or "start dictation" in clean_text:
-            logger.info("Detected dictation command")
-            print("DEBUG: Voice command triggered dictation mode")
+        # Check for dictation mode command first - with more robust detection
+        dictation_keywords = ["dictate", "dictation", "start dictation", "begin dictation", 
+                             "start typing", "take dictation", "type this", "type what i say"]
+        
+        # Check if any of our dictation keywords are in the command text
+        is_dictation_command = any(keyword in clean_text for keyword in dictation_keywords)
+        
+        if is_dictation_command:
+            logger.info(f"Detected dictation command in: '{clean_text}'")
+            print(f"DEBUG: Voice command triggered dictation mode: '{clean_text}'")
             
             # Show clear feedback that we're switching to dictation mode
             print("DEBUG: Switching to DICTATION MODE - everything you say will be typed")
@@ -461,6 +457,7 @@ class CommandProcessor:
             
             # Start dictation mode through the same path the hotkey would use
             # Use threading to avoid blocking this function
+            time.sleep(0.5)  # Add a short delay before starting dictation
             threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
             return
         
@@ -511,7 +508,11 @@ class CommandProcessor:
                 elif action == "type" and params:
                     self.type_text(params)
                     return
-                elif action == "dictate" or action == "dictation":
+                elif action == "dictate" or action == "dictation" or action == "type":
+                    print("DEBUG: LLM suggested dictation mode")
+                    logger.info("LLM interpreter triggered dictation mode")
+                    # Add a slight delay before starting dictation
+                    time.sleep(0.5)
                     threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
                     return
             
@@ -540,6 +541,15 @@ class CommandProcessor:
         if "maximize" in clean_text or "full screen" in clean_text:
             logger.info("Detected maximize command")
             self.maximize_window([])
+            return
+            
+        # Explicit check for dictation mode as fallback
+        if "dictate" in clean_text or "dictation" in clean_text:
+            logger.info("Detected dictation command via simple parsing")
+            print("DEBUG: Simple parsing caught dictation command")
+            # Start dictation mode directly
+            time.sleep(0.5)  # Add a short delay before starting dictation
+            threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
             return
         
         # Standard command processing
@@ -830,6 +840,10 @@ def process_audio():
                 except Exception as unlink_err:
                     print(f"DEBUG: Failed to delete temp file: {unlink_err}")
                 
+                # Always make sure RECORDING flag is reset even if transcription is empty
+                RECORDING = False
+                print("DEBUG: Reset RECORDING flag to False after processing")
+                
                 # Skip empty or noise transcriptions
                 if not transcription or len(transcription) < 3 or all(c.isspace() or c in ".,;!?" for c in transcription):
                     logger.warning(f"Empty or noise transcription: '{transcription}'")
@@ -843,9 +857,33 @@ def process_audio():
                     process_dictation(transcription)
                     print("DEBUG: Dictation processing completed")
                 elif confidence >= min_confidence_threshold:
+                    print("DEBUG: ========== PROCESSING COMMAND ==========")
                     print(f"DEBUG: Processing as command: '{transcription}'")
-                    command_processor.execute_command(transcription)
-                    print("DEBUG: Command processing completed")
+                    
+                    # Try executing the command
+                    try:
+                        command_processor.execute_command(transcription)
+                        print("DEBUG: Command processing completed successfully")
+                        
+                        # Show a clear notification that the command was recognized 
+                        try:
+                            from toast_notifications import send_notification
+                            send_notification(
+                                "Command Recognized", 
+                                f"Processing: {transcription}",
+                                "whisper-command-recognized",
+                                3,
+                                True
+                            )
+                        except Exception as e:
+                            print(f"DEBUG: Failed to show command notification: {e}")
+                            
+                    except Exception as e:
+                        print(f"DEBUG: Error executing command: {e}")
+                        import traceback
+                        print(f"DEBUG: {traceback.format_exc()}")
+                        
+                    print("DEBUG: Command processing flow completed")
                 else:
                     logger.warning(f"Low confidence command: {confidence:.2f} < {min_confidence_threshold}")
                     notify_error(f"Low confidence: {transcription}")
@@ -1036,6 +1074,10 @@ TRIGGER_DETECTED = False  # Whether a vocal trigger has been detected
 TRIGGER_BUFFER = []  # Buffer to store recent audio for trigger detection
 TRIGGER_WORD = "hey"  # The trigger word to listen for
 
+# Add a mutex to prevent multiple trigger detections running at once
+TRIGGER_DETECTION_RUNNING = False
+TRIGGER_MUTEX = threading.Lock()  # Mutex for trigger detection
+
 def start_recording_thread(mode):
     """Start a recording thread with specified mode.
     
@@ -1048,21 +1090,31 @@ def start_recording_thread(mode):
     - Dictation mode: System captures your speech and types it as text at the current cursor position
       Example: When you say "Hello world", it will type "Hello world" where your cursor is
     """
-    global MUTED
+    global MUTED, TRIGGER_DETECTED, RECORDING
+    
+    # Normalize the mode parameter
+    if mode.lower() in ['dictate', 'dictation', 'typing']:
+        mode = 'dictation'
+    else:
+        mode = 'command'
     
     # Check if muted
     if MUTED:
         print(f"DEBUG: Microphone is muted, ignoring {mode} request")
         
         # Show muted notification
-        from toast_notifications import send_notification
-        send_notification(
-            "Microphone Muted", 
-            "Press Ctrl+Shift+M to unmute",
-            "whisper-voice-muted",
-            3,
-            True
-        )
+        try:
+            from toast_notifications import send_notification
+            send_notification(
+                "Microphone Muted", 
+                "Press Ctrl+Shift+M to unmute",
+                "whisper-voice-muted",
+                3,
+                True
+            )
+        except Exception as e:
+            print(f"DEBUG: Failed to show mute notification: {e}")
+            
         return
         
     # Check if already recording
@@ -1073,21 +1125,49 @@ def start_recording_thread(mode):
     is_dictation = (mode == 'dictation')
     mode_name = "Dictation" if is_dictation else "Command"
     
-    print(f"DEBUG: {mode_name} hotkey triggered")
-    logger.info(f"{mode_name} hotkey triggered - starting voice recording...")
+    # For dictation mode, add a notification immediately to show it's activated
+    if is_dictation:
+        try:
+            # Extra notification right at the start
+            from toast_notifications import send_notification
+            send_notification(
+                "Starting Dictation Mode", 
+                "Get ready to speak...",
+                "whisper-dictation-preparing",
+                2,
+                True
+            )
+        except Exception as e:
+            print(f"DEBUG: Failed to show dictation preparation notification: {e}")
+    
+    print(f"DEBUG: {mode_name} mode triggered")
+    logger.info(f"{mode_name} mode triggered - starting voice recording...")
     
     def recording_thread_func():
         print(f"DEBUG: Starting {mode_name.lower()} recording")
-        # Ensure recording completes before this function returns
-        result = recorder.start_recording(dictation_mode=is_dictation)
-        print(f"DEBUG: {mode_name} recording completed, audio file: {result}")
         
-        # Verify the file was created and has content before continuing
-        if result and os.path.exists(result):
-            size = os.path.getsize(result)
-            print(f"DEBUG: Audio file size: {size} bytes")
-            if size < 1000:
-                print("WARNING: Audio file suspiciously small, may not contain speech")
+        # Set recording flag to prevent overlapping recordings
+        global RECORDING
+        RECORDING = True
+        
+        try:
+            # Ensure recording completes before this function returns
+            result = recorder.start_recording(dictation_mode=is_dictation)
+            print(f"DEBUG: {mode_name} recording completed, audio file: {result}")
+            
+            # Verify the file was created and has content before continuing
+            if result and os.path.exists(result):
+                size = os.path.getsize(result)
+                print(f"DEBUG: Audio file size: {size} bytes")
+                if size < 1000:
+                    print("WARNING: Audio file suspiciously small, may not contain speech")
+        except Exception as e:
+            print(f"DEBUG: Error in recording thread: {e}")
+            import traceback
+            print(f"DEBUG: {traceback.format_exc()}")
+            
+            # Make sure RECORDING flag is reset
+            RECORDING = False
     
     # Create a thread that will block until recording is complete
     thread = threading.Thread(target=recording_thread_func)
@@ -1098,7 +1178,7 @@ def start_recording_thread(mode):
     
     # IMPORTANT: Add a small delay to ensure thread starts properly
     # This prevents immediate return of the function
-    time.sleep(0.2)
+    time.sleep(0.5)  # Increased from 0.2 to 0.5 for more reliable startup
 
 # We've now removed keyboard shortcuts for recording and only use the mute toggle
 
@@ -1149,17 +1229,45 @@ def toggle_mute_callback():
 
 def start_trigger_detection():
     """Start listening for trigger words."""
-    if MUTED:
-        return
-        
-    logger.info("Starting trigger word detection...")
-    print("DEBUG: Starting trigger word detection")
+    global RECORDING, TRIGGER_DETECTION_RUNNING
     
-    # Start a short, silent recording to detect trigger words
-    threading.Thread(
-        target=lambda: recorder.start_recording(duration=1, dictation_mode=False, trigger_mode=True), 
-        daemon=True
-    ).start()
+    # Use mutex to prevent multiple trigger detections from running
+    acquired = TRIGGER_MUTEX.acquire(blocking=False)
+    if not acquired:
+        print("DEBUG: Another trigger detection is already running, skipping")
+        return
+    
+    try:
+        # Don't start trigger detection if we're already recording or muted
+        if MUTED or RECORDING:
+            print("DEBUG: Skipping trigger detection (muted or already recording)")
+            return
+            
+        # Also check if we already have a trigger detection running
+        if TRIGGER_DETECTION_RUNNING:
+            print("DEBUG: Trigger detection already running, skipping")
+            return
+            
+        # Mark that we're running trigger detection
+        TRIGGER_DETECTION_RUNNING = True
+        
+        logger.info("Starting trigger word detection...")
+        print("DEBUG: Starting trigger word detection")
+        
+        # Start a short, silent recording to detect trigger words
+        try:
+            # Run directly instead of thread to maintain better control
+            result = recorder.start_recording(duration=1, dictation_mode=False, trigger_mode=True)
+            print(f"DEBUG: Trigger detection recording completed: {result}")
+        except Exception as e:
+            print(f"DEBUG: Error in trigger detection recording: {e}")
+            import traceback
+            print(f"DEBUG: {traceback.format_exc()}")
+        finally:
+            # Always mark trigger detection as no longer running
+            TRIGGER_DETECTION_RUNNING = False
+    finally:
+        TRIGGER_MUTEX.release()
 
 def process_trigger_audio(audio_file):
     """Process audio to detect trigger words.
@@ -1170,11 +1278,33 @@ def process_trigger_audio(audio_file):
     Returns:
         bool: True if trigger word detected, False otherwise
     """
-    global TRIGGER_DETECTED, TRIGGER_WORD
+    global TRIGGER_DETECTED, TRIGGER_WORD, RECORDING
+    
+    # Add a marker for debugging
+    print("DEBUG: ========== TRIGGER DETECTION STARTED ==========")
+    
+    # Double-check that we're not already recording (safety check)
+    if RECORDING:
+        print("DEBUG: Already recording, skipping trigger detection")
+        return False
     
     try:
-        # Use the same model but with a lower confidence threshold for triggers
-        result = WHISPER_MODEL.transcribe(audio_file, language="en")
+        # Check if file exists and has reasonable size
+        if not os.path.exists(audio_file):
+            print(f"DEBUG: Trigger audio file not found: {audio_file}")
+            return False
+            
+        file_size = os.path.getsize(audio_file)
+        if file_size < 1000:  # Less than 1KB is probably noise or empty
+            print(f"DEBUG: Trigger audio file too small ({file_size} bytes), likely no speech")
+            return False
+        
+        # Use the same model but with a shorter output
+        result = WHISPER_MODEL.transcribe(
+            audio_file, 
+            language="en",
+            fp16=False  # Use more precise but slower processing for trigger detection
+        )
         transcription = result["text"].strip().lower()
         
         print(f"DEBUG: Trigger detection heard: '{transcription}'")
@@ -1184,6 +1314,7 @@ def process_trigger_audio(audio_file):
         
         if contains_trigger:
             print(f"DEBUG: TRIGGER WORD DETECTED: '{TRIGGER_WORD}'")
+            print("DEBUG: ========== STARTING FULL COMMAND RECORDING ==========")
             logger.info(f"Trigger word detected: '{TRIGGER_WORD}'")
             TRIGGER_DETECTED = True
             
@@ -1193,27 +1324,78 @@ def process_trigger_audio(audio_file):
             except Exception:
                 pass
                 
-            # Start full recording
+            # Add a small delay to ensure proper transition
+            time.sleep(0.2)
+            
+            # Start full recording for command mode
+            print("DEBUG: Starting command recording after trigger detection")
             start_recording_thread('command')
+            print("DEBUG: Command recording thread started")
             return True
     except Exception as e:
         print(f"DEBUG: Error in trigger detection: {e}")
+        import traceback
+        print(f"DEBUG: {traceback.format_exc()}")
+    
+    try:
+        # Clean up the audio file
+        if os.path.exists(audio_file):
+            os.unlink(audio_file)
+            print(f"DEBUG: Cleaned up trigger audio file: {audio_file}")
+    except Exception as clean_err:
+        print(f"DEBUG: Error cleaning up trigger audio: {clean_err}")
     
     # If we get here, no trigger was detected
-    # Start another trigger detection after a short delay
-    time.sleep(0.2)
-    threading.Thread(target=start_trigger_detection, daemon=True).start()
+    # Wait longer to prevent excessive CPU usage and rapid audio capture
+    time.sleep(1.0)  # Increased delay to 1 second
+    
+    # Check if we're still in a state where we should restart trigger detection
+    if not MUTED and not RECORDING and CONTINUOUS_LISTENING:
+        # Use a timer to restart after delay to avoid thread buildup
+        print("DEBUG: Scheduling next trigger detection in 2 seconds")
+        
+        def safe_restart_trigger():
+            # This function makes sure we don't get into a recursive nightmare
+            global RECORDING, TRIGGER_DETECTION_RUNNING
+            
+            if RECORDING or MUTED or not CONTINUOUS_LISTENING:
+                print("DEBUG: Conditions changed, not restarting trigger detection")
+                return
+                
+            if TRIGGER_DETECTION_RUNNING:
+                print("DEBUG: Trigger detection already running, not starting another")
+                return
+                
+            # Start trigger detection from scratch
+            print("DEBUG: Now restarting trigger detection after delay")
+            start_trigger_detection()
+            
+        # Schedule the restart with a longer delay
+        timer = threading.Timer(2.0, safe_restart_trigger)
+        timer.daemon = True
+        timer.start()
+    else:
+        print("DEBUG: Not restarting trigger detection - system state prevents it")
+        
     return False
 
 def start_continuous_listening():
     """Start continuous listening for voice commands."""
+    global TRIGGER_DETECTED
+    
+    # Don't start if muted or already recording
     if MUTED or RECORDING:
         return
         
+    # Reset trigger detection state
+    TRIGGER_DETECTED = False
+    
     logger.info("Starting continuous listening...")
     print("DEBUG: Starting continuous listening")
     
     # Instead of starting a full recording, start trigger detection
+    # Use a small delay to prevent rapid restarts
+    time.sleep(0.2)
     start_trigger_detection()
 
 def on_press(key):
@@ -1372,10 +1554,46 @@ if __name__ == "__main__":
         logger.info("")
         logger.info("Press Ctrl+C or ESC to exit")
         
-        # Start continuous listening on startup
-        if CONTINUOUS_LISTENING and not MUTED:
-            logger.info("Starting continuous listening mode...")
-            threading.Thread(target=start_continuous_listening, daemon=True).start()
+        # Wait longer before starting continuous listening to make sure everything is initialized
+        logger.info("Waiting 5 seconds before starting continuous listening mode...")
+        print("DEBUG: System will begin listening for the trigger word 'hey' in 5 seconds")
+        
+        def delayed_start():
+            # Wait 5 seconds for all subsystems to initialize
+            time.sleep(5)
+            
+            # Make sure model is loaded before starting
+            if WHISPER_MODEL is None:
+                logger.info("Waiting for Whisper model to finish loading...")
+                print("DEBUG: Waiting for Whisper model to finish loading...")
+                # Wait up to 15 more seconds for model to load
+                for _ in range(15):
+                    if WHISPER_MODEL is not None:
+                        break
+                    time.sleep(1)
+            
+            logger.info("Now starting continuous listening mode...")
+            print("DEBUG: Now starting trigger word detection")
+            print(f"DEBUG: Say '{TRIGGER_WORD}' to activate voice commands")
+            
+            if CONTINUOUS_LISTENING and not MUTED:
+                # Send a clear notification that we're listening for the trigger word
+                try:
+                    from toast_notifications import send_notification
+                    send_notification(
+                        "Voice Control Ready",
+                        f"Say '{TRIGGER_WORD}' to activate voice commands",
+                        "whisper-trigger-listening",
+                        10,
+                        False
+                    )
+                except Exception as e:
+                    print(f"DEBUG: Failed to show trigger notification: {e}")
+                
+                # Start listening for trigger word
+                start_trigger_detection()
+                
+        threading.Thread(target=delayed_start, daemon=True).start()
         
         try:
             # Send a notification that we're ready
