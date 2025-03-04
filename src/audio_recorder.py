@@ -14,7 +14,7 @@ import numpy as np
 import logging
 from typing import Optional, Dict, List, Any
 
-from state_manager import state
+from src.state_manager import state
 
 logger = logging.getLogger('audio-recorder')
 
