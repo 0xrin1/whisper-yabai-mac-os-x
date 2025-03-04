@@ -808,17 +808,7 @@ def process_dictation(transcription):
             logger.info("Using AppleScript keystroke method...")
             print("DEBUG: Trying AppleScript method")
             
-            # Remove any 'v' character that might be added by Alt+Shift+V hotkey 
-            # Check both at the beginning and when preceded by whitespace
-            if transcription.startswith('v') or transcription.startswith('V'):
-                transcription = transcription[1:].lstrip()
-                print(f"DEBUG: Removed leading 'v' character, new text: '{transcription}'")
-            
-            # Also check for "vAll" or similar patterns at the beginning
-            transcription = re.sub(r'^v([A-Z])', r'\1', transcription)
-            
-            # Remove 'v' after sentence-ending punctuation and whitespace
-            transcription = re.sub(r'([.!?]\s+)v([A-Za-z])', r'\1\2', transcription)
+            # No need to remove 'v' characters anymore since we're using different hotkeys
             
             # Save to temp file for AppleScript
             tmp_file = "/tmp/dictation_text.txt"
@@ -926,7 +916,10 @@ ALT_PRESSED = False
 CMD_PRESSED = False
 SPACE_PRESSED = False
 D_PRESSED = False
-V_PRESSED = False  # Alternative dictation key
+M_PRESSED = False  # For mute toggle
+
+# Mute state
+MUTED = False
 
 def start_recording_thread(mode):
     """Start a recording thread with specified mode.
@@ -934,6 +927,24 @@ def start_recording_thread(mode):
     Args:
         mode (str): Either 'command' or 'dictation'
     """
+    global MUTED
+    
+    # Check if muted
+    if MUTED:
+        print(f"DEBUG: Microphone is muted, ignoring {mode} request")
+        
+        # Show muted notification
+        from toast_notifications import send_notification
+        send_notification(
+            "Microphone Muted", 
+            "Press Ctrl+Alt+M to unmute",
+            "whisper-voice-muted",
+            3,
+            True
+        )
+        return
+        
+    # Check if already recording
     if RECORDING:
         print(f"DEBUG: Already recording, ignoring {mode} request")
         return
@@ -976,9 +987,38 @@ def hotkey_dictation_callback():
     """Callback for dictation mode hotkey."""
     start_recording_thread('dictation')
 
+def toggle_mute_callback():
+    """Toggle mute state."""
+    global MUTED
+    MUTED = not MUTED
+    
+    # Show notification of current mute state
+    status = "MUTED" if MUTED else "UNMUTED"
+    logger.info(f"Microphone {status}")
+    
+    # Use toast notification to show status
+    from toast_notifications import send_notification
+    send_notification(
+        f"Microphone {status}",
+        f"Voice control is {'paused' if MUTED else 'active'}",
+        "whisper-voice-mute-toggle",
+        3,
+        True
+    )
+    
+    # Play feedback sound
+    try:
+        sound = "/System/Library/Sounds/Submarine.aiff" if MUTED else "/System/Library/Sounds/Funk.aiff"
+        subprocess.run(["afplay", sound], check=False)
+    except Exception as e:
+        logger.error(f"Could not play mute toggle sound: {e}")
+
 def on_press(key):
     """Handle key press events."""
-    global CTRL_PRESSED, SHIFT_PRESSED, ALT_PRESSED, CMD_PRESSED, SPACE_PRESSED, D_PRESSED, V_PRESSED
+    global CTRL_PRESSED, SHIFT_PRESSED, ALT_PRESSED, CMD_PRESSED, SPACE_PRESSED, D_PRESSED, M_PRESSED
+    
+    # Don't process hotkeys if muted (except for unmute hotkey)
+    global MUTED
     
     try:
         # Always log the key for debugging
@@ -1009,12 +1049,23 @@ def on_press(key):
                 if char == 'd':
                     D_PRESSED = True
                     print("DEBUG: D key detected")
-                elif char == 'v':
-                    V_PRESSED = True
-                    print("DEBUG: V key detected")
+                elif char == 'm':
+                    M_PRESSED = True
+                    print("DEBUG: M key detected")
         
         # Log key states for debug
-        print(f"DEBUG: Key states - CTRL:{CTRL_PRESSED} SHIFT:{SHIFT_PRESSED} ALT:{ALT_PRESSED} SPACE:{SPACE_PRESSED} D:{D_PRESSED} V:{V_PRESSED}")
+        print(f"DEBUG: Key states - CTRL:{CTRL_PRESSED} SHIFT:{SHIFT_PRESSED} ALT:{ALT_PRESSED} SPACE:{SPACE_PRESSED} D:{D_PRESSED} M:{M_PRESSED}")
+            
+        # Check for mute toggle hotkey (Ctrl+Alt+M) - always active
+        if CTRL_PRESSED and ALT_PRESSED and M_PRESSED:
+            print("DEBUG: Mute toggle hotkey detected: Ctrl+Alt+M")
+            logger.info("Mute toggle hotkey detected: Ctrl+Alt+M")
+            toggle_mute_callback()
+            return  # Process this hotkey and return
+            
+        # If muted, don't process other hotkeys
+        if MUTED:
+            return
             
         # Check for command hotkey (Ctrl+Shift+Space)
         if CTRL_PRESSED and SHIFT_PRESSED and SPACE_PRESSED:
@@ -1022,17 +1073,10 @@ def on_press(key):
             logger.info("Command hotkey detected: Ctrl+Shift+Space")
             hotkey_command_callback()
             
-        # Check for dictation hotkeys:
-        # Option 1: Ctrl+Shift+D
+        # Check for dictation hotkey: Ctrl+Shift+D
         if CTRL_PRESSED and SHIFT_PRESSED and D_PRESSED:
             print("DEBUG: Dictation hotkey detected: Ctrl+Shift+D")
             logger.info("Dictation hotkey detected: Ctrl+Shift+D")
-            hotkey_dictation_callback()
-            
-        # Option 2: Alt+Shift+V (alternative)
-        if ALT_PRESSED and SHIFT_PRESSED and V_PRESSED:
-            print("DEBUG: Alternative dictation hotkey detected: Alt+Shift+V")
-            logger.info("Alternative dictation hotkey detected: Alt+Shift+V")
             hotkey_dictation_callback()
             
     except Exception as e:
@@ -1043,7 +1087,7 @@ def on_press(key):
 
 def on_release(key):
     """Handle key release events."""
-    global CTRL_PRESSED, SHIFT_PRESSED, ALT_PRESSED, CMD_PRESSED, SPACE_PRESSED, D_PRESSED, V_PRESSED
+    global CTRL_PRESSED, SHIFT_PRESSED, ALT_PRESSED, CMD_PRESSED, SPACE_PRESSED, D_PRESSED, M_PRESSED
     
     try:
         logger.debug(f"Key released: {key}")
@@ -1071,9 +1115,9 @@ def on_release(key):
                 if char == 'd':
                     D_PRESSED = False
                     print("DEBUG: D key released")
-                elif char == 'v':
-                    V_PRESSED = False
-                    print("DEBUG: V key released")
+                elif char == 'm':
+                    M_PRESSED = False
+                    print("DEBUG: M key released")
             
     except Exception as e:
         logger.error(f"Error in key release handler: {e}")
@@ -1129,7 +1173,8 @@ if __name__ == "__main__":
         
         logger.info("=== Voice Control Ready ===")
         logger.info(f"COMMAND MODE: Press {command_hotkey_str} to start recording voice commands")
-        logger.info(f"DICTATION MODE: Press {dictation_hotkey_str} OR Alt+Shift+V to dictate text")
+        logger.info(f"DICTATION MODE: Press {dictation_hotkey_str} to dictate text")
+        logger.info(f"MUTE TOGGLE: Press Ctrl+Alt+M to mute/unmute voice control")
         logger.info("")
         logger.info("Example commands:")
         logger.info("  'open Safari'")
@@ -1143,7 +1188,7 @@ if __name__ == "__main__":
         from toast_notifications import send_notification
         send_notification(
             "Voice Control Ready", 
-            f"Commands: {command_hotkey_str} | Dictation: Alt+Shift+V",
+            f"Commands: {command_hotkey_str} | Dictation: {dictation_hotkey_str} | Mute: Ctrl+Alt+M",
             "whisper-voice-ready",
             10,
             True
