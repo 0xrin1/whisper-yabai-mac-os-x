@@ -124,14 +124,41 @@ class AudioRecorder:
         # Set up audio stream
         try:
             print("DEBUG: Opening audio stream for recording")
+            print(f"DEBUG: Audio format: {self.format}, Channels: {self.channels}, Rate: {self.rate}, Chunk: {self.chunk}")
+            
+            # List available audio devices
+            info = self.p.get_host_api_info_by_index(0)
+            num_devices = info.get('deviceCount')
+            print(f"DEBUG: Found {num_devices} audio devices")
+            
+            default_input_device_index = self.p.get_default_input_device_info().get('index')
+            print(f"DEBUG: Default input device index: {default_input_device_index}")
+            
+            # Show input devices
+            for i in range(0, num_devices):
+                if (self.p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) > 0:
+                    name = self.p.get_device_info_by_host_api_device_index(0, i).get('name')
+                    print(f"DEBUG: Input device {i}: {name}")
+            
+            # Open stream with explicit input device index and settings
             stream = self.p.open(
                 format=self.format,
                 channels=self.channels,
                 rate=self.rate,
                 input=True,
+                input_device_index=default_input_device_index,
                 frames_per_buffer=self.chunk
             )
-            print("DEBUG: Audio stream opened successfully")
+            
+            # Test if we can read from the stream
+            test_data = stream.read(self.chunk, exception_on_overflow=False)
+            if len(test_data) > 0:
+                print(f"DEBUG: Audio stream test successful - got {len(test_data)} bytes")
+            else:
+                print("WARNING: Audio stream test got empty data")
+                
+            print("DEBUG: Audio stream opened successfully and tested")
+            
         except OSError as e:
             logger.error(f"Failed to open audio stream: {e}")
             logger.error("Make sure your microphone is connected and permissions are granted.")
@@ -143,28 +170,42 @@ class AudioRecorder:
         total_frames = int(self.rate / self.chunk * duration)
         print(f"DEBUG: Will record {total_frames} frames for {duration} seconds")
         
+        # Force a delay to ensure audio system is ready
+        time.sleep(0.1)
+        
         frames_recorded = 0
         start_time = time.time()
-        for i in range(0, total_frames):
-            if not RECORDING:
-                print("DEBUG: Recording flag turned off, stopping recording loop")
-                break
-                
-            try:
-                data = stream.read(self.chunk, exception_on_overflow=False)
-                frames.append(data)
-                frames_recorded += 1
-                
-                # Print progress every second
-                if frames_recorded % int(self.rate / self.chunk) == 0:
-                    seconds_elapsed = int(frames_recorded / (self.rate / self.chunk))
-                    print(f"DEBUG: Recorded {seconds_elapsed}/{duration} seconds ({frames_recorded}/{total_frames} frames)")
+        try:
+            # Use a more reliable approach with a time-based loop
+            end_time = start_time + duration
+            while time.time() < end_time and RECORDING:
+                try:
+                    # Read audio with a timeout to ensure we don't get stuck
+                    data = stream.read(self.chunk, exception_on_overflow=False)
+                    frames.append(data)
+                    frames_recorded += 1
                     
-            except Exception as rec_err:
-                print(f"DEBUG: Error reading audio frame: {rec_err}")
+                    # Print progress every second (approximate)
+                    if frames_recorded % int(self.rate / self.chunk) == 0:
+                        seconds_elapsed = time.time() - start_time
+                        seconds_remaining = max(0, duration - seconds_elapsed)
+                        print(f"DEBUG: Recorded {seconds_elapsed:.1f} sec, {seconds_remaining:.1f} sec remaining ({frames_recorded} frames)")
+                        
+                except Exception as rec_err:
+                    print(f"DEBUG: Error reading audio frame: {rec_err}")
+                    time.sleep(0.01)  # Small delay to avoid tight loop on error
                 
+        except KeyboardInterrupt:
+            print("DEBUG: Recording interrupted by user")
+            
+        # Final timing check    
         elapsed = time.time() - start_time
         print(f"DEBUG: Recording complete - {frames_recorded} frames in {elapsed:.2f} seconds")
+        
+        # If we recorded for less than 80% of the intended time, log a warning
+        if elapsed < (duration * 0.8) and RECORDING:
+            print(f"WARNING: Recording completed too quickly ({elapsed:.2f} sec instead of {duration} sec)!")
+            logger.warning(f"Recording completed prematurely: {elapsed:.2f}s instead of {duration}s")
             
         print("DEBUG: Stopping and closing audio stream")
         stream.stop_stream()
@@ -546,8 +587,19 @@ def process_audio():
     """Process audio files in the queue and convert to text using Whisper."""
     global WHISPER_MODEL
     
+    print("DEBUG: Audio processing thread starting...")
     logger.info(f"Loading Whisper model: {MODEL_SIZE}")
-    WHISPER_MODEL = whisper.load_model(MODEL_SIZE)
+    
+    try:
+        print(f"DEBUG: Loading Whisper model '{MODEL_SIZE}'")
+        start_time = time.time()
+        WHISPER_MODEL = whisper.load_model(MODEL_SIZE)
+        load_time = time.time() - start_time
+        print(f"DEBUG: Whisper model loaded in {load_time:.2f} seconds")
+    except Exception as model_err:
+        print(f"ERROR: Failed to load Whisper model: {model_err}")
+        logger.error(f"Failed to load Whisper model: {model_err}")
+        return
     
     command_processor = CommandProcessor()
     
@@ -555,6 +607,8 @@ def process_audio():
     min_confidence_threshold = float(os.getenv('MIN_CONFIDENCE', '0.5'))
     noise_threshold = float(os.getenv('NOISE_THRESHOLD', '0.2'))
     logger.info(f"Using minimum confidence threshold: {min_confidence_threshold}")
+    print(f"DEBUG: Confidence threshold: {min_confidence_threshold}, Noise threshold: {noise_threshold}")
+    print("DEBUG: Audio processing thread ready and listening for queue items...")
     
     while True:
         try:

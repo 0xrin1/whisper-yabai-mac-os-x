@@ -16,21 +16,66 @@ def check_microphone_permission():
     print("Testing microphone access...")
     try:
         p = pyaudio.PyAudio()
+        
+        # List available input devices
+        info = p.get_host_api_info_by_index(0)
+        num_devices = info.get('deviceCount')
+        print(f"Found {num_devices} audio devices")
+        
+        input_devices = []
+        for i in range(0, num_devices):
+            device_info = p.get_device_info_by_host_api_device_index(0, i)
+            if device_info.get('maxInputChannels') > 0:
+                name = device_info.get('name')
+                print(f"  - Input device {i}: {name}")
+                input_devices.append(i)
+                
+        if not input_devices:
+            print("❌ No input devices found!")
+            print("Please check if you have any microphones connected.")
+            return False
+            
+        # Try to use default input device
+        try:
+            default_input = p.get_default_input_device_info()
+            default_index = default_input.get('index')
+            print(f"Default input device: {default_input.get('name')} (index {default_index})")
+        except Exception as e:
+            print(f"Could not get default input device: {e}")
+            default_index = input_devices[0]  # Use first available input device
+            print(f"Using first available input device (index {default_index})")
+        
+        # Open stream with explicit device index
         stream = p.open(
             format=pyaudio.paInt16,
             channels=1,
             rate=16000,
             input=True,
+            input_device_index=default_index,
             frames_per_buffer=1024
         )
+        
+        print("Testing audio capture...")
         # Record a small amount of audio to test access
+        frames = []
         for i in range(10):
-            stream.read(1024)
+            data = stream.read(1024, exception_on_overflow=False)
+            frames.append(data)
+            
+        # Check if we got actual audio data
+        total_bytes = sum(len(frame) for frame in frames)
+        print(f"Captured {total_bytes} bytes of audio data")
+        
+        if total_bytes == 0:
+            print("❌ No audio data captured. Microphone may be muted or broken.")
+            return False
+            
         stream.stop_stream()
         stream.close()
         p.terminate()
-        print("✅ Microphone access granted.")
+        print("✅ Microphone access granted and working.")
         return True
+        
     except OSError as e:
         print("❌ Microphone access denied or device not available.")
         print(f"Error: {e}")
