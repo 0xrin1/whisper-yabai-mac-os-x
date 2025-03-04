@@ -120,6 +120,49 @@ class AudioRecorder:
             subprocess.run(["afplay", "/System/Library/Sounds/Basso.aiff"], check=False)
         except Exception as e:
             logger.error(f"Could not play stop sound: {e}")
+            
+    def start_recording(self, duration=None, dictation_mode=False):
+        """
+        Start recording audio for specified duration.
+        
+        Args:
+            duration (int, optional): Recording duration in seconds
+            dictation_mode (bool): If True, recorded audio will be transcribed directly to text
+                                  rather than interpreted as a command
+        """
+        global RECORDING
+        
+        if RECORDING:
+            print("DEBUG: Already recording, ignoring request")
+            return
+            
+        # Use environment variable if duration not specified
+        if duration is None:
+            duration = int(os.getenv('RECORDING_DURATION', '5'))
+            
+        print(f"DEBUG: Recording duration set to {duration} seconds")
+        
+        RECORDING = True
+        print("DEBUG: RECORDING flag set to True")
+        
+        # Play a sound to indicate recording has started
+        self._play_start_sound()
+        
+        # Show appropriate notification
+        mode = "Dictation" if dictation_mode else "Command"
+        print(f"DEBUG: {mode} mode activated - recording for {duration} seconds")
+        if dictation_mode:
+            logger.info(f"Dictation mode: Listening for {duration} seconds...")
+            notify_listening(duration)
+        else:
+            logger.info(f"Command mode: Listening for {duration} seconds...")
+            notify_listening(duration)
+        
+        # Create a temporary WAV file
+        temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+        temp_filename = temp_file.name
+        temp_file.close()
+        print(f"DEBUG: Created temporary WAV file: {temp_filename}")
         
         # Set up audio stream
         try:
