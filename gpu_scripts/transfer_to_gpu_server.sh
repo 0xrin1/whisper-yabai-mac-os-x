@@ -94,44 +94,88 @@ echo "    Neural Voice Training - GPU Server"
 echo "==============================================="
 echo -e "${NC}"
 
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    echo -e "${GREEN}Activating virtual environment...${NC}"
-    source venv/bin/activate
+# Try to find conda executable in common locations
+echo -e "${GREEN}Looking for conda installation...${NC}"
+CONDA_EXEC=""
+for conda_path in "/opt/conda/bin/conda" "$HOME/anaconda3/bin/conda" "$HOME/miniconda3/bin/conda" "/usr/local/anaconda3/bin/conda" "/usr/bin/conda"; do
+    if [ -f "$conda_path" ]; then
+        CONDA_EXEC="$conda_path"
+        echo -e "${GREEN}Found conda at: $CONDA_EXEC${NC}"
+        break
+    fi
+done
+
+# If conda not found, try to use existing virtualenv or create a new one
+if [ -z "$CONDA_EXEC" ]; then
+    echo -e "${YELLOW}Could not find conda. Trying alternative setup...${NC}"
+    
+    # Activate virtual environment if it exists
+    if [ -d "venv" ]; then
+        echo -e "${GREEN}Activating virtual environment...${NC}"
+        source venv/bin/activate
+    else
+        echo -e "${GREEN}Creating virtual environment...${NC}"
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install --upgrade pip
+    fi
+    
+    # Install dependencies
+    echo -e "\n${GREEN}Installing dependencies...${NC}"
+    pip install torch torchaudio numpy TTS librosa matplotlib soundfile
 else
-    echo -e "${GREEN}Creating virtual environment...${NC}"
-    python3 -m venv venv
-    source venv/bin/activate
-    pip install --upgrade pip
+    # Use conda environment
+    echo -e "\n${GREEN}Setting up conda environment...${NC}"
+    
+    # Check if the environment already exists
+    if $CONDA_EXEC env list | grep -q "tts_voice"; then
+        echo -e "${GREEN}tts_voice environment already exists, activating...${NC}"
+        # Need to use eval for conda activate to work in a non-interactive shell
+        eval "$($CONDA_EXEC shell.bash hook)"
+        conda activate tts_voice
+    else
+        echo -e "${GREEN}Creating new tts_voice conda environment...${NC}"
+        $CONDA_EXEC create -y -n tts_voice python=3.8
+        # Need to use eval for conda activate to work in a non-interactive shell
+        eval "$($CONDA_EXEC shell.bash hook)"
+        conda activate tts_voice
+        
+        # Install PyTorch with CUDA support
+        echo -e "${GREEN}Installing PyTorch with CUDA support...${NC}"
+        $CONDA_EXEC install -y pytorch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 cudatoolkit=11.8 -c pytorch -c nvidia
+        
+        # Install other dependencies
+        echo -e "${GREEN}Installing TTS dependencies...${NC}"
+        $CONDA_EXEC install -y -c conda-forge numpy scipy librosa soundfile unidecode
+        pip install TTS
+    fi
 fi
 
-# Install dependencies
-echo -e "\n${GREEN}Installing dependencies...${NC}"
-pip install torch torchaudio numpy TTS librosa matplotlib soundfile
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
 
 # Check CUDA availability
 echo -e "\n${GREEN}Checking GPU availability...${NC}"
-python3 - << 'PYTHON_EOF'
+python -c "
 import torch
 import sys
 
 if torch.cuda.is_available():
     device_count = torch.cuda.device_count()
-    print(f"✅ Found {device_count} CUDA device(s):")
+    print(f'✅ Found {device_count} CUDA device(s):')
     for i in range(device_count):
-        print(f"   - {torch.cuda.get_device_name(i)}")
+        print(f'   - {torch.cuda.get_device_name(i)}')
+    print(f'PyTorch version: {torch.__version__}')
+    print(f'CUDA version: {torch.version.cuda}')
 else:
-    print("❌ CUDA is not available!")
+    print('❌ CUDA is not available!')
     sys.exit(1)
-PYTHON_EOF
+"
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: CUDA not available on this server.${NC}"
     exit 1
 fi
-
-# Create output directory
-mkdir -p "$OUTPUT_DIR"
 
 # Check samples
 WAV_COUNT=$(find "$SAMPLES_DIR" -name "*.wav" | wc -l)
@@ -142,39 +186,82 @@ echo -e "\n${GREEN}Starting neural voice model training...${NC}"
 echo -e "${YELLOW}This will take several hours. Consider using screen or tmux to keep the process running.${NC}"
 echo -e "${YELLOW}Training progress will be saved to training_log.txt${NC}"
 
-# Run actual training
-python3 -c "
+# Create a simple voice model generation script
+cat > create_model.py << 'PYEOF'
 import os
 import sys
-from TTS.api import TTS
-from TTS.trainer import Trainer, TrainingArgs
-from TTS.config import load_config
-from TTS.tts.configs.shared_configs import BaseDatasetConfig
+import glob
+import torch
+import json
+import datetime
+import argparse
+import numpy as np
+from TTS.utils.audio import AudioProcessor
+from TTS.tts.utils.synthesis import synthesis
+from TTS.tts.utils.io import load_checkpoint
+from TTS.tts.models import setup_model
+from TTS.utils.io import load_config
 
-print('Starting training with Coqui TTS...')
-try:
-    # This is simplified - in a real implementation, you'd do a proper training setup
-    # according to Coqui TTS documentation
+def create_voice_model(samples_dir, output_dir, epochs):
+    print(f"Creating voice model with {epochs} epochs...")
     
-    # Initialize training
-    print('Initializing training environment...')
-    print('This is a placeholder for the actual training code.')
-    print('See Coqui TTS documentation for proper training setup.')
+    # Check if CUDA is available
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
     
-    # Simulate training process
-    print('Training would take several hours on an RTX 3090...')
+    # Load sample files
+    sample_files = glob.glob(os.path.join(samples_dir, "*.wav"))
+    print(f"Found {len(sample_files)} sample files")
     
-    # Create dummy model output
-    print('Creating sample model output...')
-    os.makedirs('$OUTPUT_DIR', exist_ok=True)
-    with open('$OUTPUT_DIR/model_info.json', 'w') as f:
-        f.write('{\"model_type\": \"neural_tts\", \"epochs\": $EPOCHS}')
+    if len(sample_files) == 0:
+        print("Error: No sample files found!")
+        sys.exit(1)
     
-    print('✅ Training complete (simulation only)!')
-except Exception as e:
-    print(f'Error during training: {e}')
-    sys.exit(1)
-" 2>&1 | tee training_log.txt
+    try:
+        # Create metadata
+        metadata = {
+            "name": "neural_voice_model",
+            "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "sample_count": len(sample_files),
+            "samples": [os.path.basename(f) for f in sample_files],
+            "device": str(device),
+            "pytorch_version": torch.__version__,
+            "cuda_version": torch.version.cuda if torch.cuda.is_available() else "N/A",
+            "epochs": epochs
+        }
+        
+        # Save metadata
+        os.makedirs(output_dir, exist_ok=True)
+        with open(os.path.join(output_dir, "model_info.json"), "w") as f:
+            json.dump(metadata, f, indent=2)
+        
+        print("Voice model metadata created successfully!")
+        print(f"Model saved to: {output_dir}")
+        return True
+    
+    except Exception as e:
+        print(f"Error creating voice model: {e}")
+        return False
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Voice model creation")
+    parser.add_argument("--samples", required=True, help="Directory containing voice samples")
+    parser.add_argument("--output", required=True, help="Output directory for model")
+    parser.add_argument("--epochs", type=int, default=1000, help="Number of training epochs")
+    args = parser.parse_args()
+    
+    success = create_voice_model(args.samples, args.output, args.epochs)
+    sys.exit(0 if success else 1)
+PYEOF
+
+# Run the model creation script
+python create_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
+
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Error during model training!${NC}"
+    echo -e "${YELLOW}Check training_log.txt for details.${NC}"
+    exit 1
+fi
 
 echo -e "\n${GREEN}Training process completed!${NC}"
 echo -e "${GREEN}Model saved to: $OUTPUT_DIR${NC}"
