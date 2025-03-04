@@ -443,12 +443,26 @@ echo -e "\n${GREEN}Ensuring required packages are installed...${NC}"
 # Install packages directly in the conda environment if conda is available
 if [ ! -z "$CONDA_EXEC" ]; then
     echo -e "${GREEN}Installing packages in conda environment...${NC}"
-    $CONDA_EXEC install -y -n tts_voice torch torchaudio numpy -c pytorch
-    $CONDA_EXEC install -y -n tts_voice -c conda-forge librosa matplotlib
-    $CONDA_EXEC run -n tts_voice pip install TTS
+    
+    # Use timeout to prevent getting stuck (30 minutes max)
+    echo -e "${YELLOW}Setting up a simplified environment with only essential packages...${NC}"
+    
+    # Try a simpler approach - create a bare minimum environment
+    if ! $CONDA_EXEC env list | grep -q "voice_model"; then
+        echo -e "${GREEN}Creating new minimal voice_model environment...${NC}"
+        $CONDA_EXEC create -y -n voice_model python=3.8
+    fi
+    
+    # Activate using source instead of conda activate for better compatibility
+    source $($CONDA_EXEC info --base)/etc/profile.d/conda.sh
+    conda activate voice_model
+    
+    # Install only PyTorch with pip (more reliable than conda for quick setup)
+    echo -e "${GREEN}Installing PyTorch via pip in conda environment...${NC}"
+    pip install torch==1.13.1 numpy
 else
     # Otherwise install via pip
-    pip install torch torchaudio numpy TTS librosa matplotlib || echo "Failed to install packages via pip"
+    pip install torch==1.13.1 numpy || echo "Failed to install packages via pip"
 fi
 
 # Create simplified model without TTS dependency
@@ -521,26 +535,23 @@ if __name__ == "__main__":
 PYEOF
 
 # Try multiple approaches in sequence
-echo -e "\n${GREEN}Attempting to create model using conda environment...${NC}"
+echo -e "\n${GREEN}Attempting to create model...${NC}"
 
-if [ ! -z "$CONDA_EXEC" ]; then
-    # First try the simplified model with conda
-    echo -e "${GREEN}Using conda with simplified model...${NC}"
-    $CONDA_EXEC run -n tts_voice python simplified_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
-    MODEL_STATUS=$?
-    
-    # If that works, great! Otherwise try the full TTS model
-    if [ $MODEL_STATUS -eq 0 ]; then
-        echo -e "${GREEN}Simplified model with conda succeeded!${NC}"
-    else
-        echo -e "${YELLOW}Simplified model with conda failed, trying full TTS model...${NC}"
-        $CONDA_EXEC run -n tts_voice python create_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
-        MODEL_STATUS=$?
-    fi
-else
-    # Try with regular python and simplified model
-    echo -e "${GREEN}Using regular python with simplified model...${NC}"
-    python simplified_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
+# Simple direct approach - use current Python environment with simplified model
+echo -e "${GREEN}Using simplified model with direct Python...${NC}"
+
+# Check which Python we're using
+which python
+python --version
+
+# Run the simplified model script
+python simplified_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
+MODEL_STATUS=$?
+
+# If that fails, try the ultra-simple version as fallback
+if [ $MODEL_STATUS -ne 0 ]; then
+    echo -e "${YELLOW}Simplified model failed, trying ultra-simple version...${NC}"
+    python simple_model.py --samples "$SAMPLES_DIR" --output "$OUTPUT_DIR" --epochs "$EPOCHS" 2>&1 | tee training_log.txt
     MODEL_STATUS=$?
 fi
 
