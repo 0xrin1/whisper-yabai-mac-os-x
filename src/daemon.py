@@ -4,6 +4,7 @@ Voice command daemon using Whisper and Yabai for Mac OS X control.
 """
 
 import os
+import re
 import time
 import json
 import subprocess
@@ -214,61 +215,71 @@ class AudioRecorder:
             return
         
         frames = []
-        total_frames = int(self.rate / self.chunk * duration)
-        print(f"DEBUG: Will record {total_frames} frames for {duration} seconds")
+        frames_per_second = self.rate / self.chunk
+        
+        # For silence detection
+        SILENCE_THRESHOLD = 500  # Adjust based on testing
+        silence_frames = 0
+        max_silence_frames = int(frames_per_second * 3)  # 3 seconds of silence
+        
+        # Set maximum recording duration
+        max_duration = 60 if dictation_mode else 15  # 60 seconds for dictation, 15 for commands
+        total_frames = int(frames_per_second * max_duration)
+        
+        # Minimum recording duration 
+        min_duration = 2  # At least 2 seconds of audio
+        min_frames = int(frames_per_second * min_duration)
+        
+        print(f"DEBUG: Beginning smart recording (max: {max_duration}s, silence timeout: 3s)")
         
         # Force a delay to ensure audio system is ready
         time.sleep(0.1)
         
         frames_recorded = 0
         start_time = time.time()
-        # Make sure we record for the full duration
-        seconds_recorded = 0.0
-        frames_per_second = self.rate / self.chunk
-        target_frames = int(frames_per_second * duration)
-
-        print(f"DEBUG: Beginning recording loop for {duration} seconds ({target_frames} frames)")
+        has_speech = False
         
         try:
-            # Use a strictly time-based approach 
-            end_time = start_time + duration
-            
-            while time.time() < end_time and RECORDING:
+            # Record until max duration reached, user stops recording, or silence detected after speech
+            while frames_recorded < total_frames and RECORDING:
                 try:
                     # Read audio with a timeout to ensure we don't get stuck
                     data = stream.read(self.chunk, exception_on_overflow=False)
                     frames.append(data)
                     frames_recorded += 1
                     
+                    # Convert to numpy array for audio processing
+                    audio_data = np.frombuffer(data, dtype=np.int16)
+                    
+                    # Calculate audio energy/volume
+                    energy = np.abs(audio_data).mean()
+                    
                     # Print progress every second (approximate)
                     if frames_recorded % int(frames_per_second) == 0:
                         seconds_recorded = frames_recorded / frames_per_second
-                        seconds_remaining = max(0, duration - seconds_recorded)
                         current_time = time.time()
                         elapsed_real = current_time - start_time
                         
                         print(f"DEBUG: Recorded {seconds_recorded:.1f} sec (real: {elapsed_real:.1f}s), " 
-                              f"{seconds_remaining:.1f} sec remaining ({frames_recorded}/{target_frames} frames)")
+                              f"Energy: {energy:.0f}")
+                    
+                    # Detect speech vs silence
+                    if energy > SILENCE_THRESHOLD:
+                        has_speech = True
+                        silence_frames = 0
+                    else:
+                        silence_frames += 1
                         
-                        # If we're running too fast, add a small delay to maintain timing accuracy
-                        if seconds_recorded > elapsed_real + 0.1:
-                            sleep_time = min(0.1, seconds_recorded - elapsed_real)
-                            time.sleep(sleep_time)
+                        # If we've recorded enough frames and detected sufficient silence after speech,
+                        # end the recording automatically
+                        if has_speech and frames_recorded > min_frames and silence_frames >= max_silence_frames:
+                            print(f"DEBUG: Stopping recording after detecting {silence_frames/frames_per_second:.1f}s of silence")
+                            break
                             
                 except Exception as rec_err:
                     print(f"DEBUG: Error reading audio frame: {rec_err}")
                     time.sleep(0.01)  # Small delay to avoid tight loop on error
-                
-            # Check if we ended early
-            if time.time() < end_time and not RECORDING:
-                print("DEBUG: Recording stopped early by user")
-            
-            # If we need to force completion of the duration 
-            remaining_time = end_time - time.time()
-            if remaining_time > 0.1:
-                print(f"DEBUG: Waiting {remaining_time:.1f}s to complete full duration")
-                time.sleep(remaining_time)
-                
+                    
         except KeyboardInterrupt:
             print("DEBUG: Recording interrupted by user")
             
@@ -797,10 +808,17 @@ def process_dictation(transcription):
             logger.info("Using AppleScript keystroke method...")
             print("DEBUG: Trying AppleScript method")
             
-            # Remove any leading 'v' character that might be added mistakenly
+            # Remove any 'v' character that might be added by Alt+Shift+V hotkey 
+            # Check both at the beginning and when preceded by whitespace
             if transcription.startswith('v') or transcription.startswith('V'):
                 transcription = transcription[1:].lstrip()
                 print(f"DEBUG: Removed leading 'v' character, new text: '{transcription}'")
+            
+            # Also check for "vAll" or similar patterns at the beginning
+            transcription = re.sub(r'^v([A-Z])', r'\1', transcription)
+            
+            # Remove 'v' after sentence-ending punctuation and whitespace
+            transcription = re.sub(r'([.!?]\s+)v([A-Za-z])', r'\1\2', transcription)
             
             # Save to temp file for AppleScript
             tmp_file = "/tmp/dictation_text.txt"
