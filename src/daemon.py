@@ -138,7 +138,11 @@ class AudioRecorder:
             
         # Use environment variable if duration not specified
         if duration is None:
-            duration = int(os.getenv('RECORDING_DURATION', '5'))
+            # Use longer duration for dictation mode
+            if dictation_mode:
+                duration = int(os.getenv('DICTATION_DURATION', '10'))
+            else:
+                duration = int(os.getenv('RECORDING_DURATION', '5'))
             
         print(f"DEBUG: Recording duration set to {duration} seconds")
         
