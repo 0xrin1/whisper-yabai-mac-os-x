@@ -421,6 +421,26 @@ class CommandProcessor:
             logger.info("Detected dictation command")
             print("DEBUG: Voice command triggered dictation mode")
             
+            # Show clear feedback that we're switching to dictation mode
+            print("DEBUG: Switching to DICTATION MODE - everything you say will be typed")
+            logger.info("Switching to DICTATION MODE - your speech will be typed at cursor")
+            
+            try:
+                # Visual notification of mode switch
+                from toast_notifications import send_notification
+                send_notification(
+                    "Dictation Mode Active", 
+                    "Speaking will now be typed as text | Pause to return to command mode",
+                    "whisper-dictation-mode",
+                    5,
+                    True
+                )
+                
+                # Play a distinctive sound to indicate mode switch
+                subprocess.run(["afplay", "/System/Library/Sounds/Glass.aiff"], check=False)
+            except Exception as e:
+                logger.error(f"Failed to show dictation mode notification: {e}")
+            
             # Start dictation mode through the same path the hotkey would use
             # Use threading to avoid blocking this function
             threading.Thread(target=start_recording_thread, args=('dictation',), daemon=True).start()
@@ -798,6 +818,28 @@ def process_audio():
             # start listening again after a short delay
             if CONTINUOUS_LISTENING and not MUTED:
                 print("DEBUG: Restarting continuous listening after processing")
+                
+                # If we're coming back from dictation mode, show a notification about returning to command mode
+                if is_dictation_mode:
+                    print("DEBUG: Returning to COMMAND MODE after dictation")
+                    logger.info("Returning to COMMAND MODE")
+                    
+                    try:
+                        # Visual notification of mode switch back to commands
+                        from toast_notifications import send_notification
+                        send_notification(
+                            "Command Mode Active", 
+                            "You can now speak commands | Say 'dictate' for typing",
+                            "whisper-command-mode",
+                            3,
+                            True
+                        )
+                        
+                        # Play a different sound for returning to command mode
+                        subprocess.run(["afplay", "/System/Library/Sounds/Bottle.aiff"], check=False)
+                    except Exception as e:
+                        logger.error(f"Failed to show command mode notification: {e}")
+                
                 # Add a small delay to avoid CPU overuse
                 time.sleep(0.5)
                 threading.Thread(target=start_continuous_listening, daemon=True).start()
@@ -948,6 +990,12 @@ def start_recording_thread(mode):
     
     Args:
         mode (str): Either 'command' or 'dictation'
+        
+    IMPORTANT DIFFERENCE BETWEEN MODES:
+    - Command mode: System listens for voice commands to control your computer
+      Example: "open Safari", "maximize window", etc.
+    - Dictation mode: System captures your speech and types it as text at the current cursor position
+      Example: When you say "Hello world", it will type "Hello world" where your cursor is
     """
     global MUTED
     
@@ -959,7 +1007,7 @@ def start_recording_thread(mode):
         from toast_notifications import send_notification
         send_notification(
             "Microphone Muted", 
-            "Press Ctrl+Alt+M to unmute",
+            "Press Ctrl+Shift+M to unmute",
             "whisper-voice-muted",
             3,
             True
@@ -1204,12 +1252,13 @@ if __name__ == "__main__":
         logger.info("ALWAYS LISTENING MODE: Voice control is always active unless muted")
         logger.info(f"MUTE TOGGLE: Press Ctrl+Shift+M to mute/unmute voice control")
         logger.info("")
-        logger.info("Example commands:")
-        logger.info("  'open Safari'")
-        logger.info("  'maximize window'")
-        logger.info("  'open terminal'")
-        logger.info("  'focus chrome'")
-        logger.info("  'dictate' (switches to dictation mode)")
+        logger.info("TWO MODES:")
+        logger.info("1. COMMAND MODE (default): System listens for commands to control your computer")
+        logger.info("   Examples: 'open Safari', 'maximize window', 'focus chrome'")
+        logger.info("")
+        logger.info("2. DICTATION MODE: System types what you say at the cursor position")
+        logger.info("   To enter dictation mode, say 'dictate' or 'start dictation'")
+        logger.info("   To exit dictation mode, stop speaking for 3 seconds")
         logger.info("")
         logger.info("Press Ctrl+C or ESC to exit")
         
@@ -1223,7 +1272,7 @@ if __name__ == "__main__":
             from toast_notifications import send_notification
             send_notification(
                 "Voice Control Ready", 
-                "Always listening mode active | Say 'dictate' for dictation | Mute: Ctrl+Shift+M",
+                "Command Mode: Say commands | Say 'dictate' to switch to typing | Mute: Ctrl+Shift+M",
                 "whisper-voice-ready",
                 10,
                 True
