@@ -84,13 +84,21 @@ def record_sample(seconds: float = 3.0, prompt: str = None, interactive: bool = 
         frames_per_buffer=CHUNK
     )
     
-    print("* Recording...")
+    print("* Get ready...")
     
     # Play a sound to indicate start
     try:
         subprocess.run(["afplay", "/System/Library/Sounds/Tink.aiff"], check=False)
+        # Add a delay after the sound to avoid capturing it in the recording
+        print("* Starting in 3...")
+        time.sleep(1)
+        print("* 2...")
+        time.sleep(1)
+        print("* 1...")
+        time.sleep(0.5)
+        print("* Recording NOW:")
     except:
-        pass
+        print("* Recording...")
     
     # Record audio with countdown display
     frames = []
@@ -710,6 +718,41 @@ def install_voice_model(name: str = DEFAULT_VOICE_MODEL) -> bool:
     print(f"Voice model '{name}' installed as the active voice!")
     return True
 
+def create_backup_zip(samples_dir: str = TRAINING_DIR) -> str:
+    """Create a backup zip file of all recorded samples.
+    
+    Args:
+        samples_dir: Directory containing samples to backup
+        
+    Returns:
+        Path to the created zip file
+    """
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.expanduser(f"~/voice_samples_backup_{timestamp}.zip")
+    
+    try:
+        import zipfile
+        
+        # Count WAV files
+        wav_files = [f for f in os.listdir(samples_dir) if f.endswith('.wav')]
+        if not wav_files:
+            print("No WAV files found to backup.")
+            return None
+            
+        # Create zip file
+        print(f"\nCreating backup of {len(wav_files)} voice samples...")
+        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file in wav_files:
+                file_path = os.path.join(samples_dir, file)
+                zipf.write(file_path, arcname=file)
+        
+        print(f"✅ Backup created: {backup_path}")
+        print(f"Total size: {os.path.getsize(backup_path) / 1024 / 1024:.2f} MB")
+        return backup_path
+    except Exception as e:
+        print(f"Error creating backup: {e}")
+        return None
+
 def main():
     """Main function for voice training."""
     print("\n=== VOICE TRAINING UTILITY ===")
@@ -836,6 +879,12 @@ def main():
     print(f"2. Edit src/continuous_recorder.py - set energy_threshold to {thresholds['continuous_threshold']}")
     print(f"3. Restart the daemon after making these changes")
     
+    # Create backup of all voice samples
+    backup_path = create_backup_zip()
+    if backup_path:
+        print(f"\n✅ Your voice samples have been backed up to: {backup_path}")
+        print("Keep this file safe in case you need to recreate your voice model later.")
+    
     # Ask if user wants to create a voice model
     if interactive_mode:
         try:
@@ -858,6 +907,14 @@ def main():
         if model_dir:
             install_voice_model(DEFAULT_VOICE_MODEL)
             print("\nCustom voice model created and installed automatically.")
+    
+    # Provide next steps for neural training
+    if len(all_samples) >= 10:
+        print("\n=== NEXT STEPS ===")
+        print("To create a neural voice model with the RTX 3090 GPU:")
+        print("1. Run the GPU server check script: ./gpu_scripts/check_gpu_server.sh")
+        print("2. Transfer samples and start training: ./gpu_scripts/transfer_to_gpu_server.sh")
+        print("3. After training completes, retrieve your model: ./gpu_scripts/retrieve_from_gpu_server.sh")
     
     print("\nThank you for training the system with your voice!")
 
