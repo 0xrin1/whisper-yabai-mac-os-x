@@ -74,18 +74,24 @@ class AudioRecorder:
         global RECORDING
         
         if RECORDING:
+            print("DEBUG: Already recording, ignoring request")
             return
             
         # Use environment variable if duration not specified
         if duration is None:
             duration = int(os.getenv('RECORDING_DURATION', '5'))
             
+        print(f"DEBUG: Recording duration set to {duration} seconds")
+        
         RECORDING = True
+        print("DEBUG: RECORDING flag set to True")
         
         # Play a sound to indicate recording has started
         self._play_start_sound()
         
         # Show appropriate notification
+        mode = "Dictation" if dictation_mode else "Command"
+        print(f"DEBUG: {mode} mode activated - recording for {duration} seconds")
         if dictation_mode:
             logger.info(f"Dictation mode: Listening for {duration} seconds...")
             notify_listening(duration)
@@ -97,6 +103,7 @@ class AudioRecorder:
         temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
         temp_filename = temp_file.name
         temp_file.close()
+        print(f"DEBUG: Created temporary WAV file: {temp_filename}")
         
     def _play_start_sound(self):
         """Play a sound to indicate recording has started."""
@@ -116,6 +123,7 @@ class AudioRecorder:
         
         # Set up audio stream
         try:
+            print("DEBUG: Opening audio stream for recording")
             stream = self.p.open(
                 format=self.format,
                 channels=self.channels,
@@ -123,35 +131,81 @@ class AudioRecorder:
                 input=True,
                 frames_per_buffer=self.chunk
             )
+            print("DEBUG: Audio stream opened successfully")
         except OSError as e:
             logger.error(f"Failed to open audio stream: {e}")
             logger.error("Make sure your microphone is connected and permissions are granted.")
+            print(f"DEBUG: Audio stream error: {e}")
             RECORDING = False
             return
         
         frames = []
-        for i in range(0, int(self.rate / self.chunk * duration)):
+        total_frames = int(self.rate / self.chunk * duration)
+        print(f"DEBUG: Will record {total_frames} frames for {duration} seconds")
+        
+        frames_recorded = 0
+        start_time = time.time()
+        for i in range(0, total_frames):
             if not RECORDING:
+                print("DEBUG: Recording flag turned off, stopping recording loop")
                 break
-            data = stream.read(self.chunk)
-            frames.append(data)
+                
+            try:
+                data = stream.read(self.chunk, exception_on_overflow=False)
+                frames.append(data)
+                frames_recorded += 1
+                
+                # Print progress every second
+                if frames_recorded % int(self.rate / self.chunk) == 0:
+                    seconds_elapsed = int(frames_recorded / (self.rate / self.chunk))
+                    print(f"DEBUG: Recorded {seconds_elapsed}/{duration} seconds ({frames_recorded}/{total_frames} frames)")
+                    
+            except Exception as rec_err:
+                print(f"DEBUG: Error reading audio frame: {rec_err}")
+                
+        elapsed = time.time() - start_time
+        print(f"DEBUG: Recording complete - {frames_recorded} frames in {elapsed:.2f} seconds")
             
+        print("DEBUG: Stopping and closing audio stream")
         stream.stop_stream()
         stream.close()
+        print("DEBUG: Audio stream closed")
         
         # Save the recorded data as a WAV file
-        wf = wave.open(temp_filename, 'wb')
-        wf.setnchannels(self.channels)
-        wf.setsampwidth(self.p.get_sample_size(self.format))
-        wf.setframerate(self.rate)
-        wf.writeframes(b''.join(frames))
-        wf.close()
+        print(f"DEBUG: Writing {len(frames)} audio frames to {temp_filename}")
+        try:
+            wf = wave.open(temp_filename, 'wb')
+            wf.setnchannels(self.channels)
+            wf.setsampwidth(self.p.get_sample_size(self.format))
+            wf.setframerate(self.rate)
+            
+            # Join frames and write to file
+            joined_frames = b''.join(frames)
+            print(f"DEBUG: Joined audio data is {len(joined_frames)} bytes")
+            wf.writeframes(joined_frames)
+            wf.close()
+            print(f"DEBUG: WAV file written successfully: {temp_filename}")
+            
+            # Verify file exists and has content
+            if os.path.exists(temp_filename):
+                file_size = os.path.getsize(temp_filename)
+                print(f"DEBUG: WAV file size: {file_size} bytes")
+                if file_size < 1000:
+                    print("WARNING: WAV file seems very small, may not contain enough audio")
+            else:
+                print(f"ERROR: WAV file not found after writing: {temp_filename}")
+                
+        except Exception as wav_err:
+            print(f"DEBUG: Error saving WAV file: {wav_err}")
+            # Try to continue anyway
         
         logger.info(f"Recording saved to {temp_filename}")
         RECORDING = False
+        print("DEBUG: RECORDING flag set to False")
         
         # Play a sound to indicate recording has ended
         self._play_stop_sound()
+        print("DEBUG: Stop sound played")
         
         # Add to processing queue with mode flag
         if dictation_mode:
@@ -736,14 +790,34 @@ V_PRESSED = False  # Alternative dictation key
 def hotkey_command_callback():
     """Callback for command mode hotkey."""
     if not RECORDING:
+        print("DEBUG: Command hotkey callback triggered")
         logger.info("Command hotkey triggered - starting voice recording...")
-        threading.Thread(target=lambda: recorder.start_recording(dictation_mode=False)).start()
+        
+        def start_command_recording():
+            print("DEBUG: Starting command recording thread")
+            recorder.start_recording(dictation_mode=False)
+            print("DEBUG: Command recording thread completed")
+            
+        thread = threading.Thread(target=start_command_recording)
+        thread.daemon = True
+        thread.start()
+        print(f"DEBUG: Command recording thread started: {thread.name}")
 
 def hotkey_dictation_callback():
     """Callback for dictation mode hotkey."""
     if not RECORDING:
+        print("DEBUG: Dictation hotkey callback triggered")
         logger.info("Dictation hotkey triggered - starting voice recording...")
-        threading.Thread(target=lambda: recorder.start_recording(dictation_mode=True)).start()
+        
+        def start_dictation_recording():
+            print("DEBUG: Starting dictation recording thread")
+            recorder.start_recording(dictation_mode=True)
+            print("DEBUG: Dictation recording thread completed")
+            
+        thread = threading.Thread(target=start_dictation_recording)
+        thread.daemon = True
+        thread.start()
+        print(f"DEBUG: Dictation recording thread started: {thread.name}")
 
 def on_press(key):
     """Handle key press events."""
@@ -752,49 +826,61 @@ def on_press(key):
     try:
         # Always log the key for debugging
         logger.debug(f"Key pressed: {key}")
+        print(f"DEBUG: Key pressed: {key}")
         
         # Update key state
         if key == keyboard.Key.ctrl or key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
             CTRL_PRESSED = True
+            print("DEBUG: CTRL key pressed")
         elif key == keyboard.Key.shift or key == keyboard.Key.shift_l or key == keyboard.Key.shift_r:
             SHIFT_PRESSED = True
+            print("DEBUG: SHIFT key pressed")
         elif key == keyboard.Key.alt or key == keyboard.Key.alt_l or key == keyboard.Key.alt_r:
             ALT_PRESSED = True
+            print("DEBUG: ALT key pressed")
         elif key == keyboard.Key.cmd:
             CMD_PRESSED = True
+            print("DEBUG: CMD key pressed")
         elif key == keyboard.Key.space:
             SPACE_PRESSED = True
+            print("DEBUG: SPACE key pressed")
         elif isinstance(key, keyboard.KeyCode):
             # Handle character keys with better detection
             if hasattr(key, 'char') and key.char:
-                if key.char.lower() == 'd':
+                char = key.char.lower()
+                print(f"DEBUG: Character key pressed: '{char}'")
+                if char == 'd':
                     D_PRESSED = True
-                    logger.debug("D key detected")
-                elif key.char.lower() == 'v':
+                    print("DEBUG: D key detected")
+                elif char == 'v':
                     V_PRESSED = True
-                    logger.debug("V key detected")
+                    print("DEBUG: V key detected")
         
         # Log key states for debug
-        logger.debug(f"Key states: CTRL:{CTRL_PRESSED} SHIFT:{SHIFT_PRESSED} ALT:{ALT_PRESSED} SPACE:{SPACE_PRESSED} D:{D_PRESSED} V:{V_PRESSED}")
+        print(f"DEBUG: Key states - CTRL:{CTRL_PRESSED} SHIFT:{SHIFT_PRESSED} ALT:{ALT_PRESSED} SPACE:{SPACE_PRESSED} D:{D_PRESSED} V:{V_PRESSED}")
             
         # Check for command hotkey (Ctrl+Shift+Space)
         if CTRL_PRESSED and SHIFT_PRESSED and SPACE_PRESSED:
+            print("DEBUG: Command hotkey detected: Ctrl+Shift+Space")
             logger.info("Command hotkey detected: Ctrl+Shift+Space")
             hotkey_command_callback()
             
         # Check for dictation hotkeys:
         # Option 1: Ctrl+Shift+D
         if CTRL_PRESSED and SHIFT_PRESSED and D_PRESSED:
+            print("DEBUG: Dictation hotkey detected: Ctrl+Shift+D")
             logger.info("Dictation hotkey detected: Ctrl+Shift+D")
             hotkey_dictation_callback()
             
         # Option 2: Alt+Shift+V (alternative)
         if ALT_PRESSED and SHIFT_PRESSED and V_PRESSED:
+            print("DEBUG: Alternative dictation hotkey detected: Alt+Shift+V")
             logger.info("Alternative dictation hotkey detected: Alt+Shift+V")
             hotkey_dictation_callback()
             
     except Exception as e:
         logger.error(f"Error in key press handler: {e}")
+        print(f"DEBUG: Key press handler error: {e}")
         import traceback
         logger.error(traceback.format_exc())
 
@@ -804,32 +890,43 @@ def on_release(key):
     
     try:
         logger.debug(f"Key released: {key}")
+        print(f"DEBUG: Key released: {key}")
         
         # Update key state
         if key == keyboard.Key.ctrl or key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
             CTRL_PRESSED = False
+            print("DEBUG: CTRL key released")
         elif key == keyboard.Key.shift or key == keyboard.Key.shift_l or key == keyboard.Key.shift_r:
             SHIFT_PRESSED = False
+            print("DEBUG: SHIFT key released")
         elif key == keyboard.Key.alt or key == keyboard.Key.alt_l or key == keyboard.Key.alt_r:
             ALT_PRESSED = False
+            print("DEBUG: ALT key released")
         elif key == keyboard.Key.cmd:
             CMD_PRESSED = False
+            print("DEBUG: CMD key released")
         elif key == keyboard.Key.space:
             SPACE_PRESSED = False
+            print("DEBUG: SPACE key released")
         elif isinstance(key, keyboard.KeyCode):
             if hasattr(key, 'char') and key.char:
-                if key.char.lower() == 'd':
+                char = key.char.lower() if key.char else ""
+                if char == 'd':
                     D_PRESSED = False
-                elif key.char.lower() == 'v':
+                    print("DEBUG: D key released")
+                elif char == 'v':
                     V_PRESSED = False
+                    print("DEBUG: V key released")
             
     except Exception as e:
         logger.error(f"Error in key release handler: {e}")
+        print(f"DEBUG: Key release handler error: {e}")
         import traceback
         logger.error(traceback.format_exc())
     
     # Stop listener if escape key is pressed
     if key == keyboard.Key.esc:
+        print("DEBUG: ESC key pressed - exiting application")
         # Add None to the queue to signal the processor to exit
         AUDIO_QUEUE.put(None)
         return False
