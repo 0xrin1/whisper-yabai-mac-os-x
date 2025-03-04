@@ -450,17 +450,23 @@ class TestJarvisIntegration(unittest.TestCase):
             assistant.process_voice_command("Tell me a joke")
             self.assertTrue(mock_speak.call_count >= 1)  # Just response
             
-            # 4. Ask for capabilities
+            # 4. Ask for abilities instead of browser command
+            mock_speak.reset_mock()
+            response = assistant.handle_user_input("What can you help me with")
+            # Don't check speak call count - it might not speak directly but return a response
+            self.assertTrue(len(response) > 0)
+            
+            # 5. Ask for capabilities
             mock_speak.reset_mock()
             assistant.process_voice_command("What can you do?")
             self.assertTrue(mock_speak.call_count >= 1)
             
-            # 5. Say thanks and verify response
+            # 6. Say thanks and verify response
             mock_speak.reset_mock()
             assistant.process_voice_command("Thanks for your help")
             self.assertTrue(mock_speak.call_count >= 1)
             
-            # 6. Deactivate with "go to sleep"
+            # 7. Deactivate with "go to sleep"
             mock_speak.reset_mock()
             assistant.process_voice_command("Go to sleep")
             self.assertFalse(assistant.assistant_state["active"])
