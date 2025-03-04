@@ -2,7 +2,7 @@
 """
 Voice training utility for whisper-yabai-mac-os-x.
 This script records samples of your voice saying trigger words and commands,
-then uses them to help optimize recognition settings.
+then uses them to help optimize recognition settings and create custom voice models.
 """
 
 import os
@@ -15,6 +15,8 @@ import subprocess
 import whisper
 import numpy as np
 import datetime
+import json
+import shutil
 from typing import List, Dict, Tuple, Optional, Any, Union
 
 # Configure logging
@@ -32,12 +34,15 @@ FORMAT = pyaudio.paInt16
 CHUNK = 1024
 TRAINING_DIR = "training_samples"
 MODEL_SIZE = "tiny"  # Using smaller model for faster iteration
+VOICE_MODELS_DIR = "voice_models"
+DEFAULT_VOICE_MODEL = "default_voice"
 
-def ensure_training_dir():
-    """Make sure the training directory exists."""
-    if not os.path.exists(TRAINING_DIR):
-        os.makedirs(TRAINING_DIR)
-        logger.info(f"Created directory: {TRAINING_DIR}")
+def ensure_directories():
+    """Make sure the necessary directories exist."""
+    for directory in [TRAINING_DIR, VOICE_MODELS_DIR]:
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+            logger.info(f"Created directory: {directory}")
 
 def record_sample(seconds: float = 3.0, prompt: str = None, interactive: bool = True) -> str:
     """Record an audio sample of specified length.
@@ -411,6 +416,187 @@ def calculate_optimal_thresholds(samples: List[str]) -> Dict[str, float]:
         print(f"Error calculating thresholds: {e}. Using default values.")
         return default_thresholds
 
+def create_voice_model(name: str = DEFAULT_VOICE_MODEL, samples: List[str] = None) -> str:
+    """Create a custom voice model using existing voice samples.
+    
+    Args:
+        name: Name for the voice model
+        samples: List of WAV file paths with voice samples (if None, uses all training samples)
+        
+    Returns:
+        Path to the created voice model directory
+    """
+    # Ensure voice models directory exists
+    if not os.path.exists(VOICE_MODELS_DIR):
+        os.makedirs(VOICE_MODELS_DIR)
+    
+    # Create model directory
+    model_dir = os.path.join(VOICE_MODELS_DIR, name)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    
+    # If no samples provided, use all WAV files in training directory
+    if not samples:
+        samples = [os.path.join(TRAINING_DIR, f) for f in os.listdir(TRAINING_DIR) 
+                   if f.endswith('.wav')]
+    
+    if not samples:
+        print("No voice samples found for creating a voice model!")
+        return None
+    
+    print(f"Creating voice model '{name}' with {len(samples)} samples...")
+    
+    # Analyze samples to create voice profile
+    voice_profile = analyze_voice_samples(samples)
+    
+    # Create model metadata file with sample information and voice profile
+    metadata = {
+        "name": name,
+        "created": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "samples": [os.path.basename(s) for s in samples],
+        "sample_count": len(samples),
+        "voice_profile": voice_profile
+    }
+    
+    # Optional: copy samples to model directory for self-contained model
+    model_samples_dir = os.path.join(model_dir, "samples")
+    if not os.path.exists(model_samples_dir):
+        os.makedirs(model_samples_dir)
+    
+    for sample in samples:
+        if os.path.exists(sample):
+            shutil.copy2(sample, os.path.join(model_samples_dir, os.path.basename(sample)))
+    
+    # Save metadata
+    with open(os.path.join(model_dir, "metadata.json"), 'w') as f:
+        json.dump(metadata, f, indent=2)
+    
+    print(f"Voice model created at: {model_dir}")
+    return model_dir
+
+def analyze_voice_samples(samples: List[str]) -> Dict[str, Any]:
+    """Analyze voice samples to extract voice characteristics.
+    
+    Args:
+        samples: List of WAV file paths
+        
+    Returns:
+        Dictionary with voice characteristics
+    """
+    print("Analyzing voice samples for characteristics...")
+    
+    # Initialize profile with defaults
+    voice_profile = {
+        "pitch": 0.0,
+        "pitch_range": 0.0,
+        "energy": 0.0,
+        "speaking_rate": 1.0,
+        "base_voice": "Daniel",  # Default base voice
+        "gender_probability": 0.5,  # 0.0 = female, 1.0 = male
+        "pitch_modifier": 0.97  # Default pitch modifier
+    }
+    
+    try:
+        # Basic audio analysis on a subset of samples
+        sample_count = min(len(samples), 10)  # Analyze up to 10 samples
+        analyzed_samples = samples[:sample_count]
+        
+        total_energy = 0.0
+        
+        for sample_path in analyzed_samples:
+            # Simple analysis based on file content
+            # This is a basic approximation - a real implementation would use
+            # actual audio analysis algorithms
+            
+            # Load WAV file and extract some basic properties
+            try:
+                with wave.open(sample_path, 'rb') as wf:
+                    # Check file properties
+                    sample_width = wf.getsampwidth()
+                    framerate = wf.getframerate()
+                    n_frames = wf.getnframes()
+                    
+                    # Basic sanity check
+                    if n_frames > 0 and sample_width > 0:
+                        # Calculate file duration
+                        duration = n_frames / framerate
+                        
+                        # Read frames
+                        frames = wf.readframes(n_frames)
+                        
+                        # Convert to numpy array for analysis
+                        signal = np.frombuffer(frames, dtype=np.int16)
+                        
+                        # Calculate average energy
+                        energy = np.mean(np.abs(signal))
+                        total_energy += energy
+                        
+                        # Update voice profile
+                        voice_profile["energy"] = max(voice_profile["energy"], energy / 32768.0)  # Normalize
+                        
+                        # Determine ideal base voice and pitch modifier from file name
+                        file_name = os.path.basename(sample_path).lower()
+                        if "hey" in file_name or "command" in file_name:
+                            # Command detection samples, likely more assertive
+                            voice_profile["gender_probability"] = 0.8  # More masculine
+                            voice_profile["base_voice"] = "Daniel"
+                            voice_profile["pitch_modifier"] = 0.95
+                        elif "type" in file_name or "dictation" in file_name:
+                            # Typing samples, likely more neutral
+                            voice_profile["gender_probability"] = 0.5  # Neutral
+                            voice_profile["base_voice"] = "Samantha"
+                            voice_profile["pitch_modifier"] = 0.96
+            except Exception as e:
+                print(f"Error analyzing sample {sample_path}: {e}")
+        
+        # Calculate overall properties based on all samples
+        if sample_count > 0:
+            voice_profile["energy"] = total_energy / (sample_count * 32768.0)  # Normalize
+            
+            # Adjust based on sample count
+            if len(samples) > 30:
+                # More samples = better confidence in the voice profile
+                voice_profile["speaking_rate"] = 1.05  # Slightly faster rate
+                # Set base voice based on gender probability
+                if voice_profile["gender_probability"] > 0.6:
+                    voice_profile["base_voice"] = "Daniel"
+                    voice_profile["pitch_modifier"] = 0.93
+                else:
+                    voice_profile["base_voice"] = "Samantha"
+                    voice_profile["pitch_modifier"] = 0.96
+                    
+    except Exception as e:
+        print(f"Error during voice analysis: {e}")
+        
+    return voice_profile
+
+def install_voice_model(name: str = DEFAULT_VOICE_MODEL) -> bool:
+    """Install a custom voice model to be used by the system.
+    
+    Args:
+        name: Name of the voice model to install
+        
+    Returns:
+        Boolean indicating success
+    """
+    model_dir = os.path.join(VOICE_MODELS_DIR, name)
+    if not os.path.exists(model_dir):
+        print(f"Voice model '{name}' not found!")
+        return False
+    
+    metadata_path = os.path.join(model_dir, "metadata.json")
+    if not os.path.exists(metadata_path):
+        print(f"Voice model metadata for '{name}' not found!")
+        return False
+    
+    # Create a symlink or config file that the speech synthesis module can use
+    active_model_path = os.path.join(VOICE_MODELS_DIR, "active_model.json")
+    with open(active_model_path, 'w') as f:
+        json.dump({"active_model": name, "path": model_dir}, f, indent=2)
+    
+    print(f"Voice model '{name}' installed as the active voice!")
+    return True
+
 def main():
     """Main function for voice training."""
     print("\n=== VOICE TRAINING UTILITY ===")
@@ -421,11 +607,12 @@ def main():
     # Check command line args
     import sys
     interactive_mode = "--non-interactive" not in sys.argv
+    create_voice_model_flag = "--create-voice-model" in sys.argv
     
     print(f"Running in {'interactive' if interactive_mode else 'non-interactive'} mode")
     
-    # Ensure training directory exists
-    ensure_training_dir()
+    # Ensure necessary directories exist
+    ensure_directories()
     
     # Ask user for consent in interactive mode
     if interactive_mode:
@@ -535,6 +722,30 @@ def main():
     print(f"   - Command mode: {thresholds['command_threshold']}")
     print(f"2. Edit src/continuous_recorder.py - set energy_threshold to {thresholds['continuous_threshold']}")
     print(f"3. Restart the daemon after making these changes")
+    
+    # Ask if user wants to create a voice model
+    if interactive_mode:
+        try:
+            create_model = input("\nDo you want to create a custom voice model using these samples? (y/n): ").lower()
+            if create_model == 'y':
+                user_name = input("Enter a name for your voice model (or press Enter for default): ").strip()
+                name = user_name if user_name else DEFAULT_VOICE_MODEL
+                
+                model_dir = create_voice_model(name, all_samples)
+                if model_dir:
+                    install = input("Do you want to set this as your active voice model? (y/n): ").lower()
+                    if install == 'y':
+                        install_voice_model(name)
+                        print("\nCustom voice model installed! The system will now use your voice instead of the default.")
+        except (EOFError, KeyboardInterrupt):
+            print("\nVoice model creation skipped.")
+    elif create_voice_model_flag:
+        # In non-interactive mode with flag, create model automatically
+        model_dir = create_voice_model(DEFAULT_VOICE_MODEL, all_samples)
+        if model_dir:
+            install_voice_model(DEFAULT_VOICE_MODEL)
+            print("\nCustom voice model created and installed automatically.")
+    
     print("\nThank you for training the system with your voice!")
 
 if __name__ == "__main__":

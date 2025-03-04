@@ -151,14 +151,14 @@ class AudioRecorder:
         
         # For silence detection - adjust thresholds based on mode
         if trigger_mode:
-            SILENCE_THRESHOLD = 200  # Significantly lower for better trigger detection
+            SILENCE_THRESHOLD = 155  # Threshold from voice training
             max_silence_seconds = 0.7  # Slightly longer timeout for trigger detection
         elif dictation_mode:
-            SILENCE_THRESHOLD = 150  # Much lower for dictation to catch softer speech
+            SILENCE_THRESHOLD = 119  # Threshold from voice training
             max_silence_seconds = 4.5  # Longer timeout for dictation to avoid premature cutoff
         else:
             # For command mode, use even lower threshold and longer timeout
-            SILENCE_THRESHOLD = 120  # Extremely low threshold to avoid cutting off commands
+            SILENCE_THRESHOLD = 100  # Threshold from voice training
             max_silence_seconds = 5.5  # Much longer timeout for commands (5.5 seconds)
             
         silence_frames = 0

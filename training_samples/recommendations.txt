@@ -1,0 +1,29 @@
+=== VOICE TRAINING RECOMMENDATIONS ===
+Generated: 2025-03-04 20:06:36
+
+Recommended silence thresholds:
+  TRIGGER_MODE: SILENCE_THRESHOLD = 200
+  DICTATION_MODE: SILENCE_THRESHOLD = 150
+  COMMAND_MODE: SILENCE_THRESHOLD = 120
+  CONTINUOUS_RECORDING: energy_threshold = 180
+
+Sample transcriptions:
+  dummy_sample.wav: "[Invalid audio format]" (confidence: 0.00)
+  dummy_command_sample.wav: "[Invalid audio format]" (confidence: 0.00)
+
+=== HOW TO APPLY THESE SETTINGS ===
+1. Edit src/audio_recorder.py:
+   - Find the AudioRecorder class
+   - Update the SILENCE_THRESHOLD values in the start_recording method:
+     if trigger_mode:
+            SILENCE_THRESHOLD = 200  # Trigger detection
+     elif dictation_mode:
+            SILENCE_THRESHOLD = 150  # Dictation mode
+     else:
+            SILENCE_THRESHOLD = 120  # Command mode
+
+2. Edit src/continuous_recorder.py:
+   - Find the ContinuousRecorder class
+   - Update the energy_threshold value to 180
+
+3. Restart the daemon after making these changes

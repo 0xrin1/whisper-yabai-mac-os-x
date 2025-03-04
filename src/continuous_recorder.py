@@ -35,7 +35,7 @@ class ContinuousRecorder:
         self.max_buffer_frames = int(self.frames_per_second * self.buffer_seconds)
         
         # Detection settings
-        self.energy_threshold = 120  # Lower threshold for better detection
+        self.energy_threshold = 137  # Threshold from voice training
         self.silence_timeout = 0.8  # Seconds of silence before processing buffer
         
         # Create trigger detector

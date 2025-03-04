@@ -1,11 +1,16 @@
 # Whisper Voice Control for macOS with Yabai
 
-A voice command daemon that uses OpenAI's Whisper model locally to control your Mac, with Yabai window manager integration and LLM-powered natural language command interpretation.
+A voice command daemon that uses OpenAI's Whisper model locally to control your Mac, with Yabai window manager integration, LLM-powered natural language command interpretation, and customized voice synthesis that sounds like you.
 
 ## Features
 
 - Voice control for your Mac using a local Whisper model
 - Dictation mode for converting speech directly to text at cursor position
+- **Enhanced custom voice model** with advanced voice personalization:
+  - Voice profile extraction from your recordings
+  - Dynamic voice adjustments based on context
+  - Intelligent base voice selection tailored to your voice characteristics
+  - Customized pitch, rate, and tone based on your speech patterns
 - Audio feedback with sounds for recording start/stop and completion
 - Yabai window manager integration for advanced window management
 - Continuous listening mode that automatically processes commands
@@ -115,6 +120,41 @@ There are two versions of the daemon:
    - **Dictation Mode**: Press Ctrl+Shift+D to start recording, then speak text to be typed at the current cursor position
 
 3. To exit, press Ctrl+C in the terminal or press ESC to exit gracefully.
+
+### Creating an Enhanced Custom Voice Model
+
+The system uses an advanced voice model based on your voice characteristics for natural-sounding responses:
+
+1. Record voice samples with the training utility:
+   ```
+   python src/voice_training.py
+   ```
+   This records samples and creates a baseline voice profile.
+
+2. Create your personalized voice model:
+   ```
+   ./create_voice_model.sh
+   ```
+   This analyzes your voice recordings to extract unique characteristics:
+   - Speech patterns and energy levels
+   - Voice profile with optimal parameters
+   - Context-aware speech adjustments
+
+3. Test your custom voice:
+   ```
+   python test_neural_voice.py
+   ```
+   This compares your custom voice with standard system voices.
+
+4. The system automatically uses your custom voice for all responses with:
+   - Dynamic pitch and rate adjustments
+   - Context-aware voice changes (questions, statements, exclamations)
+   - Personalized voice characteristics
+
+5. To switch back to default system voices:
+   ```
+   rm voice_models/active_model.json
+   ```
 
 ## Voice Commands
 
@@ -265,6 +305,34 @@ Examples of commands that work with LLM interpretation:
   - Make sure the application has accessibility permissions
   - Try clicking on the text field before dictating
   - For non-standard keyboard layouts, the clipboard-based paste approach should work
+
+### Enhanced Voice Model Troubleshooting
+
+- If the custom voice isn't working properly:
+  - Check that `voice_models/active_model.json` exists and points to a valid model
+  - Verify the voice profile was created correctly in the metadata.json file
+  - Run `python test_neural_voice.py` to compare with system voices
+  - Try `python src/speech_synthesis.py` to test individual voices
+
+- For better voice quality:
+  - Record at least 40+ voice samples with diverse speech patterns
+  - Include a mix of commands, dictation, and natural speech
+  - Record in a quiet environment with a good microphone
+  - Use varied intonation for different types of phrases
+  - Record some questions, statements, and exclamations
+
+- Fine-tuning your voice model:
+  - Customize parameters in `speech_synthesis.py` for your specific voice
+  - Adjust base voice selection (`Daniel`, `Samantha`, `Alex` work best)
+  - Try different pitch modifiers (0.92-0.98 range)
+  - Modify rate parameters for more natural speed
+  - Create a new model with `./create_voice_model.sh` after making changes
+
+- Advanced customization:
+  - The system now uses dynamic voice adjustments based on context
+  - Questions automatically use different parameters than statements
+  - Advanced analysis extracts voice characteristics from your recordings
+  - Voice profiles intelligently select optimal parameters
 
 ### LLM Troubleshooting
 

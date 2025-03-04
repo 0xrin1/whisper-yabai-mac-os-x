@@ -2,6 +2,15 @@
 
 This document provides a quick reference for available voice commands in your voice control system.
 
+## Custom Voice Model
+
+| Command | Description |
+|---------|-------------|
+| `python src/voice_training.py` | Run voice training utility to record voice samples |
+| `./create_voice_model.sh` | Create custom voice model from existing samples |
+| `rm voice_models/active_model.json` | Switch back to default system voices |
+| `python -c "import src.speech_synthesis as speech; speech.test_voices()"` | Test all available voices including your custom voice |
+
 ## Hotkeys
 
 | Hotkey | Action |
