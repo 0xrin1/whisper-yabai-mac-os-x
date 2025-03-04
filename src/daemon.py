@@ -1009,22 +1009,28 @@ def toggle_mute_callback():
     status = "MUTED" if MUTED else "UNMUTED"
     logger.info(f"Microphone {status}")
     
-    # Use toast notification to show status
-    from toast_notifications import send_notification
-    send_notification(
-        f"Microphone {status}",
-        f"Voice control is {'paused' if MUTED else 'active'}",
-        "whisper-voice-mute-toggle",
-        3,
-        True
-    )
-    
-    # Play feedback sound
+    # Play feedback sound first (more reliable)
     try:
         sound = "/System/Library/Sounds/Submarine.aiff" if MUTED else "/System/Library/Sounds/Funk.aiff"
         subprocess.run(["afplay", sound], check=False)
     except Exception as e:
         logger.error(f"Could not play mute toggle sound: {e}")
+        
+    # Use toast notification to show status (wrapped in try/except)
+    try:
+        # Import here to avoid circular imports
+        from toast_notifications import send_notification
+        send_notification(
+            f"Microphone {status}",
+            f"Voice control is {'paused' if MUTED else 'active'}",
+            "whisper-voice-mute-toggle",
+            3,
+            True
+        )
+    except Exception as e:
+        logger.error(f"Could not show mute notification: {e}")
+        # Still log the status change
+        print(f"DEBUG: Microphone is now {status}")
 
 def on_press(key):
     """Handle key press events."""
@@ -1069,11 +1075,15 @@ def on_press(key):
         # Log key states for debug
         print(f"DEBUG: Key states - CTRL:{CTRL_PRESSED} SHIFT:{SHIFT_PRESSED} ALT:{ALT_PRESSED} SPACE:{SPACE_PRESSED} D:{D_PRESSED} M:{M_PRESSED}")
             
-        # Check for mute toggle hotkey (Ctrl+Alt+M) - always active
-        if CTRL_PRESSED and ALT_PRESSED and M_PRESSED:
-            print("DEBUG: Mute toggle hotkey detected: Ctrl+Alt+M")
-            logger.info("Mute toggle hotkey detected: Ctrl+Alt+M")
-            toggle_mute_callback()
+        # Check for mute toggle hotkey (Ctrl+Shift+M) - always active
+        if CTRL_PRESSED and SHIFT_PRESSED and M_PRESSED:
+            print("DEBUG: Mute toggle hotkey detected: Ctrl+Shift+M")
+            logger.info("Mute toggle hotkey detected: Ctrl+Shift+M")
+            try:
+                toggle_mute_callback()
+            except Exception as e:
+                print(f"DEBUG: Error in mute toggle: {e}")
+                logger.error(f"Error toggling mute: {e}")
             return  # Process this hotkey and return
             
         # If muted, don't process other hotkeys
@@ -1186,7 +1196,7 @@ if __name__ == "__main__":
         
         logger.info("=== Voice Control Ready ===")
         logger.info(f"COMMAND MODE: Press {command_hotkey_str} to start recording voice commands")
-        logger.info(f"MUTE TOGGLE: Press Ctrl+Alt+M to mute/unmute voice control")
+        logger.info(f"MUTE TOGGLE: Press Ctrl+Shift+M to mute/unmute voice control")
         logger.info("")
         logger.info("Example commands:")
         logger.info("  'open Safari'")
@@ -1197,15 +1207,19 @@ if __name__ == "__main__":
         logger.info("")
         logger.info("Press Ctrl+C or ESC to exit")
         
-        # Send a notification that we're ready
-        from toast_notifications import send_notification
-        send_notification(
-            "Voice Control Ready", 
-            f"Commands: {command_hotkey_str} | Say 'dictate' for dictation | Mute: Ctrl+Alt+M",
-            "whisper-voice-ready",
-            10,
-            True
-        )
+        try:
+            # Send a notification that we're ready
+            from toast_notifications import send_notification
+            send_notification(
+                "Voice Control Ready", 
+                f"Commands: {command_hotkey_str} | Say 'dictate' for dictation | Mute: Ctrl+Shift+M",
+                "whisper-voice-ready",
+                10,
+                True
+            )
+        except Exception as e:
+            logger.error(f"Failed to show startup notification: {e}")
+            # Not critical, can continue without notification
         
         # Keep the main thread alive to listen for keyboard events
         # Also check if listener is still alive
