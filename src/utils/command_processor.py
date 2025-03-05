@@ -78,12 +78,12 @@ class CommandProcessor:
             try:
                 cmd_action(args)
                 # Show success notification
-                from toast_notifications import notify_command_executed
+                from src.ui.toast_notifications import notify_command_executed
                 notify_command_executed(f"{command} {' '.join(args)}")
                 return True
             except Exception as e:
                 logger.error(f"Error executing command '{command}': {e}")
-                from toast_notifications import notify_error
+                from src.ui.toast_notifications import notify_error
                 notify_error(f"Error executing '{command}': {str(e)}")
                 return False
         else:
@@ -101,7 +101,7 @@ class CommandProcessor:
                         logger.info(f"Executing hotkey: {keys}")
                         pyautogui.hotkey(*keys)
                         
-                        from toast_notifications import notify_command_executed
+                        from src.ui.toast_notifications import notify_command_executed
                         notify_command_executed(f"Hotkey: {'+'.join(keys)}")
                         return True
                     elif "pyautogui.write" in cmd_str:
@@ -110,28 +110,28 @@ class CommandProcessor:
                         logger.info(f"Writing text: {text}")
                         pyautogui.write(text)
                         
-                        from toast_notifications import notify_command_executed
+                        from src.ui.toast_notifications import notify_command_executed
                         notify_command_executed(f"Type: {text}")
                         return True
                     else:
                         logger.error(f"Unsupported pyautogui command: {cmd_str}")
-                        from toast_notifications import notify_error
+                        from src.ui.toast_notifications import notify_error
                         notify_error(f"Unsupported command: {cmd_str}")
                         return False
                 except Exception as e:
                     logger.error(f"Error executing pyautogui command: {e}")
-                    from toast_notifications import notify_error
+                    from src.ui.toast_notifications import notify_error
                     notify_error(f"Error with keyboard/mouse command: {str(e)}")
                     return False
             else:
                 # Handle shell command (Yabai or other)
                 success = self.execute_shell_command(cmd_str)
                 if success:
-                    from toast_notifications import notify_command_executed
+                    from src.ui.toast_notifications import notify_command_executed
                     notify_command_executed(f"{command}: {cmd_str}")
                     return True
                 else:
-                    from toast_notifications import notify_error
+                    from src.ui.toast_notifications import notify_error
                     notify_error(f"Failed to run: {cmd_str}")
                     return False
     
@@ -149,7 +149,7 @@ class CommandProcessor:
         
         if not clean_text:
             logger.warning("Empty command received")
-            from toast_notifications import notify_error
+            from src.ui.toast_notifications import notify_error
             notify_error("Empty command received")
             return False
         
@@ -209,7 +209,7 @@ class CommandProcessor:
                     return self.execute(cmd_name, [])
             
             # No command found
-            from toast_notifications import notify_error
+            from src.ui.toast_notifications import notify_error
             notify_error(f"Unknown command: {command}")
             return False
     
