@@ -99,15 +99,19 @@ jobs:
           echo "Patching test_utils.py for CI environment..."
           # Create a backup
           cp src/test_utils.py src/test_utils.py.bak
-          # Insert mock environment setup at the top of the file
-          sed -i '' '1i\
-import os\
-# CI test environment setup\
-os.environ["MOCK_TEST_MODE"] = "true"\
-os.environ["SKIP_AUDIO_RECORDING"] = "true"\
-os.environ["SKIP_AUDIO_PLAYBACK"] = "true"\
-os.environ["USE_MOCK_SPEECH"] = "true"\
-' src/test_utils.py
+          # Create a temporary file with the new content
+          cat > src/test_utils.py.temp << 'EOF'
+import os
+# CI test environment setup
+os.environ["MOCK_TEST_MODE"] = "true"
+os.environ["SKIP_AUDIO_RECORDING"] = "true"
+os.environ["SKIP_AUDIO_PLAYBACK"] = "true"
+os.environ["USE_MOCK_SPEECH"] = "true"
+EOF
+          # Append the original file content
+          cat src/test_utils.py >> src/test_utils.py.temp
+          # Replace the original with the new file
+          mv src/test_utils.py.temp src/test_utils.py
         else
           # Create a test utils file if it doesn't exist
           echo "Creating mock test_utils.py for CI environment..."
