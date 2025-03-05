@@ -103,11 +103,18 @@
   - Standardized on single implementation for each feature
   - Reduced complexity by removing stale code
   - Improved maintainability by reducing duplication
+  - Added pre-commit hooks for code quality checks
 
 - **Files removed**:
   - Removed: neural_speech_synthesis.py (replaced by neural_voice_client.py)
   - Removed: direct_dictation.py (functionality covered by direct_typing.py)
   - Kept: dictation.py, simple_dictation.py, ultra_simple_dictation.py (distinct use cases)
+
+- **Pre-commit hooks**:
+  - Added pre-commit hooks to catch common issues before committing
+  - Checks for syntax errors, import problems, and code quality issues
+  - Install with: `git config core.hooksPath .githooks`
+  - See `.githooks/README.md` for more details
 
 ## Enhanced Voice Model Implementation
 
