@@ -614,80 +614,249 @@ def analyze_voice_samples(samples: List[str]) -> Dict[str, Any]:
         "speaking_rate": 1.0,
         "base_voice": "Daniel",  # Default base voice
         "gender_probability": 0.5,  # 0.0 = female, 1.0 = male
-        "pitch_modifier": 0.97  # Default pitch modifier
+        "pitch_modifier": 0.97,  # Default pitch modifier
+        "voice_quality": "standard",  # standard, warm, clear, authoritative
+        "expressiveness": 0.5,  # 0.0 to 1.0
+        "timbre": "neutral",  # bright, neutral, dark, resonant
+        "cadence": "moderate",  # slow, moderate, quick, varied
+        "emotion_markers": {
+            "enthusiasm": 0.5,
+            "warmth": 0.5,
+            "authority": 0.5,
+            "clarity": 0.5
+        },
+        "context_modifiers": {
+            "questions": {"pitch_shift": 1.03, "rate_shift": 1.0},
+            "commands": {"pitch_shift": 0.98, "rate_shift": 1.0},
+            "exclamations": {"pitch_shift": 1.0, "rate_shift": 1.1},
+            "dictation": {"pitch_shift": 1.0, "rate_shift": 0.98}
+        }
     }
     
     try:
-        # Basic audio analysis on a subset of samples
-        sample_count = min(len(samples), 10)  # Analyze up to 10 samples
+        # Try to import librosa for advanced audio analysis
+        try:
+            import librosa
+            import librosa.feature
+            LIBROSA_AVAILABLE = True
+            print("Using advanced audio analysis with librosa")
+        except ImportError:
+            LIBROSA_AVAILABLE = False
+            print("Using basic audio analysis (librosa not available)")
+        
+        # Use all available samples for more comprehensive analysis
+        # but cap at 30 to avoid long processing times
+        sample_count = min(len(samples), 30)
         analyzed_samples = samples[:sample_count]
         
+        # Prepare accumulators for aggregate analysis
         total_energy = 0.0
+        pitch_values = []
+        speaking_rates = []
+        formant_data = []
+        spectral_centroids = []
         
+        # Analyze each sample
         for sample_path in analyzed_samples:
-            # Simple analysis based on file content
-            # This is a basic approximation - a real implementation would use
-            # actual audio analysis algorithms
-            
-            # Load WAV file and extract some basic properties
             try:
+                # Basic analysis using wave module
                 with wave.open(sample_path, 'rb') as wf:
-                    # Check file properties
                     sample_width = wf.getsampwidth()
                     framerate = wf.getframerate()
                     n_frames = wf.getnframes()
                     
-                    # Basic sanity check
-                    if n_frames > 0 and sample_width > 0:
-                        # Calculate file duration
-                        duration = n_frames / framerate
+                    # Skip invalid files
+                    if n_frames <= 0 or sample_width <= 0:
+                        print(f"Skipping invalid file: {sample_path}")
+                        continue
+                    
+                    # Calculate duration and read frames
+                    duration = n_frames / framerate
+                    frames = wf.readframes(n_frames)
+                    signal = np.frombuffer(frames, dtype=np.int16)
+                    
+                    # Calculate energy
+                    energy = np.mean(np.abs(signal))
+                    total_energy += energy
+                    
+                # Advanced analysis with librosa if available
+                if LIBROSA_AVAILABLE:
+                    # Load audio with librosa
+                    y, sr = librosa.load(sample_path, sr=None)
+                    
+                    # Extract pitch (fundamental frequency) using PYIN algorithm
+                    try:
+                        f0, voiced_flag, voiced_probs = librosa.pyin(
+                            y, 
+                            fmin=librosa.note_to_hz('C2'),
+                            fmax=librosa.note_to_hz('C7'),
+                            sr=sr
+                        )
+                        # Filter out unvoiced and zero values
+                        valid_f0 = f0[voiced_flag & (f0 > 0)]
+                        if len(valid_f0) > 0:
+                            mean_f0 = np.mean(valid_f0)
+                            pitch_values.append(mean_f0)
+                    except Exception as e:
+                        print(f"Error extracting pitch from {sample_path}: {e}")
+                    
+                    # Calculate speaking rate (syllables per second approximation)
+                    try:
+                        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+                        onset_frames = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr)
+                        if len(onset_frames) > 0 and duration > 0:
+                            # Approximate syllables from onsets
+                            syllable_count = len(onset_frames) * 0.7  # Adjust for over-detection
+                            rate = syllable_count / duration
+                            speaking_rates.append(rate)
+                    except Exception as e:
+                        print(f"Error calculating speaking rate from {sample_path}: {e}")
+                    
+                    # Extract spectral centroid (brightness of sound)
+                    try:
+                        cent = librosa.feature.spectral_centroid(y=y, sr=sr)[0]
+                        spectral_centroids.append(np.mean(cent))
+                    except Exception as e:
+                        print(f"Error extracting spectral centroid from {sample_path}: {e}")
                         
-                        # Read frames
-                        frames = wf.readframes(n_frames)
-                        
-                        # Convert to numpy array for analysis
-                        signal = np.frombuffer(frames, dtype=np.int16)
-                        
-                        # Calculate average energy
-                        energy = np.mean(np.abs(signal))
-                        total_energy += energy
-                        
-                        # Update voice profile
-                        voice_profile["energy"] = max(voice_profile["energy"], energy / 32768.0)  # Normalize
-                        
-                        # Determine ideal base voice and pitch modifier from file name
-                        file_name = os.path.basename(sample_path).lower()
-                        if "hey" in file_name or "command" in file_name:
-                            # Command detection samples, likely more assertive
-                            voice_profile["gender_probability"] = 0.8  # More masculine
-                            voice_profile["base_voice"] = "Daniel"
-                            voice_profile["pitch_modifier"] = 0.95
-                        elif "type" in file_name or "dictation" in file_name:
-                            # Typing samples, likely more neutral
-                            voice_profile["gender_probability"] = 0.5  # Neutral
-                            voice_profile["base_voice"] = "Samantha"
-                            voice_profile["pitch_modifier"] = 0.96
+                # Analyze file name for context clues
+                file_name = os.path.basename(sample_path).lower()
+                
+                # Check for command/trigger samples
+                if "hey" in file_name or "command" in file_name:
+                    # Likely command voice samples
+                    voice_profile["emotion_markers"]["authority"] += 0.1
+                    voice_profile["emotion_markers"]["clarity"] += 0.1
+                    
+                # Check for dictation samples
+                elif "type" in file_name or "dictation" in file_name:
+                    # Likely dictation voice samples
+                    voice_profile["emotion_markers"]["clarity"] += 0.1
+                    
+                # Check for question samples
+                elif "question" in file_name or "ask" in file_name:
+                    # Likely question voice samples
+                    voice_profile["context_modifiers"]["questions"]["pitch_shift"] += 0.01
+                    
+                # Check for exclamation samples
+                elif "exclamation" in file_name or "emphasis" in file_name:
+                    # Likely exclamation voice samples
+                    voice_profile["context_modifiers"]["exclamations"]["rate_shift"] += 0.02
+                    voice_profile["emotion_markers"]["enthusiasm"] += 0.1
+                
             except Exception as e:
                 print(f"Error analyzing sample {sample_path}: {e}")
         
-        # Calculate overall properties based on all samples
+        # Process collected data for the voice profile
         if sample_count > 0:
-            voice_profile["energy"] = total_energy / (sample_count * 32768.0)  # Normalize
+            # Normalize energy
+            voice_profile["energy"] = total_energy / (sample_count * 32768.0)
             
-            # Adjust based on sample count
-            if len(samples) > 30:
-                # More samples = better confidence in the voice profile
-                voice_profile["speaking_rate"] = 1.05  # Slightly faster rate
-                # Set base voice based on gender probability
-                if voice_profile["gender_probability"] > 0.6:
+            # Calculate average pitch and pitch range if we have data
+            if pitch_values:
+                mean_pitch = np.mean(pitch_values)
+                pitch_range = np.std(pitch_values)
+                
+                # Set pitch data in profile
+                voice_profile["pitch"] = float(mean_pitch)
+                voice_profile["pitch_range"] = float(pitch_range)
+                
+                # Estimate gender probability from pitch
+                # (simplified approach - actual gender determination would be more complex)
+                # Average male voice: ~120Hz, Average female voice: ~210Hz
+                gender_probability = max(0.0, min(1.0, (210 - mean_pitch) / 90))
+                voice_profile["gender_probability"] = float(gender_probability)
+                
+                # Select base voice based on gender probability
+                if gender_probability > 0.6:
+                    # More masculine voice
                     voice_profile["base_voice"] = "Daniel"
-                    voice_profile["pitch_modifier"] = 0.93
-                else:
+                    voice_profile["pitch_modifier"] = 0.95
+                elif gender_probability < 0.4:
+                    # More feminine voice
                     voice_profile["base_voice"] = "Samantha"
-                    voice_profile["pitch_modifier"] = 0.96
-                    
+                    voice_profile["pitch_modifier"] = 0.98
+                else:
+                    # Neutral voice
+                    voice_profile["base_voice"] = "Alex"
+                    voice_profile["pitch_modifier"] = 0.97
+            
+            # Set speaking rate if we have data
+            if speaking_rates:
+                mean_rate = np.mean(speaking_rates)
+                # Normalize rate to a reasonable value around 1.0
+                voice_profile["speaking_rate"] = float(min(1.1, max(0.9, mean_rate / 4.0)))
+            
+            # Determine timbre from spectral centroid data if available
+            if spectral_centroids:
+                mean_centroid = np.mean(spectral_centroids)
+                # Classify timbre based on centroid value
+                if mean_centroid < 2000:
+                    voice_profile["timbre"] = "dark"
+                elif mean_centroid < 3000:
+                    voice_profile["timbre"] = "neutral"
+                elif mean_centroid < 4000:
+                    voice_profile["timbre"] = "bright"
+                else:
+                    voice_profile["timbre"] = "resonant"
+            
+            # Adjust expressiveness based on pitch range
+            if pitch_values and len(pitch_values) > 1:
+                # Calculate normalized expressiveness from pitch variation
+                normalized_range = min(1.0, pitch_range / 50.0)
+                voice_profile["expressiveness"] = float(normalized_range)
+            
+            # Determine voice quality based on collected parameters
+            if voice_profile["emotion_markers"]["clarity"] > 0.7:
+                voice_profile["voice_quality"] = "clear"
+            elif voice_profile["emotion_markers"]["warmth"] > 0.7:
+                voice_profile["voice_quality"] = "warm"
+            elif voice_profile["emotion_markers"]["authority"] > 0.7:
+                voice_profile["voice_quality"] = "authoritative"
+            else:
+                voice_profile["voice_quality"] = "standard"
+            
+            # Boost quality settings based on sample count
+            if len(samples) > 20:
+                # More samples give us more confidence in the voice profile
+                voice_profile["context_modifiers"]["questions"]["pitch_shift"] = 1.03
+                voice_profile["context_modifiers"]["commands"]["pitch_shift"] = 0.96
+                voice_profile["context_modifiers"]["exclamations"]["pitch_shift"] = 0.98
+                voice_profile["context_modifiers"]["exclamations"]["rate_shift"] = 1.15
+            
+            if len(samples) > 40:
+                # Even more samples allow for more precise tuning
+                voice_profile["expressiveness"] = min(1.0, voice_profile["expressiveness"] + 0.1)
+                
+                # Fine-tune based on file analysis
+                if voice_profile["gender_probability"] > 0.7:
+                    # More masculine voice - fine-tune pitch modifier
+                    voice_profile["pitch_modifier"] = 0.94
+                elif voice_profile["gender_probability"] < 0.3:
+                    # More feminine voice - fine-tune pitch modifier
+                    voice_profile["pitch_modifier"] = 0.97
+                else:
+                    # Neutral voice - fine-tune pitch modifier based on timbre
+                    if voice_profile["timbre"] == "dark":
+                        voice_profile["pitch_modifier"] = 0.96
+                    elif voice_profile["timbre"] == "bright":
+                        voice_profile["pitch_modifier"] = 0.98
+                    else:
+                        voice_profile["pitch_modifier"] = 0.97
+        
+        # Print a summary of the analysis
+        print(f"\nVoice Profile Summary:")
+        print(f"Base voice: {voice_profile['base_voice']}")
+        print(f"Pitch modifier: {voice_profile['pitch_modifier']:.2f}")
+        print(f"Speaking rate: {voice_profile['speaking_rate']:.2f}")
+        print(f"Voice quality: {voice_profile['voice_quality']}")
+        print(f"Timbre: {voice_profile['timbre']}")
+        print(f"Expressiveness: {voice_profile['expressiveness']:.2f}")
+        
     except Exception as e:
         print(f"Error during voice analysis: {e}")
+        import traceback
+        print(traceback.format_exc())
         
     return voice_profile
 

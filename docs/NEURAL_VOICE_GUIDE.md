@@ -1,13 +1,14 @@
-# GPU-Accelerated Neural Voice Training Guide
+# Enhanced Neural Voice Training Guide
 
-This guide will help you train a high-quality neural voice model using the RTX 3090 GPU server for voice cloning.
+This guide will help you train a high-quality neural voice model using the RTX 3090 GPU server for voice cloning, as well as create advanced parameter-based voice models with context and emotion awareness.
 
 ## Prerequisites
 
-1. Access to GPU server with RTX 3090 or better
+1. Access to GPU server with RTX 3090 or better (for neural voice only)
 2. At least 20 voice samples (40+ recommended for best quality)
-3. CUDA libraries installed on GPU server
+3. CUDA libraries installed on GPU server (for neural voice only)
 4. Configured config/.env file with GPU server credentials
+5. Enhanced voice analysis libraries installed via `scripts/setup/install_voice_training_deps.sh`
 
 ## Step 1: Set Up Neural Voice Environment
 
@@ -421,19 +422,57 @@ Voice test complete.\
 
 ## Advanced Configuration
 
+### Enhanced Voice Features
+
+The latest version includes advanced voice enhancements:
+
+- **Context-Aware Speech**: Different speaking styles for questions, commands, and exclamations
+- **Emotion-Aware Speech**: Detection of emotional context in text with appropriate voice adjustments
+- **Comprehensive Voice Profiles**: Detailed voice characteristic extraction
+- **Dynamic Adaptation**: Real-time voice adjustments based on speech content
+
+To test these enhanced features, use:
+
+```bash
+./scripts/neural_voice/test_enhanced_voice.py
+```
+
 ### Improving Voice Quality
 
 For even better voice quality:
 - Record 40+ diverse samples in a quiet environment
 - Include various intonations and speech patterns
+- Include questions, exclamations, commands, and natural speech
 - Increase training epochs to 10000 for extended training
+
+### Voice Profile Parameters
+
+The enhanced voice profile contains parameters that can be fine-tuned:
+
+```json
+{
+  "pitch": 120.5,            // Base pitch in Hz
+  "pitch_range": 25.0,       // Variation in pitch
+  "energy": 0.75,            // Voice energy/volume 
+  "speaking_rate": 1.05,     // Speaking rate multiplier
+  "base_voice": "Daniel",    // Base system voice
+  "pitch_modifier": 0.94,    // Pitch adjustment factor
+  "voice_quality": "warm",   // Voice quality classification
+  "expressiveness": 0.8,     // Expressiveness rating
+  "timbre": "dark",          // Timbre classification
+  "context_modifiers": {     // Context-specific adjustments
+    "questions": {"pitch_shift": 1.03, "rate_shift": 1.0},
+    "commands": {"pitch_shift": 0.96, "rate_shift": 1.0}
+  }
+}
+```
 
 ### Server Performance
 
 The neural voice server includes:
 - Automatic caching for frequently used phrases
 - GPU memory optimization
-- Graceful fallback to parameter-based voice if neural model unavailable
+- Graceful fallback to enhanced parameter-based voice if neural model unavailable
 
 ## Troubleshooting
 

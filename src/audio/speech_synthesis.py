@@ -563,20 +563,68 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
         pitch_modifier = 0.95  # Default male pitch modifier
         speaking_rate_modifier = 1.0  # Default speaking rate
         
-        # If we have a voice profile, use its parameters (but ensure male voice)
+        # If we have a voice profile, use its parameters
         if voice_profile:
             # Use recommended voice settings from the profile
             base_voice_from_profile = voice_profile.get("base_voice", "Daniel")
             
-            # Ensure we're using a male voice as base (for JARVIS-like experience)
-            if base_voice_from_profile.lower() in MALE_VOICES:
+            # Use the voice from the profile
+            if base_voice_from_profile.lower() in AVAILABLE_VOICES:
                 base_voice = base_voice_from_profile
             else:
-                # Force a male voice if profile specifies female
+                # Use Daniel as fallback if voice not available
                 base_voice = "Daniel"
                 
+            # Get basic voice parameters
             pitch_modifier = voice_profile.get("pitch_modifier", 0.95)
             speaking_rate_modifier = voice_profile.get("speaking_rate", 1.0)
+            
+            # Check for enhanced voice profile features
+            # (These are added by the new voice training system)
+            expressiveness = voice_profile.get("expressiveness", 0.5)
+            timbre = voice_profile.get("timbre", "neutral")
+            cadence = voice_profile.get("cadence", "moderate")
+            voice_quality = voice_profile.get("voice_quality", "standard")
+            
+            # Fine-tune voices based on voice quality
+            if voice_quality == "warm":
+                if base_voice.lower() in ["daniel", "alex", "fred"]:
+                    # For male voices, adjust for warmth
+                    pitch_modifier *= 0.98
+                    speaking_rate_modifier *= 0.97
+                else:
+                    # For female voices, adjust for warmth
+                    pitch_modifier *= 0.95
+                    speaking_rate_modifier *= 0.95
+            elif voice_quality == "clear":
+                # Clear voice has slightly higher pitch and faster rate
+                pitch_modifier *= 1.02
+                speaking_rate_modifier *= 1.03
+            elif voice_quality == "authoritative":
+                # Authoritative voice has lower pitch and measured pace
+                pitch_modifier *= 0.93
+                speaking_rate_modifier *= 0.95
+            
+            # Adjust based on timbre
+            if timbre == "dark":
+                pitch_modifier *= 0.97
+            elif timbre == "bright":
+                pitch_modifier *= 1.03
+            elif timbre == "resonant":
+                pitch_modifier *= 0.94
+                
+            # Adjust rate based on cadence
+            if cadence == "slow":
+                speaking_rate_modifier *= 0.9
+            elif cadence == "quick":
+                speaking_rate_modifier *= 1.1
+            elif cadence == "varied":
+                # Varied cadence means natural variations, handled by context
+                pass
+                
+            # Get context modifiers if available
+            context_modifiers = voice_profile.get("context_modifiers", {})
+            
         elif sample_count > 0 and model_name == "user_voice":
             # Fallback if no voice profile but we have samples
             if sample_count > 30:
@@ -589,27 +637,88 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
                 base_voice = "Daniel"
                 pitch_modifier = 0.94
                 
-        # Make the voice sound more like your voice based on training samples
-        # Use different base voices for different types of phrases
-        if "?" in text:
-            # Questions use slightly higher pitch
-            temp_pitch = pitch_modifier * 1.03
-        elif "!" in text:
-            # Exclamations use more energy
-            temp_pitch = pitch_modifier * 0.98
-            volume *= 1.15  # Increase volume slightly
-        else:
-            # Normal statements
-            temp_pitch = pitch_modifier
+        # Apply context-specific modifiers based on text content
+        # Check for advanced context modifiers in voice profile
+        has_context_modifiers = False
+        pitch_shift = 1.0
+        rate_shift = 1.0
+        volume_shift = 1.0
+        
+        if voice_profile and "context_modifiers" in voice_profile:
+            context_modifiers = voice_profile["context_modifiers"]
+            has_context_modifiers = True
             
+            # Analyze text for context
+            if "?" in text:
+                # Question modifiers
+                if "questions" in context_modifiers:
+                    question_mods = context_modifiers["questions"]
+                    pitch_shift = question_mods.get("pitch_shift", 1.03)
+                    rate_shift = question_mods.get("rate_shift", 1.0)
+            elif "!" in text:
+                # Exclamation modifiers
+                if "exclamations" in context_modifiers:
+                    excl_mods = context_modifiers["exclamations"]
+                    pitch_shift = excl_mods.get("pitch_shift", 0.98)
+                    rate_shift = excl_mods.get("rate_shift", 1.1)
+                    volume_shift = 1.15
+            elif any(cmd in text.lower() for cmd in ["open", "focus", "move", "resize", "launch"]):
+                # Command modifiers
+                if "commands" in context_modifiers:
+                    cmd_mods = context_modifiers["commands"]
+                    pitch_shift = cmd_mods.get("pitch_shift", 0.96)
+                    rate_shift = cmd_mods.get("rate_shift", 1.0)
+            elif any(word in text.lower() for word in ["type", "dictate", "write", "transcribe"]):
+                # Dictation modifiers
+                if "dictation" in context_modifiers:
+                    dict_mods = context_modifiers["dictation"]
+                    pitch_shift = dict_mods.get("pitch_shift", 1.0)
+                    rate_shift = dict_mods.get("rate_shift", 0.98)
+        
+        # If no advanced context modifiers, use basic rules
+        if not has_context_modifiers:
+            if "?" in text:
+                # Questions use slightly higher pitch
+                pitch_shift = 1.03
+            elif "!" in text:
+                # Exclamations use more energy
+                pitch_shift = 0.98
+                volume_shift = 1.15
+                
+        # Apply the context modifiers
+        temp_pitch = pitch_modifier * pitch_shift
+        adjusted_rate = int(rate * speaking_rate_modifier * rate_shift)
+        adjusted_volume = volume * volume_shift
+        
+        # Check for emotion markers in the text
+        emotion_boost = 1.0
+        if voice_profile and "emotion_markers" in voice_profile:
+            markers = voice_profile["emotion_markers"]
+            
+            # Check for text that indicates enthusiasm
+            enthusiasm_words = ["amazing", "great", "awesome", "excellent", "fantastic", "wow"]
+            if any(word in text.lower() for word in enthusiasm_words) and "enthusiasm" in markers:
+                enthusiasm = markers["enthusiasm"]
+                if enthusiasm > 0.6:  # Only apply if the voice has high enthusiasm trait
+                    # Boost speaking rate and add volume for enthusiastic text
+                    adjusted_rate = int(adjusted_rate * 1.05)
+                    adjusted_volume = min(1.0, adjusted_volume * 1.1)
+                    emotion_boost = 1.05
+                    
+            # Check for text that requires authority
+            authority_words = ["important", "attention", "warning", "critical", "alert", "listen"]
+            if any(word in text.lower() for word in authority_words) and "authority" in markers:
+                authority = markers["authority"]
+                if authority > 0.6:  # Only apply if the voice has high authority trait
+                    # Lower pitch slightly for authoritative statements
+                    temp_pitch *= 0.98
+                    emotion_boost = 0.98
+        
         # Create unique temp file for this speech
         unique_id = int(time.time() * 1000)
         temp_audio = os.path.join(temp_dir, f"voice_{unique_id}.aiff")
         
         # Generate speech with macOS high-quality voice
-        # Apply speaking rate modifier to the rate parameter
-        adjusted_rate = int(rate * speaking_rate_modifier)
-        
         base_cmd = [
             "say",
             "-v", base_voice,
@@ -623,7 +732,7 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
         # Play with customized parameters
         play_cmd = [
             "afplay",
-            "-v", str(volume),
+            "-v", str(adjusted_volume),
             "-r", str(temp_pitch),  # Adjusted pitch to sound more like user's voice
             temp_audio
         ]
@@ -637,6 +746,8 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
         return True
     except Exception as e:
         logger.error(f"Custom voice error: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return False
 
 
