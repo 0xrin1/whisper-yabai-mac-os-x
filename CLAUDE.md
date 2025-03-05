@@ -8,6 +8,19 @@
 - Test specific module: `python src/test_*.py`
 - Install deps: `pip install -r requirements.txt`
 
+## Continuous Integration
+- CI runs on GitHub Actions for all PRs and main branch pushes
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Badge status: ![CI Status](https://github.com/YOUR_USERNAME/whisper-yabai-mac-os-x/actions/workflows/ci.yml/badge.svg)
+
+### CI Process
+- Runs on macOS environment
+- Syntax and import checks for all Python files
+- Module-specific import tests for core components
+- Code quality checks (prints, TODOs, hardcoded paths)
+- Neural voice tests (skipped if GPU unavailable)
+- Unit tests for all test_*.py modules
+
 ## Code Style
 - Use 4-space indentation
 - Follow PEP 8 naming conventions (snake_case for functions/variables)

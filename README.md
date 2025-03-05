@@ -1,5 +1,7 @@
 # Whisper Voice Control for macOS with Yabai
 
+![CI Status](https://github.com/YOUR_USERNAME/whisper-yabai-mac-os-x/actions/workflows/ci.yml/badge.svg)
+
 A voice command daemon that uses OpenAI's Whisper model locally to control your Mac, with Yabai window manager integration, LLM-powered natural language command interpretation, and customized voice synthesis that sounds like you.
 
 ## Features
