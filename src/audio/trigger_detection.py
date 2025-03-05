@@ -235,7 +235,7 @@ class TriggerDetector:
                 
             # Forward to the assistant module
             try:
-                import assistant
+                from src.utils import assistant
                 assistant.process_voice_command(transcription)
                 return True
             except Exception as e:
@@ -250,7 +250,7 @@ class TriggerDetector:
                 
             # Add a notification to clearly show we're entering dictation mode
             try:
-                from toast_notifications import send_notification
+                from src.ui.toast_notifications import send_notification
                 send_notification(
                     "Dictation Mode Activated", 
                     "Everything you say will be typed as text",
@@ -271,7 +271,7 @@ class TriggerDetector:
                 
             # Add a notification to show we're listening for a command
             try:
-                from toast_notifications import send_notification
+                from src.ui.toast_notifications import send_notification
                 send_notification(
                     "Command Mode Activated", 
                     "Listening for your command...",

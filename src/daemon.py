@@ -10,6 +10,7 @@ import threading
 import signal
 import logging
 import whisper
+import argparse
 from dotenv import load_dotenv
 
 # Import our modules
@@ -31,8 +32,12 @@ logger = logging.getLogger('voice-control')
 class VoiceControlDaemon:
     """Main daemon class for voice control system."""
     
-    def __init__(self):
-        """Initialize the daemon."""
+    def __init__(self, force_onboarding=False):
+        """Initialize the daemon.
+        
+        Args:
+            force_onboarding (bool, optional): Force the onboarding conversation even if not first run.
+        """
         # Configure logging
         self._setup_logging()
         
@@ -43,6 +48,9 @@ class VoiceControlDaemon:
         state.model_size = os.getenv('WHISPER_MODEL_SIZE', 'tiny')
         state.command_trigger = "hey"
         state.dictation_trigger = "type"
+        
+        # Store CLI arguments
+        self.force_onboarding = force_onboarding
         
         # Initialize components
         self.recorder = AudioRecorder()
@@ -73,6 +81,9 @@ class VoiceControlDaemon:
         
         # Show startup banner
         self._show_startup_banner()
+        
+        # Show onboarding conversation if this is first run
+        self._show_onboarding_conversation()
         
         # Start continuous recording with delay
         self._delayed_start()
@@ -239,6 +250,92 @@ class VoiceControlDaemon:
             logger.error(f"Failed to show startup notification: {e}")
 
 
+    def _show_onboarding_conversation(self):
+        """Show interactive onboarding conversation for first-time users."""
+        # Check if this is first run or if onboarding is forced
+        if not self._is_first_run() and not self.force_onboarding:
+            logger.debug("Skipping onboarding conversation for returning user")
+            return
+            
+        logger.info("Starting onboarding conversation for user")
+        
+        try:
+            # Onboarding welcome
+            tts.speak("Welcome to Voice Control! I'm your voice assistant.", block=True)
+            time.sleep(0.5)
+            
+            # Send a notification with welcome message
+            send_notification(
+                "Voice Control Welcome", 
+                "Let's get you started with a brief orientation",
+                "whisper-welcome",
+                15,
+                True
+            )
+            
+            # Introduction to how it works
+            tts.speak("I'll listen for trigger phrases and respond to your voice commands.", block=True)
+            time.sleep(0.5)
+            
+            # Explain the trigger words
+            tts.speak(f"You can say '{state.command_trigger}' to activate command mode for system control.", block=True)
+            time.sleep(0.5)
+            
+            tts.speak(f"Say '{state.dictation_trigger}' to start typing what you say.", block=True)
+            time.sleep(0.5)
+            
+            tts.speak("Or say 'hey Jarvis' to have a conversation with me.", block=True)
+            time.sleep(0.5)
+            
+            # Tips for best experience
+            tts.speak("For best results, speak clearly and use natural commands.", block=True)
+            time.sleep(0.5)
+            
+            # Completion message
+            tts.speak("That's all! You're ready to start using voice control. Just speak naturally.", block=True)
+            
+            # Mark as introduced so we don't show this again
+            self._mark_as_introduced()
+            
+        except Exception as e:
+            logger.error(f"Error during onboarding: {e}")
+            
+    def _is_first_run(self):
+        """Check if this is the first run of the application.
+        
+        Returns:
+            bool: True if this is the first run, False otherwise
+        """
+        # We use a marker file to determine if the user has been introduced
+        user_home = os.path.expanduser("~")
+        marker_dir = os.path.join(user_home, ".config", "voice-control")
+        marker_file = os.path.join(marker_dir, "introduced.txt")
+        
+        return not os.path.exists(marker_file)
+        
+    def _mark_as_introduced(self):
+        """Mark that the user has been introduced to the system."""
+        # Create the marker file
+        user_home = os.path.expanduser("~")
+        marker_dir = os.path.join(user_home, ".config", "voice-control")
+        marker_file = os.path.join(marker_dir, "introduced.txt")
+        
+        # Create directory if it doesn't exist
+        os.makedirs(marker_dir, exist_ok=True)
+        
+        # Write the marker file with timestamp
+        with open(marker_file, "w") as f:
+            f.write(f"Introduced at: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            
+        logger.info(f"Marked user as introduced in {marker_file}")
+
+
 if __name__ == "__main__":
-    daemon = VoiceControlDaemon()
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Voice Control Daemon')
+    parser.add_argument('--onboard', action='store_true', help='Force the onboarding conversation')
+    args = parser.parse_args()
+    
+    # Create and start the daemon
+    daemon = VoiceControlDaemon(force_onboarding=args.onboard)
     daemon.start()
