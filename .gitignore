@@ -68,11 +68,17 @@ src/tests/test_trigger_words.py
 src/tests/test_type_command.py
 src/tests/test_typing_methods.py
 
-# Test logs
+# Test logs and temporary directories
 test_logs_*/
-logs/
-tmp_neural_audio/
-neural_cache/
+logs/*
+!logs/.gitkeep
+!logs/test_logs/
+logs/test_logs/*
+!logs/test_logs/.gitkeep
+tmp_neural_audio/*
+!tmp_neural_audio/.gitkeep
+neural_cache/*
+!neural_cache/.gitkeep
 
 # Ignore voice training samples and temp files
 training_samples/*.wav
