@@ -10,8 +10,12 @@
 
 ## Continuous Integration
 - CI runs on GitHub Actions for all PRs and main branch pushes
-- GitHub Actions workflow: `.github/workflows/ci.yml`
-- Badge status: ![CI Status](https://github.com/YOUR_USERNAME/whisper-yabai-mac-os-x/actions/workflows/ci.yml/badge.svg)
+- GitHub Actions workflows: 
+  - `.github/workflows/ci.yml` - Main CI workflow
+  - `.github/workflows/lint.yml` - Code quality checks
+- Badge status: 
+  - ![CI Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/ci.yml/badge.svg)
+  - ![Lint Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/lint.yml/badge.svg)
 
 ### CI Process
 - Runs on macOS environment
