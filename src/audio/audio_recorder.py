@@ -68,83 +68,155 @@ class AudioRecorder:
         Returns:
             Path to the recorded WAV file, or None if recording failed
         """
-        # If force is True, reset the recording flag before continuing
-        if state.is_recording() and force:
-            logger.debug("Force flag set - resetting recording state")
-            state.stop_recording()
-            time.sleep(0.1)  # Brief pause to ensure flag propagation
-        
-        # Check if still recording
-        if state.is_recording() and not trigger_mode and not force:
-            logger.debug("Already recording, ignoring request")
-            return None
-            
-        # Use environment variable if duration not specified
-        if duration is None:
-            if trigger_mode:
-                # Increased duration for trigger detection for better reliability
-                duration = 2.0  # 2.0 seconds for more reliable trigger word detection
-            elif dictation_mode:
-                # Longer duration for dictation mode
-                duration = int(os.getenv('DICTATION_DURATION', '12'))
-            else:
-                # Standard duration for commands, increased for reliability
-                duration = int(os.getenv('RECORDING_DURATION', '10'))
-        
-        logger.debug(f"Recording duration set to {duration} seconds")
-        
-        if not trigger_mode:
-            state.start_recording()
-            # Play a sound to indicate recording has started, but only for full recordings
-            self.play_sound('start')
-        else:
-            # For trigger detection, we don't want to play sounds or show notifications
-            logger.debug("Silent trigger detection started")
-        
-        # Show appropriate notification
-        mode = "Dictation" if dictation_mode else "Command"
-        logger.info(f"{mode} mode: Listening for {duration} seconds...")
-        
-        # Import here to avoid circular imports
-        from toast_notifications import notify_listening
-        notify_listening(duration)
-        
-        # Create a temporary WAV file
-        temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
-        temp_filename = temp_file.name
-        temp_file.close()
-        logger.debug(f"Created temporary WAV file: {temp_filename}")
-        
-        # Set up audio stream
+        # Import error handler for better error handling
+        from src.core.error_handler import handle_error
+
         try:
-            logger.debug("Opening audio stream for recording")
+            # If force is True, reset the recording flag before continuing
+            if state.is_recording() and force:
+                logger.debug("Force flag set - resetting recording state")
+                state.stop_recording()
+                time.sleep(0.1)  # Brief pause to ensure flag propagation
             
-            # Get default input device
-            default_input_device_index = self.p.get_default_input_device_info().get('index')
-            logger.debug(f"Default input device index: {default_input_device_index}")
-            
-            # Open stream with explicit input device index and settings
-            stream = self.p.open(
-                format=self.format,
-                channels=self.channels,
-                rate=self.rate,
-                input=True,
-                input_device_index=default_input_device_index,
-                frames_per_buffer=self.chunk
-            )
-            
-            # Test if we can read from the stream
-            test_data = stream.read(self.chunk, exception_on_overflow=False)
-            if len(test_data) == 0:
-                logger.warning("Audio stream test got empty data")
+            # Check if still recording
+            if state.is_recording() and not trigger_mode and not force:
+                logger.debug("Already recording, ignoring request")
+                return None
                 
-            logger.debug("Audio stream opened successfully and tested")
+            # Use environment variable if duration not specified
+            if duration is None:
+                if trigger_mode:
+                    # Increased duration for trigger detection for better reliability
+                    duration = 2.0  # 2.0 seconds for more reliable trigger word detection
+                elif dictation_mode:
+                    # Longer duration for dictation mode
+                    duration = int(os.getenv('DICTATION_DURATION', '12'))
+                else:
+                    # Standard duration for commands, increased for reliability
+                    duration = int(os.getenv('RECORDING_DURATION', '10'))
             
-        except OSError as e:
-            logger.error(f"Failed to open audio stream: {e}")
-            logger.error("Make sure your microphone is connected and permissions are granted.")
+            logger.debug(f"Recording duration set to {duration} seconds")
+            
+            if not trigger_mode:
+                state.start_recording()
+                # Play a sound to indicate recording has started, but only for full recordings
+                try:
+                    self.play_sound('start')
+                except Exception as sound_error:
+                    handle_error(sound_error, logger, context="Sound playback", 
+                                notification_text=None, should_raise=False)
+                    # Continue even if sound fails
+            else:
+                # For trigger detection, we don't want to play sounds or show notifications
+                logger.debug("Silent trigger detection started")
+            
+            # Show appropriate notification
+            mode = "Dictation" if dictation_mode else "Command"
+            logger.info(f"{mode} mode: Listening for {duration} seconds...")
+            
+            # Import here to avoid circular imports
+            try:
+                from src.ui.toast_notifications import notify_listening
+                notify_listening(duration)
+            except Exception as notify_error:
+                handle_error(notify_error, logger, context="Notification", 
+                            notification_text=None, should_raise=False)
+                # Continue even if notification fails
+            
+            # Create a temporary WAV file
+            try:
+                temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+                temp_filename = temp_file.name
+                temp_file.close()
+                logger.debug(f"Created temporary WAV file: {temp_filename}")
+            except Exception as file_error:
+                handle_error(file_error, logger, context="Temporary file creation",
+                            notification_text="Failed to create temporary file", should_raise=True)
+                # If we can't create a temp file, we can't continue
+                return None
+            
+            # Set up audio stream
+            try:
+                logger.debug("Opening audio stream for recording")
+                
+                # Get available input devices for better error messages
+                available_inputs = []
+                info = self.p.get_host_api_info_by_index(0)
+                num_devices = info.get('deviceCount')
+                
+                for i in range(num_devices):
+                    if self.p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels') > 0:
+                        device_name = self.p.get_device_info_by_host_api_device_index(0, i).get('name')
+                        available_inputs.append(f"Input device {i}: {device_name}")
+                
+                # Get default input device
+                try:
+                    device_info = self.p.get_default_input_device_info()
+                    default_input_device_index = device_info.get('index')
+                    device_name = device_info.get('name', 'Unknown')
+                    logger.debug(f"Default input device: {device_name} (index: {default_input_device_index})")
+                except IOError as device_error:
+                    error_msg = (f"No default input device found: {device_error}. "
+                                f"Available devices: {', '.join(available_inputs)}")
+                    logger.error(error_msg)
+                    
+                    from src.ui.toast_notifications import notify_error
+                    notify_error("No microphone available")
+                    
+                    state.stop_recording()
+                    return None
+                
+                # Open stream with explicit input device index and settings
+                stream = self.p.open(
+                    format=self.format,
+                    channels=self.channels,
+                    rate=self.rate,
+                    input=True,
+                    input_device_index=default_input_device_index,
+                    frames_per_buffer=self.chunk
+                )
+                
+                # Test if we can read from the stream
+                try:
+                    test_data = stream.read(self.chunk, exception_on_overflow=False)
+                    if len(test_data) == 0:
+                        logger.warning("Audio stream test got empty data - microphone may not be working properly")
+                    else:
+                        logger.debug(f"Audio stream test successful, read {len(test_data)} bytes")
+                except Exception as read_error:
+                    handle_error(read_error, logger, context="Audio stream test",
+                                notification_text="Failed to read from microphone", should_raise=True)
+                    stream.close()
+                    state.stop_recording()
+                    return None
+                    
+                logger.debug("Audio stream opened successfully and tested")
+                
+            except OSError as e:
+                error_msg = f"Failed to open audio stream: {e}"
+                help_msg = "\n".join([
+                    "Possible solutions:",
+                    "1. Make sure your microphone is connected and not in use by another application",
+                    "2. Check that macOS has microphone permissions granted for this application",
+                    "3. Try a different microphone or restart your computer",
+                    f"Available input devices: {', '.join(available_inputs) if available_inputs else 'None found'}"
+                ])
+                logger.error(f"{error_msg}\n{help_msg}")
+                
+                # Show user-friendly notification
+                from src.ui.toast_notifications import notify_error
+                notify_error("Microphone access failed - check permissions")
+                
+                state.stop_recording()
+                return None
+        except Exception as setup_error:
+            handle_error(setup_error, logger, context="Recording setup",
+                        notification_text="Failed to start recording", should_raise=False)
             state.stop_recording()
             return None
+        
+        # Import error handler for better error handling
+        from src.core.error_handler import handle_error
         
         frames = []
         frames_per_second = self.rate / self.chunk
@@ -186,6 +258,7 @@ class AudioRecorder:
         frames_recorded = 0
         start_time = time.time()
         has_speech = False
+        recording_successful = False
         
         try:
             # Record until max duration reached, user stops recording, or silence detected after speech
@@ -195,6 +268,10 @@ class AudioRecorder:
                     data = stream.read(self.chunk, exception_on_overflow=False)
                     frames.append(data)
                     frames_recorded += 1
+                    
+                    # Once we have at least one frame, we've started recording successfully
+                    if frames_recorded == 1:
+                        recording_successful = True
                     
                     # Convert to numpy array for audio processing
                     audio_data = np.frombuffer(data, dtype=np.int16)
@@ -238,11 +315,15 @@ class AudioRecorder:
                             break
                             
                 except Exception as rec_err:
-                    logger.debug(f"Error reading audio frame: {rec_err}")
+                    handle_error(rec_err, logger, context="Reading audio frame", 
+                                 notification_text=None, should_raise=False)
                     time.sleep(0.01)  # Small delay to avoid tight loop on error
                     
         except KeyboardInterrupt:
             logger.debug("Recording interrupted by user")
+        except Exception as rec_loop_err:
+            handle_error(rec_loop_err, logger, context="Recording loop", 
+                         notification_text="Recording interrupted", should_raise=False)
             
         # Final timing check    
         elapsed = time.time() - start_time
@@ -251,10 +332,33 @@ class AudioRecorder:
         # If we recorded for less than 80% of the intended time, log a warning
         if elapsed < (duration * 0.8) and state.is_recording():
             logger.warning(f"Recording completed prematurely: {elapsed:.2f}s instead of {duration}s")
+        
+        # Check if we've actually recorded anything
+        if frames_recorded == 0:
+            logger.error("No audio frames recorded - microphone may not be working")
+            from src.ui.toast_notifications import notify_error
+            notify_error("Failed to record audio - check microphone")
+            state.stop_recording()
             
+            # Cleanup
+            try:
+                stream.stop_stream()
+                stream.close()
+            except Exception as cleanup_err:
+                handle_error(cleanup_err, logger, context="Stream cleanup after empty recording", 
+                             notification_text=None, should_raise=False)
+                
+            return None
+            
+        # We have some frames, proceed with normal recording completion
         logger.debug("Stopping and closing audio stream")
-        stream.stop_stream()
-        stream.close()
+        try:
+            stream.stop_stream()
+            stream.close()
+        except Exception as stream_err:
+            handle_error(stream_err, logger, context="Closing audio stream", 
+                         notification_text=None, should_raise=False)
+            # Continue anyway - we already have the frames
         
         # Save the recorded data as a WAV file
         logger.debug(f"Writing {len(frames)} audio frames to {temp_filename}")
@@ -278,27 +382,50 @@ class AudioRecorder:
                     logger.warning("WAV file seems very small, may not contain enough audio")
             else:
                 logger.error(f"WAV file not found after writing: {temp_filename}")
+                raise FileNotFoundError(f"WAV file not found: {temp_filename}")
                 
         except Exception as wav_err:
-            logger.error(f"Error saving WAV file: {wav_err}")
-            # Try to continue anyway
+            handle_error(wav_err, logger, context="Saving WAV file", 
+                         notification_text="Failed to save recording", should_raise=True)
+            state.stop_recording()
+            return None
         
         logger.info(f"Recording saved to {temp_filename}")
         state.stop_recording()
         
         # Play a sound to indicate recording has ended
-        self.play_sound('stop')
+        try:
+            self.play_sound('stop')
+        except Exception as sound_err:
+            handle_error(sound_err, logger, context="Sound playback", 
+                        notification_text=None, should_raise=False)
+            # Continue even if sound fails
         
         # Add to processing queue with appropriate flags
-        if trigger_mode:
-            logger.debug(f"Adding to queue as trigger detection: {temp_filename}")
-            state.enqueue_audio(temp_filename, False, True)
-        elif dictation_mode:
-            logger.debug(f"Adding to queue as dictation: {temp_filename}")
-            state.enqueue_audio(temp_filename, True, False)
-        else:
-            logger.debug(f"Adding to queue as command: {temp_filename}")
-            state.enqueue_audio(temp_filename, False, False)
+        try:
+            if trigger_mode:
+                logger.debug(f"Adding to queue as trigger detection: {temp_filename}")
+                state.enqueue_audio(temp_filename, False, True)
+            elif dictation_mode:
+                logger.debug(f"Adding to queue as dictation: {temp_filename}")
+                state.enqueue_audio(temp_filename, True, False)
+            else:
+                logger.debug(f"Adding to queue as command: {temp_filename}")
+                state.enqueue_audio(temp_filename, False, False)
+                
+            # Send a notification that recording completed successfully
+            if not trigger_mode:  # Don't show for trigger recordings
+                try:
+                    from src.ui.toast_notifications import notify_processing
+                    notify_processing()
+                except Exception as notify_err:
+                    handle_error(notify_err, logger, context="Recording completion notification", 
+                                notification_text=None, should_raise=False)
+                    
+        except Exception as queue_err:
+            handle_error(queue_err, logger, context="Enqueueing audio", 
+                         notification_text="Failed to process recording", should_raise=False)
+            # Return the filename anyway so it can be handled upstream
             
         # Return the filename so caller can check it
         return temp_filename
