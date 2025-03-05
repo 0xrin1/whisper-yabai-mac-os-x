@@ -21,7 +21,7 @@ class CommandProcessor:
         self.load_commands()
     
     def load_commands(self):
-        """Load command mappings from commands.json if it exists."""
+        """Load command mappings from config/commands.json if it exists."""
         default_commands = {
             "open": self.open_application,
             "focus": self.focus_application,
@@ -35,7 +35,7 @@ class CommandProcessor:
         }
         
         try:
-            with open('commands.json', 'r') as f:
+            with open('config/commands.json', 'r') as f:
                 custom_data = json.load(f)
                 if 'custom_commands' in custom_data:
                     default_commands.update(custom_data['custom_commands'])

@@ -1,9 +1,9 @@
 #!/bin/bash
 # Script to check GPU server status
 
-# Load configuration from .env file
-if [[ -f .env ]]; then
-    # Parse .env file and export variables
+# Load configuration from config/.env file
+if [[ -f config/.env ]]; then
+    # Parse config/.env file and export variables
     while IFS='=' read -r key value || [ -n "$key" ]; do
         # Skip comments and empty lines
         if [[ $key == \#* ]] || [[ -z $key ]]; then
@@ -12,9 +12,9 @@ if [[ -f .env ]]; then
         # Remove quotes and export the variable
         value=$(echo $value | sed 's/^["'"'"']//;s/["'"'"']$//')
         export "$key=$value"
-    done < .env
+    done < config/.env
 else
-    echo "Error: .env file not found"
+    echo "Error: config/.env file not found"
     exit 1
 fi
 

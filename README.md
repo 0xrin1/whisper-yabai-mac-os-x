@@ -380,16 +380,28 @@ The codebase has been restructured for improved maintainability and extensibilit
 The project follows a modular directory structure:
 
 ```
-src/
-├── core/           # Core infrastructure components
-├── audio/          # Audio processing components
-├── utils/          # Utility modules
-├── ui/             # User interface components
-├── config/         # Configuration management
-└── tests/          # Test modules
+├── src/                    # Source code
+│   ├── core/               # Core infrastructure components
+│   ├── audio/              # Audio processing components 
+│   ├── utils/              # Utility modules
+│   ├── ui/                 # User interface components
+│   ├── config/             # Configuration management
+│   └── tests/              # Test modules
+├── config/                 # Configuration files
+├── docs/                   # Documentation
+├── logs/                   # Log files
+│   └── test_logs/          # Test log output
+├── scripts/                # Shell scripts
+│   ├── neural_voice/       # Neural voice scripts
+│   ├── gpu/                # GPU-related scripts
+│   └── setup/              # Setup scripts
+├── models/                 # Model files
+├── voice_models/           # Voice model data
+├── neural_cache/           # Neural voice cache
+└── tmp_neural_audio/       # Temporary neural audio files
 ```
 
-Each directory contains a README.md with detailed information about its components and usage.
+Each source directory contains a README.md with detailed information about its components and usage.
 
 ### Core Architectural Components
 

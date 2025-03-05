@@ -133,7 +133,7 @@
   - Updated: daemon.py to use modular architecture
   - Created: ultra_simple_dictation.py for minimal functionality
   - Removed: daemon_refactored.py (merged into daemon.py)
-  - Updated docs: CLAUDE.md
+  - Updated docs: docs/CLAUDE.md
 
 ## Codebase Streamlining Project
 - **What we accomplished**:
@@ -172,7 +172,7 @@
   - Created: logging_config.py for consistent logging
   - Created: core_dictation.py for shared dictation logic
   - Created: test_error_handler.py and test_config.py for testing
-  - Added: config.json for user configuration
+  - Added: config/config.json for user configuration
 
 - **Key improvements**:
   - Reduced code duplication across dictation implementations
@@ -202,8 +202,8 @@
   - Created: voice_models/ directory structure
   - Enhanced: speech_synthesis.py with custom voice capabilities
   - Enhanced: voice_training.py with voice profile extraction
-  - Created: test_neural_voice.py for voice comparison testing
-  - Created: create_voice_model.sh for streamlined model creation
+  - Created: scripts/neural_voice/test_neural_voice.py for voice comparison testing
+  - Created: scripts/neural_voice/create_voice_model.sh for streamlined model creation
   
 - **Technical Approach**:
   - Voice sample analysis for characteristic extraction

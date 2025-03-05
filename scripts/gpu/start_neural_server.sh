@@ -20,12 +20,12 @@ MODEL_DIR="voice_models/neural_voice"
 PORT=5001
 HOST="0.0.0.0"  # Listen on all interfaces
 
-# Load environment variables if .env file exists
-if [ -f ".env" ]; then
-    echo "Loading environment variables from .env file..."
-    source .env
+# Load environment variables if config/.env file exists
+if [ -f "config/.env" ]; then
+    echo "Loading environment variables from config/.env file..."
+    source config/.env
     
-    # Override defaults if set in .env
+    # Override defaults if set in config/.env
     [ ! -z "$NEURAL_MODEL_DIR" ] && MODEL_DIR="$NEURAL_MODEL_DIR"
     [ ! -z "$NEURAL_SERVER_PORT" ] && PORT="$NEURAL_SERVER_PORT"
     [ ! -z "$NEURAL_SERVER_HOST" ] && HOST="$NEURAL_SERVER_HOST"

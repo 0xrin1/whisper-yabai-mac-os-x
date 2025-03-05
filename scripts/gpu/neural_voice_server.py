@@ -104,7 +104,7 @@ def load_model(model_path: str) -> Optional[Dict[str, Any]]:
         
         # Check for actual model files
         model_file = os.path.join(model_path, "best_model.pth")
-        config_file = os.path.join(model_path, "config.json")
+        config_file = os.path.join(model_path, "config/config.json")
         vocoder_file = os.path.join(model_path, "vocoder_model.pth")
         vocoder_config = os.path.join(model_path, "vocoder_config.json")
         

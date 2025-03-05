@@ -71,7 +71,7 @@ class TestConfig(unittest.TestCase):
         
         # Create a temporary config file
         self.temp_config_dir = tempfile.TemporaryDirectory()
-        self.temp_config_path = os.path.join(self.temp_config_dir.name, "config.json")
+        self.temp_config_path = os.path.join(self.temp_config_dir.name, "config/config.json")
     
     def tearDown(self):
         """Clean up test fixtures."""

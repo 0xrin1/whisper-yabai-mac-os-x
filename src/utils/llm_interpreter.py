@@ -84,7 +84,7 @@ class CommandInterpreter:
     def _load_available_commands(self) -> Dict[str, Any]:
         """Load available commands from commands.json."""
         try:
-            with open('commands.json', 'r') as f:
+            with open('config/commands.json', 'r') as f:
                 commands_data = json.load(f)
                 
             # Extract custom commands if present

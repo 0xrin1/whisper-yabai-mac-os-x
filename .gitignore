@@ -49,7 +49,9 @@ models/*.bin
 dictation_log.txt
 
 # Environment variables
-.env
+config/.env
+# But allow the root .env which just points to config directory
+!.env
 
 # Temporary files
 *.tmp

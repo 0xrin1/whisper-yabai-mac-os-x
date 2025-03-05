@@ -1,4 +1,64 @@
 #!/bin/bash
+# Script to set up neural voice conversion on the GPU server
+
+# Load configuration from config/.env file
+if [[ -f config/.env ]]; then
+    # Parse config/.env file and export variables
+    while IFS='=' read -r key value || [ -n "$key" ]; do
+        # Skip comments and empty lines
+        if [[ $key == \#* ]] || [[ -z $key ]]; then
+            continue
+        fi
+        # Remove quotes and export the variable
+        value=$(echo $value | sed 's/^["'"'"']//;s/["'"'"']$//')
+        export "$key=$value"
+    done < config/.env
+else
+    echo "Error: config/.env file not found"
+    exit 1
+fi
+
+echo "=== Setting up Neural Voice Conversion ==="
+echo "Host: $GPU_SERVER_HOST"
+echo "User: $GPU_SERVER_USER"
+echo
+
+# Create SSH commands
+SSHPASS_CMD="sshpass -p $GPU_SERVER_PASSWORD"
+SSH_BASE="$SSHPASS_CMD ssh -o StrictHostKeyChecking=no -p $GPU_SERVER_PORT $GPU_SERVER_USER@$GPU_SERVER_HOST"
+SCP_BASE="$SSHPASS_CMD scp -o StrictHostKeyChecking=no -P $GPU_SERVER_PORT"
+
+# Check server connectivity
+echo "Testing connection to GPU server..."
+if $SSH_BASE "echo 'Connection successful'" > /dev/null 2>&1; then
+    echo "✅ Connected to GPU server"
+else
+    echo "❌ Failed to connect to GPU server"
+    exit 1
+fi
+
+# Create remote directory structure
+echo "Creating remote directories..."
+$SSH_BASE "mkdir -p ~/neural_voice_model/code ~/neural_voice_model/models ~/neural_voice_model/samples"
+
+# Transfer audio samples to GPU server
+echo "Transferring voice samples to GPU server..."
+$SCP_BASE training_samples/*.wav "$GPU_SERVER_USER@$GPU_SERVER_HOST:~/neural_voice_model/samples/"
+
+# Transfer GPU training code
+echo "Transferring GPU training scripts..."
+mkdir -p gpu_transfer
+cp scripts/gpu/train_neural_voice.py gpu_transfer/
+cp scripts/gpu/neural_voice_server.py gpu_transfer/
+cp scripts/gpu/start_neural_server.sh gpu_transfer/
+
+$SCP_BASE gpu_transfer/* "$GPU_SERVER_USER@$GPU_SERVER_HOST:~/neural_voice_model/code/"
+rm -rf gpu_transfer
+
+# Create the remote setup script
+echo "Creating remote setup script..."
+cat > scripts/setup/setup_remote.sh << 'EOF'
+#!/bin/bash
 cd ~/neural_voice_model
 
 # Try to find conda executable in common locations
@@ -88,13 +148,13 @@ class VoiceConverter:
         print(f"Using device: {self.device}")
         
         # Set up paths from the pre-trained model
-        self.config_path = os.path.join(model_path, "config.json")
+        self.config_path = os.path.join(model_path, "config/config.json")
         self.model_path = os.path.join(model_path, "checkpoint_130000.pth.tar")
         self.vocoder_path = "tts_models/en/ljspeech/hifigan_v2"
         
         # Load configs
         self.config = load_config(self.config_path)
-        self.vocoder_config = load_config(os.path.join(self.vocoder_path, "config.json"))
+        self.vocoder_config = load_config(os.path.join(self.vocoder_path, "config/config.json"))
         
         # Load models
         self.model = setup_model(self.config)
@@ -211,3 +271,14 @@ if __name__ == "__main__":
 PYEOF
 
 echo "Setup complete!"
+EOF
+
+# Make the remote script executable
+$SSH_BASE "cat > ~/neural_voice_model/setup.sh" < scripts/setup/setup_remote.sh
+$SSH_BASE "chmod +x ~/neural_voice_model/setup.sh"
+
+# Run the remote setup script
+echo "Running remote setup script..."
+$SSH_BASE "cd ~/neural_voice_model && bash ./setup.sh"
+
+echo "Neural voice conversion setup complete!"

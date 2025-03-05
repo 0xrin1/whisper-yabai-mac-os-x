@@ -5,21 +5,21 @@
 MODEL_DIR="../voice_models/neural_voice"
 REMOTE_MODEL_PATH="models/neural_voice"
 
-# Load environment variables if .env file exists
-if [ -f ".env" ]; then
-    echo "Loading GPU server configuration from .env file..."
-    source .env
+# Load environment variables if config/.env file exists
+if [ -f "config/.env" ]; then
+    echo "Loading GPU server configuration from config/.env file..."
+    source config/.env
     SERVER_USER="${GPU_SERVER_USER}"
     SERVER_HOST="${GPU_SERVER_HOST}"
     SERVER_PATH="${GPU_SERVER_PATH}"
 elif [ -f "../.env" ]; then
-    echo "Loading GPU server configuration from parent directory .env file..."
+    echo "Loading GPU server configuration from parent directory config/.env file..."
     source "../.env"
     SERVER_USER="${GPU_SERVER_USER}"
     SERVER_HOST="${GPU_SERVER_HOST}"
     SERVER_PATH="${GPU_SERVER_PATH}"
 else
-    # Default values if .env doesn't exist
+    # Default values if config/.env doesn't exist
     SERVER_USER="user"
     SERVER_HOST="gpu-server.example.com"
     SERVER_PATH="/home/user/voice-training"
@@ -44,7 +44,7 @@ echo -e "${NC}"
 # Verify we have the required server information
 if [ -z "$SERVER_HOST" ] || [ -z "$SERVER_USER" ] || [ -z "$SERVER_PATH" ]; then
     echo -e "${RED}Error: Server information incomplete.${NC}"
-    echo -e "${YELLOW}Please set GPU_SERVER_HOST, GPU_SERVER_USER, and GPU_SERVER_PATH in .env file.${NC}"
+    echo -e "${YELLOW}Please set GPU_SERVER_HOST, GPU_SERVER_USER, and GPU_SERVER_PATH in config/.env file.${NC}"
     exit 1
 fi
 

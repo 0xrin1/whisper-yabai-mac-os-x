@@ -2,7 +2,7 @@
 # Simple script to start the voice control daemon
 
 # Change to the project directory
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 # Bypass permission check for Ghostty
 echo "Starting voice control daemon in Ghostty..."

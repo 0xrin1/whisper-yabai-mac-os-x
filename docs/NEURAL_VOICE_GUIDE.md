@@ -7,7 +7,7 @@ This guide will help you train a high-quality neural voice model using the RTX 3
 1. Access to GPU server with RTX 3090 or better
 2. At least 20 voice samples (40+ recommended for best quality)
 3. CUDA libraries installed on GPU server
-4. Configured .env file with GPU server credentials
+4. Configured config/.env file with GPU server credentials
 
 ## Step 1: Set Up Neural Voice Environment
 
@@ -114,121 +114,218 @@ The following packages will be DOWNGRADED:
 
 
 
-Downloading and Extracting Packages: ...working...pytorch-2.0.1        | 56.9 MB   |            |   0% 
-mysql-8.4.0          | 56.6 MB   |            |   0% [A
+Downloading and Extracting Packages: ...working...
+pytorch-2.0.1        | 56.9 MB   |            |   0% 
 
-libprotobuf-3.20.3   | 2.4 MB    |            |   0% [A[A
-
-
-ninja-base-1.12.1    | 157 KB    |            |   0% [A[A[A
+mysql-8.4.0          | 56.6 MB   |            |   0% [A
 
 
-
-blas-1.0             | 46 KB     |            |   0% [A[A[A[A
+libprotobuf-3.20.3   | 2.4 MB    |            |   0% [A[A
 
 
 
-
-ninja-1.12.1         | 8 KB      |            |   0% [A[A[A[A[A
-
-
-
-blas-1.0             | 46 KB     | ########## | 100% [A[A[A[A
-
-libprotobuf-3.20.3   | 2.4 MB    | 6          |   7% [A[A
-
-
-ninja-base-1.12.1    | 157 KB    | #####1     |  51% [A[A[A
-
-
-
-blas-1.0             | 46 KB     | ########## | 100% [A[A[A[A
+ninja-base-1.12.1    | 157 KB    |            |   0% [A[A[A
 
 
 
 
-ninja-1.12.1         | 8 KB      | ########## | 100% [A[A[A[A[A
+blas-1.0             | 46 KB     |            |   0% [A[A[A[A
 
 
 
 
-ninja-1.12.1         | 8 KB      | ########## | 100% [A[A[A[A[A
+
+ninja-1.12.1         | 8 KB      |            |   0% [A[A[A[A[A
 
 
 
 
-ninja-1.12.1         | 8 KB      | ########## | 100% [A[A[A[A[A
+blas-1.0             | 46 KB     | ########## | 100% [A[A[A[A
 
 
-ninja-base-1.12.1    | 157 KB    | ########## | 100% [A[A[A
-
-
-ninja-base-1.12.1    | 157 KB    | ########## | 100% [A[A[A
-
-libprotobuf-3.20.3   | 2.4 MB    | ########## | 100% [A[A
-mysql-8.4.0          | 56.6 MB   |            |   0% [A
-
-libprotobuf-3.20.3   | 2.4 MB    | ########## | 100% [A[A
-
-libprotobuf-3.20.3   | 2.4 MB    | ########## | 100% [A[A
-mysql-8.4.0          | 56.6 MB   | 3          |   3% [Apytorch-2.0.1        | 56.9 MB   |            |   0% pytorch-2.0.1        | 56.9 MB   |            |   0% 
-mysql-8.4.0          | 56.6 MB   | 5          |   6% [Apytorch-2.0.1        | 56.9 MB   |            |   1% 
-mysql-8.4.0          | 56.6 MB   | 8          |   9% [A
-mysql-8.4.0          | 56.6 MB   | #3         |  14% [Apytorch-2.0.1        | 56.9 MB   | 1          |   1% pytorch-2.0.1        | 56.9 MB   | 2          |   3% 
-mysql-8.4.0          | 56.6 MB   | #6         |  17% [Apytorch-2.0.1        | 56.9 MB   | 4          |   4% 
-mysql-8.4.0          | 56.6 MB   | #9         |  20% [Apytorch-2.0.1        | 56.9 MB   | 6          |   7% 
-mysql-8.4.0          | 56.6 MB   | ##2        |  22% [Apytorch-2.0.1        | 56.9 MB   | 9          |   9% 
-mysql-8.4.0          | 56.6 MB   | ##5        |  25% [Apytorch-2.0.1        | 56.9 MB   | #1         |  12% 
-mysql-8.4.0          | 56.6 MB   | ##8        |  28% [Apytorch-2.0.1        | 56.9 MB   | #7         |  18% pytorch-2.0.1        | 56.9 MB   | ##2        |  23% 
-mysql-8.4.0          | 56.6 MB   | ###1       |  31% [Apytorch-2.0.1        | 56.9 MB   | ##6        |  26% 
-mysql-8.4.0          | 56.6 MB   | ###3       |  33% [Apytorch-2.0.1        | 56.9 MB   | ###2       |  33% 
-mysql-8.4.0          | 56.6 MB   | ###5       |  35% [Apytorch-2.0.1        | 56.9 MB   | ###6       |  36% 
-mysql-8.4.0          | 56.6 MB   | ###7       |  37% [Apytorch-2.0.1        | 56.9 MB   | ####3      |  43% 
-mysql-8.4.0          | 56.6 MB   | ###9       |  39% [A
-mysql-8.4.0          | 56.6 MB   | ####       |  41% [Apytorch-2.0.1        | 56.9 MB   | ####7      |  48% 
-mysql-8.4.0          | 56.6 MB   | ####2      |  42% [Apytorch-2.0.1        | 56.9 MB   | #####1     |  52% 
-mysql-8.4.0          | 56.6 MB   | ####3      |  44% [Apytorch-2.0.1        | 56.9 MB   | #####6     |  57% pytorch-2.0.1        | 56.9 MB   | ######     |  61% 
-mysql-8.4.0          | 56.6 MB   | ####5      |  45% [Apytorch-2.0.1        | 56.9 MB   | ######5    |  65% 
-mysql-8.4.0          | 56.6 MB   | ####6      |  47% [Apytorch-2.0.1        | 56.9 MB   | ######8    |  69% 
-mysql-8.4.0          | 56.6 MB   | ####7      |  48% [Apytorch-2.0.1        | 56.9 MB   | #######4   |  75% pytorch-2.0.1        | 56.9 MB   | #######9   |  79% 
-mysql-8.4.0          | 56.6 MB   | ####8      |  49% [Apytorch-2.0.1        | 56.9 MB   | ########3  |  83% 
-mysql-8.4.0          | 56.6 MB   | ####9      |  50% [Apytorch-2.0.1        | 56.9 MB   | ########7  |  87% 
-mysql-8.4.0          | 56.6 MB   | #####      |  51% [Apytorch-2.0.1        | 56.9 MB   | #########3 |  93% 
-mysql-8.4.0          | 56.6 MB   | #####1     |  52% [Apytorch-2.0.1        | 56.9 MB   | #########7 |  97% 
-mysql-8.4.0          | 56.6 MB   | #####2     |  53% [Apytorch-2.0.1        | 56.9 MB   | ########## | 100% 
-mysql-8.4.0          | 56.6 MB   | #####3     |  53% [A
-mysql-8.4.0          | 56.6 MB   | #####4     |  55% [A
-mysql-8.4.0          | 56.6 MB   | #####6     |  56% [A
-mysql-8.4.0          | 56.6 MB   | #####7     |  58% [A
-mysql-8.4.0          | 56.6 MB   | #####9     |  60% [A
-mysql-8.4.0          | 56.6 MB   | ######2    |  62% [A
-mysql-8.4.0          | 56.6 MB   | ######5    |  66% [A
-mysql-8.4.0          | 56.6 MB   | ######8    |  68% [A
-mysql-8.4.0          | 56.6 MB   | #######2   |  72% [A
-mysql-8.4.0          | 56.6 MB   | #######5   |  75% [A
-mysql-8.4.0          | 56.6 MB   | #######7   |  78% [A
-mysql-8.4.0          | 56.6 MB   | ########3  |  83% [A
-mysql-8.4.0          | 56.6 MB   | ########6  |  87% [A
-mysql-8.4.0          | 56.6 MB   | ########9  |  90% [A
-mysql-8.4.0          | 56.6 MB   | #########4 |  94% [A
-mysql-8.4.0          | 56.6 MB   | #########7 |  97% [A
-mysql-8.4.0          | 56.6 MB   | ########## | 100% [A
-mysql-8.4.0          | 56.6 MB   | ########## | 100% [Apytorch-2.0.1        | 56.9 MB   | ########## | 100%                                                      
-                                                     [A
-
-                                                     [A[A
-
-
-                                                     [A[A[A
+libprotobuf-3.20.3   | 2.4 MB    | 6          |   7% [A[A
 
 
 
-                                                     [A[A[A[A
+ninja-base-1.12.1    | 157 KB    | #####1     |  51% [A[A[A
 
 
 
 
-                                                     [A[A[A[A[A done
+blas-1.0             | 46 KB     | ########## | 100% [A[A[A[A
+
+
+
+
+
+ninja-1.12.1         | 8 KB      | ########## | 100% [A[A[A[A[A
+
+
+
+
+
+ninja-1.12.1         | 8 KB      | ########## | 100% [A[A[A[A[A
+
+
+
+
+
+ninja-1.12.1         | 8 KB      | ########## | 100% [A[A[A[A[A
+
+
+
+ninja-base-1.12.1    | 157 KB    | ########## | 100% [A[A[A
+
+
+
+ninja-base-1.12.1    | 157 KB    | ########## | 100% [A[A[A
+
+
+libprotobuf-3.20.3   | 2.4 MB    | ########## | 100% [A[A
+
+mysql-8.4.0          | 56.6 MB   |            |   0% [A
+
+
+libprotobuf-3.20.3   | 2.4 MB    | ########## | 100% [A[A
+
+
+libprotobuf-3.20.3   | 2.4 MB    | ########## | 100% [A[A
+
+mysql-8.4.0          | 56.6 MB   | 3          |   3% [A
+pytorch-2.0.1        | 56.9 MB   |            |   0% 
+pytorch-2.0.1        | 56.9 MB   |            |   0% 
+
+mysql-8.4.0          | 56.6 MB   | 5          |   6% [A
+pytorch-2.0.1        | 56.9 MB   |            |   1% 
+
+mysql-8.4.0          | 56.6 MB   | 8          |   9% [A
+
+mysql-8.4.0          | 56.6 MB   | #3         |  14% [A
+pytorch-2.0.1        | 56.9 MB   | 1          |   1% 
+pytorch-2.0.1        | 56.9 MB   | 2          |   3% 
+
+mysql-8.4.0          | 56.6 MB   | #6         |  17% [A
+pytorch-2.0.1        | 56.9 MB   | 4          |   4% 
+
+mysql-8.4.0          | 56.6 MB   | #9         |  20% [A
+pytorch-2.0.1        | 56.9 MB   | 6          |   7% 
+
+mysql-8.4.0          | 56.6 MB   | ##2        |  22% [A
+pytorch-2.0.1        | 56.9 MB   | 9          |   9% 
+
+mysql-8.4.0          | 56.6 MB   | ##5        |  25% [A
+pytorch-2.0.1        | 56.9 MB   | #1         |  12% 
+
+mysql-8.4.0          | 56.6 MB   | ##8        |  28% [A
+pytorch-2.0.1        | 56.9 MB   | #7         |  18% 
+pytorch-2.0.1        | 56.9 MB   | ##2        |  23% 
+
+mysql-8.4.0          | 56.6 MB   | ###1       |  31% [A
+pytorch-2.0.1        | 56.9 MB   | ##6        |  26% 
+
+mysql-8.4.0          | 56.6 MB   | ###3       |  33% [A
+pytorch-2.0.1        | 56.9 MB   | ###2       |  33% 
+
+mysql-8.4.0          | 56.6 MB   | ###5       |  35% [A
+pytorch-2.0.1        | 56.9 MB   | ###6       |  36% 
+
+mysql-8.4.0          | 56.6 MB   | ###7       |  37% [A
+pytorch-2.0.1        | 56.9 MB   | ####3      |  43% 
+
+mysql-8.4.0          | 56.6 MB   | ###9       |  39% [A
+
+mysql-8.4.0          | 56.6 MB   | ####       |  41% [A
+pytorch-2.0.1        | 56.9 MB   | ####7      |  48% 
+
+mysql-8.4.0          | 56.6 MB   | ####2      |  42% [A
+pytorch-2.0.1        | 56.9 MB   | #####1     |  52% 
+
+mysql-8.4.0          | 56.6 MB   | ####3      |  44% [A
+pytorch-2.0.1        | 56.9 MB   | #####6     |  57% 
+pytorch-2.0.1        | 56.9 MB   | ######     |  61% 
+
+mysql-8.4.0          | 56.6 MB   | ####5      |  45% [A
+pytorch-2.0.1        | 56.9 MB   | ######5    |  65% 
+
+mysql-8.4.0          | 56.6 MB   | ####6      |  47% [A
+pytorch-2.0.1        | 56.9 MB   | ######8    |  69% 
+
+mysql-8.4.0          | 56.6 MB   | ####7      |  48% [A
+pytorch-2.0.1        | 56.9 MB   | #######4   |  75% 
+pytorch-2.0.1        | 56.9 MB   | #######9   |  79% 
+
+mysql-8.4.0          | 56.6 MB   | ####8      |  49% [A
+pytorch-2.0.1        | 56.9 MB   | ########3  |  83% 
+
+mysql-8.4.0          | 56.6 MB   | ####9      |  50% [A
+pytorch-2.0.1        | 56.9 MB   | ########7  |  87% 
+
+mysql-8.4.0          | 56.6 MB   | #####      |  51% [A
+pytorch-2.0.1        | 56.9 MB   | #########3 |  93% 
+
+mysql-8.4.0          | 56.6 MB   | #####1     |  52% [A
+pytorch-2.0.1        | 56.9 MB   | #########7 |  97% 
+
+mysql-8.4.0          | 56.6 MB   | #####2     |  53% [A
+pytorch-2.0.1        | 56.9 MB   | ########## | 100% 
+
+mysql-8.4.0          | 56.6 MB   | #####3     |  53% [A
+
+mysql-8.4.0          | 56.6 MB   | #####4     |  55% [A
+
+mysql-8.4.0          | 56.6 MB   | #####6     |  56% [A
+
+mysql-8.4.0          | 56.6 MB   | #####7     |  58% [A
+
+mysql-8.4.0          | 56.6 MB   | #####9     |  60% [A
+
+mysql-8.4.0          | 56.6 MB   | ######2    |  62% [A
+
+mysql-8.4.0          | 56.6 MB   | ######5    |  66% [A
+
+mysql-8.4.0          | 56.6 MB   | ######8    |  68% [A
+
+mysql-8.4.0          | 56.6 MB   | #######2   |  72% [A
+
+mysql-8.4.0          | 56.6 MB   | #######5   |  75% [A
+
+mysql-8.4.0          | 56.6 MB   | #######7   |  78% [A
+
+mysql-8.4.0          | 56.6 MB   | ########3  |  83% [A
+
+mysql-8.4.0          | 56.6 MB   | ########6  |  87% [A
+
+mysql-8.4.0          | 56.6 MB   | ########9  |  90% [A
+
+mysql-8.4.0          | 56.6 MB   | #########4 |  94% [A
+
+mysql-8.4.0          | 56.6 MB   | #########7 |  97% [A
+
+mysql-8.4.0          | 56.6 MB   | ########## | 100% [A
+
+mysql-8.4.0          | 56.6 MB   | ########## | 100% [A
+pytorch-2.0.1        | 56.9 MB   | ########## | 100% 
+                                                     
+
+                                                     [A
+
+
+                                                     [A[A
+
+
+
+                                                     [A[A[A
+
+
+
+
+                                                     [A[A[A[A
+
+
+
+
+
+                                                     [A[A[A[A[A done
 Preparing transaction: - \ | done
 Verifying transaction: - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / - \ | / done
 Executing transaction: \ | / - \ | / - \ | / - \ | / - \ | / - \ | / By downloading and using the CUDA Toolkit conda packages, you accept the terms and conditions of the CUDA End User License Agreement (EULA): https://docs.nvidia.com/cuda/eula/index.html

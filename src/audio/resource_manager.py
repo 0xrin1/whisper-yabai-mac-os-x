@@ -13,7 +13,7 @@ from typing import Optional, List, Any, Generator
 from contextlib import contextmanager
 
 from src.core.error_handler import handle_error
-from src.config.config import config
+from src.config.config.config import config
 
 logger = logging.getLogger('resource-manager')
 

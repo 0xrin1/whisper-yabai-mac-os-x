@@ -292,7 +292,7 @@ def train_voice_model(data_dir: str, output_dir: str, epochs: int = 5000) -> boo
         
         # Save the final model
         model_path = os.path.join(output_dir, "best_model.pth")
-        config_path = os.path.join(output_dir, "config.json")
+        config_path = os.path.join(output_dir, "config/config.json")
         
         # Create model info file
         os.makedirs(output_dir, exist_ok=True)
@@ -462,7 +462,7 @@ def main():
     print(f"Training used {args.epochs} epochs on {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
     
     print("\nTo use this model with the voice control system:")
-    print("1. Make sure the neural voice server is running (gpu_scripts/start_neural_server.sh)")
+    print("1. Make sure the neural voice server is running (scripts/gpu/start_neural_server.sh)")
     print("2. Verify the client is configured to connect to the server (NEURAL_SERVER env variable)")
     print("3. Test with: python test_neural_voice.py")
     

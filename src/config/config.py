@@ -146,7 +146,7 @@ class Config:
     def _load_from_files(self):
         """Load configuration from JSON files."""
         config_files = [
-            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config.json'),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'config/config.json'),
             os.path.expanduser('~/.config/whisper_voice_control/config.json')
         ]
         
@@ -206,7 +206,7 @@ class Config:
         if filepath is None:
             config_dir = os.path.expanduser('~/.config/whisper_voice_control')
             os.makedirs(config_dir, exist_ok=True)
-            filepath = os.path.join(config_dir, 'config.json')
+            filepath = os.path.join(config_dir, 'config/config.json')
             
         try:
             with open(filepath, 'w') as f:
