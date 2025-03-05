@@ -18,8 +18,22 @@
 - Syntax and import checks for all Python files
 - Module-specific import tests for core components
 - Code quality checks (prints, TODOs, hardcoded paths)
-- Neural voice tests (skipped if GPU unavailable)
-- Unit tests for all test_*.py modules
+- Neural voice tests with mock audio system
+- Unit tests for all test_*.py modules with audio mocks
+
+### Mock Testing Environment
+- Uses src/test_utils.py for mock audio recording and playback
+- Environment variables control mock behavior:
+  - MOCK_TEST_MODE=true: Enable full mock environment
+  - SKIP_AUDIO_RECORDING=true: Skip actual microphone recording
+  - SKIP_AUDIO_PLAYBACK=true: Skip actual audio playback
+  - USE_MOCK_SPEECH=true: Use mock speech synthesis
+- Mock helpers available:
+  - is_ci_environment(): Check if running in CI
+  - mock_speech_synthesis(): Mock speech function
+  - mock_whisper_transcription(): Mock transcription
+  - mock_audio_recorder(): Mock recording device
+  - setup_mock_environment(): Configure mock environment
 
 ## Code Style
 - Use 4-space indentation
