@@ -187,20 +187,6 @@ def synthesize_speech(text: str) -> Optional[str]:
         logger.error(f"Error synthesizing speech with neural voice: {e}")
         return None
 
-def synthesize_speech_fallback(text: str) -> Optional[str]:
-    """DEPRECATED: Fallback is disabled. Function kept for backward compatibility.
-    
-    This function is deprecated and will always return None. The system now requires
-    a working neural voice server connection.
-    
-    Args:
-        text: Text to synthesize (ignored)
-        
-    Returns:
-        None (always)
-    """
-    logger.warning("synthesize_speech_fallback is deprecated and disabled")
-    return None
 
 def play_audio(file_path: str) -> bool:
     """Play an audio file.
