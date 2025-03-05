@@ -1,0 +1,108 @@
+#!/bin/bash
+# Pre-commit hook for whisper-yabai-mac-os-x
+# Makes sure code passes basic checks before committing
+
+# Set error handling
+set -eo pipefail
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}╭────────────────────────────────────────╮${NC}"
+echo -e "${BLUE}│${NC}  ${YELLOW}Whisper Voice Control Pre-Commit Hook${NC}  ${BLUE}│${NC}"
+echo -e "${BLUE}╰────────────────────────────────────────╯${NC}"
+
+# Store the list of changed Python files
+CHANGED_PYTHON_FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep "\.py$" || true)
+if [ -z "$CHANGED_PYTHON_FILES" ]; then
+  echo -e "${GREEN}✓ No Python files changed. Skipping Python checks.${NC}"
+else
+  echo -e "${YELLOW}Checking Python files:${NC}"
+  echo "$CHANGED_PYTHON_FILES"
+  
+  # Check for syntax errors
+  echo -e "${YELLOW}Checking Python syntax...${NC}"
+  for file in $CHANGED_PYTHON_FILES; do
+    if [ -f "$file" ]; then
+      python -m py_compile "$file" || { echo -e "${RED}✗ Syntax error in $file${NC}"; exit 1; }
+    fi
+  done
+  echo -e "${GREEN}✓ No syntax errors found${NC}"
+  
+  # Check for import errors in modified files
+  echo -e "${YELLOW}Checking Python imports...${NC}"
+  for file in $CHANGED_PYTHON_FILES; do
+    if [ -f "$file" ]; then
+      # Only check files in src directory
+      if [[ "$file" == src/* ]]; then
+        echo -n "Importing $file: "
+        python -c "import sys; sys.path.append('$(dirname "$file")'); import $(basename "$file" .py)" 2>/dev/null \
+          && echo -e "${GREEN}✓${NC}" \
+          || { echo -e "${RED}✗ Failed${NC}"; exit 1; }
+      fi
+    fi
+  done
+  echo -e "${GREEN}✓ All imports valid${NC}"
+  
+  # Run a simple check on speech_synthesis.py if it's modified
+  MODIFIED_SPEECH=$(echo "$CHANGED_PYTHON_FILES" | grep -E "speech_synthesis.py|neural_voice_client.py" || true)
+  if [ -n "$MODIFIED_SPEECH" ]; then
+    echo -e "${YELLOW}Testing speech synthesis imports...${NC}"
+    python -c "import sys; sys.path.append('.'); from src import speech_synthesis" 2>/dev/null \
+      && echo -e "${GREEN}✓ Speech synthesis imports succeeded${NC}" \
+      || { echo -e "${RED}✗ Speech synthesis imports failed${NC}"; exit 1; }
+  fi
+  
+  # Check audio processing imports if modified
+  MODIFIED_AUDIO=$(echo "$CHANGED_PYTHON_FILES" | grep -E "audio_processor.py|audio_recorder.py" || true)
+  if [ -n "$MODIFIED_AUDIO" ]; then
+    echo -e "${YELLOW}Testing audio modules...${NC}"
+    python -c "import sys; sys.path.append('.'); from src import audio_processor; from src import audio_recorder" 2>/dev/null \
+      && echo -e "${GREEN}✓ Audio modules loaded successfully${NC}" \
+      || { echo -e "${RED}✗ Audio module imports failed${NC}"; exit 1; }
+  fi
+  
+  # Check for problematic patterns
+  echo -e "${YELLOW}Checking for problematic patterns...${NC}"
+  for file in $CHANGED_PYTHON_FILES; do
+    if [ -f "$file" ]; then
+      # Check for print statements in main modules (not tests)
+      if [[ "$file" == src/* && ! "$file" =~ test_ ]]; then
+        PRINT_STATEMENTS=$(grep -n "print(" "$file" | grep -v "# DEBUG" || true)
+        if [ -n "$PRINT_STATEMENTS" ]; then
+          echo -e "${YELLOW}Warning: print() statements found in $file:${NC}"
+          echo "$PRINT_STATEMENTS"
+          echo -e "${YELLOW}Consider using logging instead of print() for production code.${NC}"
+        fi
+      fi
+      
+      # Check for TODOs
+      TODOS=$(grep -n "# TODO" "$file" || true)
+      if [ -n "$TODOS" ]; then
+        echo -e "${YELLOW}Warning: TODOs found in $file:${NC}"
+        echo "$TODOS"
+      fi
+      
+      # Check for hardcoded file paths
+      HARDCODED_PATHS=$(grep -E "'/Users/|\"C:\\\\|'/tmp/|'/var/|'/etc/" "$file" || true)
+      if [ -n "$HARDCODED_PATHS" ]; then
+        echo -e "${YELLOW}Warning: Possibly hardcoded paths in $file:${NC}"
+        echo "$HARDCODED_PATHS"
+      fi
+    fi
+  done
+fi
+
+# Check for large files
+LARGE_FILES=$(git diff --cached --name-only --diff-filter=ACMR | xargs du -h 2>/dev/null | grep -E "^[0-9]+M" || true)
+if [ -n "$LARGE_FILES" ]; then
+  echo -e "${YELLOW}Warning: You're attempting to commit large files:${NC}"
+  echo "$LARGE_FILES"
+  echo -e "${YELLOW}Consider if these should be added to .gitignore instead.${NC}"
+fi
+
+echo -e "${GREEN}✓ All pre-commit checks passed!${NC}"
+echo -e "${BLUE}Commit proceeding...${NC}"
+exit 0
