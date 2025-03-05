@@ -85,4 +85,5 @@ neural_cache/*
 # Ignore voice training samples and temp files
 training_samples/*.wav
 voice_models/**/samples/*.wav
-voice_models/**/temp/*.aiff
+voice_models/**/temp/*.aiffconfig/.env
+config/.env
