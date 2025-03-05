@@ -13,8 +13,8 @@ from unittest.mock import patch, MagicMock
 
 # Add src directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src import assistant
-from src import speech_synthesis as tts
+from src.utils import assistant
+from src.audio import speech_synthesis as tts
 
 class TestJarvisAssistant(unittest.TestCase):
     """Test suite for JARVIS assistant functionality."""

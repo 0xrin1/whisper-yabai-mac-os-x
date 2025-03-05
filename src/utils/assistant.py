@@ -18,8 +18,8 @@ from typing import Dict, List, Optional, Tuple, Any
 
 # Import our own modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src import speech_synthesis as tts
-from src.toast_notifications import send_notification
+from src.audio import speech_synthesis as tts
+from src.ui.toast_notifications import send_notification
 
 # Status display constants
 STATUS_LINE = 0

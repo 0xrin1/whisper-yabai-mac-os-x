@@ -12,7 +12,7 @@ from unittest.mock import patch
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import our test utilities
-from src.test_utils import (
+from src.tests.test_utils import (
     setup_mock_environment,
     mock_speech_synthesis,
     mock_whisper_transcription,

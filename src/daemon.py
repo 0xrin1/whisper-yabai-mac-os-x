@@ -17,14 +17,14 @@ from dotenv import load_dotenv
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from state_manager import state
-from audio_recorder import AudioRecorder
-from audio_processor import processor
-from continuous_recorder import ContinuousRecorder
-from hotkey_manager import hotkeys
-import speech_synthesis as tts
-import assistant
-from toast_notifications import send_notification
+from src.core.state_manager import state
+from src.audio.audio_recorder import AudioRecorder
+from src.audio.audio_processor import processor
+from src.audio.continuous_recorder import ContinuousRecorder
+from src.utils.hotkey_manager import hotkeys
+import src.audio.speech_synthesis as tts
+import src.utils.assistant as assistant
+from src.ui.toast_notifications import send_notification
 
 logger = logging.getLogger('voice-control')
 

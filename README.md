@@ -375,13 +375,29 @@ Examples of commands that work with LLM interpretation:
 
 The codebase has been restructured for improved maintainability and extensibility:
 
+### Directory Structure
+
+The project follows a modular directory structure:
+
+```
+src/
+├── core/           # Core infrastructure components
+├── audio/          # Audio processing components
+├── utils/          # Utility modules
+├── ui/             # User interface components
+├── config/         # Configuration management
+└── tests/          # Test modules
+```
+
+Each directory contains a README.md with detailed information about its components and usage.
+
 ### Core Architectural Components
 
-- **Centralized Configuration System**: `config.py` provides unified configuration management from multiple sources
-- **Error Handling Utilities**: `error_handler.py` implements consistent error handling patterns
-- **Resource Management**: `resource_manager.py` ensures proper cleanup of system resources
-- **Centralized Logging**: `logging_config.py` establishes consistent logging practices
-- **Core Dictation Module**: `core_dictation.py` provides shared typing functionality
+- **Centralized Configuration System**: `config/config.py` provides unified configuration management from multiple sources
+- **Error Handling Utilities**: `core/error_handler.py` implements consistent error handling patterns
+- **Resource Management**: `audio/resource_manager.py` ensures proper cleanup of system resources
+- **Centralized Logging**: `core/logging_config.py` establishes consistent logging practices
+- **Core Dictation Module**: `core/core_dictation.py` provides shared typing functionality
 
 ### Key Design Patterns
 
@@ -396,21 +412,21 @@ The codebase has been restructured for improved maintainability and extensibilit
 The modular architecture makes it easy to extend the system:
 
 1. **Adding New Commands**: Add to `commands.json` or extend command processor
-2. **Custom Dictation Processing**: Extend `DictationProcessor` or implement a new processor
-3. **New Voice Synthesis Options**: Add to speech synthesis module
-4. **Enhanced Audio Processing**: Extend audio processor with new capabilities 
+2. **Custom Dictation Processing**: Extend `utils/dictation.py` or implement a new processor
+3. **New Voice Synthesis Options**: Add to `audio/speech_synthesis.py` module
+4. **Enhanced Audio Processing**: Extend `audio/audio_processor.py` with new capabilities
 
 ### Development Guidelines
 
 When contributing to this project:
 
-- Follow existing code organization and patterns
+- Follow the established directory structure and import patterns
 - Use the error handling utilities for consistent error reporting
 - Let the configuration system manage settings
 - Use resource managers to handle system resources
 - Implement proper type annotations and docstrings
 - Follow the logging conventions
-- Write tests for new functionality
+- Write tests for new functionality in the tests directory
 - Update documentation for new features
 
 ## Troubleshooting

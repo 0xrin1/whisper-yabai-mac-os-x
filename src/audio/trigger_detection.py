@@ -15,8 +15,8 @@ import whisper
 import torch
 import numpy as np
 
-from src.state_manager import state
-from src.audio_recorder import AudioRecorder
+from src.core.state_manager import state
+from src.audio.audio_recorder import AudioRecorder
 
 logger = logging.getLogger('trigger-detection')
 

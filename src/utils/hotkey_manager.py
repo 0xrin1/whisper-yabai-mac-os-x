@@ -7,8 +7,8 @@ Manages keyboard shortcuts for system control.
 import logging
 from pynput import keyboard
 
-from src.state_manager import state
-from src.audio_recorder import AudioRecorder
+from src.core.state_manager import state
+from src.audio.audio_recorder import AudioRecorder
 
 logger = logging.getLogger('hotkey-manager')
 

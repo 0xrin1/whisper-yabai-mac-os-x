@@ -7,8 +7,8 @@ Converts speech to text and types it at the cursor position.
 import logging
 from typing import Optional
 
-from src.core_dictation import core_dictation
-from src.error_handler import handle_error, safe_execute
+from src.core.core_dictation import core_dictation
+from src.core.error_handler import handle_error, safe_execute
 
 logger = logging.getLogger('dictation')
 

@@ -10,8 +10,8 @@ import pyaudio
 import numpy as np
 import logging
 
-from src.state_manager import state
-from src.trigger_detection import TriggerDetector
+from src.core.state_manager import state
+from src.audio.trigger_detection import TriggerDetector
 
 logger = logging.getLogger('continuous-recorder')
 
