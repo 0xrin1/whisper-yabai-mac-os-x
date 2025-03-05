@@ -389,9 +389,11 @@ The project follows a modular directory structure:
 │   └── tests/              # Test modules
 ├── config/                 # Configuration files
 ├── docs/                   # Documentation
+├── docs-src/               # Source files for generated documentation
 ├── logs/                   # Log files
 │   └── test_logs/          # Test log output
 ├── scripts/                # Shell scripts
+│   ├── docs/               # Documentation generation scripts
 │   ├── neural_voice/       # Neural voice scripts
 │   ├── gpu/                # GPU-related scripts
 │   └── setup/              # Setup scripts
@@ -440,6 +442,39 @@ When contributing to this project:
 - Follow the logging conventions
 - Write tests for new functionality in the tests directory
 - Update documentation for new features
+
+### Documentation System
+
+The project includes a comprehensive documentation system:
+
+- **Automated Documentation**: Generated from docstrings in the code
+- **Self-Hosted Documentation**: Uses mdBook to create a searchable, static website
+- **Documentation Tools**:
+  - `scripts/docs/add_docstrings.py`: Adds template docstrings to Python files
+  - `scripts/docs/extract_docs.py`: Extracts docstrings and generates markdown
+  - `scripts/docs/create_documentation.sh`: End-to-end documentation generation
+  - `scripts/docs/build_docs.sh`: Builds and serves documentation with Docker
+
+To generate the documentation:
+
+```bash
+# Generate and build documentation
+./scripts/docs/create_documentation.sh
+
+# Serve existing documentation
+./scripts/docs/build_docs.sh --serve-only
+
+# Use Docker to build and serve
+docker build -t whisper-voice-control-docs -f Dockerfile.docs .
+docker run -p 8080:8080 whisper-voice-control-docs
+```
+
+The documentation website includes:
+- API reference for all modules
+- Searchable interface
+- Interactive code examples
+- Markdown rendering with syntax highlighting
+- Responsive design for all devices
 
 ## Troubleshooting
 

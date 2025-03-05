@@ -1,0 +1,1124 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Whisper Voice Control Documentation</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Documentation for Whisper Voice Control for macOS with Yabai">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon.svg">
+        <link rel="shortcut icon" href="favicon.png">
+        <link rel="stylesheet" href="css/variables.css">
+        <link rel="stylesheet" href="css/general.css">
+        <link rel="stylesheet" href="css/chrome.css">
+        <link rel="stylesheet" href="css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="highlight.css">
+        <link rel="stylesheet" href="tomorrow-night.css">
+        <link rel="stylesheet" href="ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="theme/custom.css">
+
+
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc.js"></script>
+    </head>
+    <body>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Whisper Voice Control Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        <a href="https://github.com/0xrin1/whisper-yabai-mac-os-x" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="whisper-voice-control-for-macos"><a class="header" href="#whisper-voice-control-for-macos">Whisper Voice Control for macOS</a></h1>
+<p>A voice command daemon that uses OpenAI's Whisper model locally to control your Mac.</p>
+<h2 id="documentation"><a class="header" href="#documentation">Documentation</a></h2>
+<p>This is the auto-generated API documentation for the Whisper Voice Control system.
+The documentation is extracted from docstrings in the source code.</p>
+<h3 id="key-components"><a class="header" href="#key-components">Key Components</a></h3>
+<ul>
+<li><strong>Core</strong>: Core infrastructure components</li>
+<li><strong>Audio</strong>: Audio recording and processing components</li>
+<li><strong>Utils</strong>: Utility functions and command processing</li>
+<li><strong>UI</strong>: User interface components</li>
+<li><strong>Config</strong>: Configuration management</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="audio_processor"><a class="header" href="#audio_processor">audio_processor</a></h1>
+<p>Audio processing module for voice control system.
+Handles transcription of audio files using Whisper.</p>
+<p>Source: <code>audio/audio_processor.py</code></p>
+<h2 id="class-audioprocessor"><a class="header" href="#class-audioprocessor">Class: AudioProcessor</a></h2>
+<p>Processes audio files in the queue and converts to text.</p>
+<h2 id="function-__init__self"><a class="header" href="#function-__init__self">Function: <code>__init__(self)</code></a></h2>
+<p>Initialize the audio processor.</p>
+<h2 id="function-startself"><a class="header" href="#function-startself">Function: <code>start(self)</code></a></h2>
+<p>Start processing audio in a background thread.</p>
+<h2 id="function-stopself"><a class="header" href="#function-stopself">Function: <code>stop(self)</code></a></h2>
+<p>Stop audio processing.</p>
+<h2 id="function-load_modelself"><a class="header" href="#function-load_modelself">Function: <code>load_model(self)</code></a></h2>
+<p>Load the Whisper model.</p>
+<h2 id="function-_processing_threadself"><a class="header" href="#function-_processing_threadself">Function: <code>_processing_thread(self)</code></a></h2>
+<p>Main processing thread function.</p>
+<h2 id="function-_process_commandself-transcription"><a class="header" href="#function-_process_commandself-transcription">Function: <code>_process_command(self, transcription)</code></a></h2>
+<p>Process a command transcription.</p>
+<pre><code>    Args:
+        transcription: Transcribed text to process as a command
+        
+    Returns:
+        bool: True if command was processed successfully
+</code></pre>
+<h2 id="function-_start_dictation_modeself"><a class="header" href="#function-_start_dictation_modeself">Function: <code>_start_dictation_mode(self)</code></a></h2>
+<p>Start dictation mode.</p>
+<pre><code>    Returns:
+        bool: True if dictation mode was started successfully
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="audio_recorder"><a class="header" href="#audio_recorder">audio_recorder</a></h1>
+<p>Audio recording module for voice control system.
+Handles recording from microphone with smart silence detection.</p>
+<p>Source: <code>audio/audio_recorder.py</code></p>
+<h2 id="class-audiorecorder"><a class="header" href="#class-audiorecorder">Class: AudioRecorder</a></h2>
+<p>Records audio from microphone with configurable parameters.</p>
+<h2 id="function-play_soundself-sound_type-str"><a class="header" href="#function-play_soundself-sound_type-str">Function: <code>play_sound(self, sound_type: str)</code></a></h2>
+<p>Play a sound to indicate recording status.</p>
+<pre><code>    Args:
+        sound_type: Type of sound to play ('start', 'stop', 'dictation', 'command')
+</code></pre>
+<h2 id="function-stop_recordingself"><a class="header" href="#function-stop_recordingself">Function: <code>stop_recording(self)</code></a></h2>
+<p>Stop the current recording.</p>
+<h2 id="function-cleanupself"><a class="header" href="#function-cleanupself">Function: <code>cleanup(self)</code></a></h2>
+<p>Clean up PyAudio resources.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="continuous_recorder"><a class="header" href="#continuous_recorder">continuous_recorder</a></h1>
+<p>Continuous recording module for voice control system.
+Manages a rolling buffer of audio to detect trigger words.</p>
+<p>Source: <code>audio/continuous_recorder.py</code></p>
+<h2 id="class-continuousrecorder"><a class="header" href="#class-continuousrecorder">Class: ContinuousRecorder</a></h2>
+<p>Records continuously in the background with a rolling buffer.</p>
+<h2 id="function-__init__self-buffer_seconds5"><a class="header" href="#function-__init__self-buffer_seconds5">Function: <code>__init__(self, buffer_seconds=5)</code></a></h2>
+<p>Initialize continuous recorder.</p>
+<pre><code>    Args:
+        buffer_seconds: Number of seconds to keep in the rolling buffer
+</code></pre>
+<h2 id="function-startself-1"><a class="header" href="#function-startself-1">Function: <code>start(self)</code></a></h2>
+<p>Start continuous recording in a background thread.</p>
+<h2 id="function-stopself-1"><a class="header" href="#function-stopself-1">Function: <code>stop(self)</code></a></h2>
+<p>Stop continuous recording.</p>
+<h2 id="function-_recording_threadself"><a class="header" href="#function-_recording_threadself">Function: <code>_recording_thread(self)</code></a></h2>
+<p>Main recording thread function.</p>
+<h2 id="function-_process_bufferself"><a class="header" href="#function-_process_bufferself">Function: <code>_process_buffer(self)</code></a></h2>
+<p>Process the audio buffer to detect trigger words.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="neural_voice_client"><a class="header" href="#neural_voice_client">neural_voice_client</a></h1>
+<p>Neural Voice Client - Connects to GPU-powered voice server
+Enables high-quality neural voice synthesis on lightweight clients</p>
+<p>Source: <code>audio/neural_voice_client.py</code></p>
+<h2 id="function-configureserver-str--default_server-enable_fallback-bool--true"><a class="header" href="#function-configureserver-str--default_server-enable_fallback-bool--true">Function: <code>configure(server: str = DEFAULT_SERVER, enable_fallback: bool = True)</code></a></h2>
+<p>Configure the neural voice client.</p>
+<pre><code>Args:
+    server: URL of the neural voice server (including protocol and port)
+    enable_fallback: Whether to enable fallback to local TTS if server is unavailable
+</code></pre>
+<h2 id="function-check_server_connection"><a class="header" href="#function-check_server_connection">Function: <code>check_server_connection()</code></a></h2>
+<p>Check if the neural voice server is available.</p>
+<pre><code>Returns:
+    Boolean indicating if server is available
+</code></pre>
+<h2 id="function-play_audiofile_path-str"><a class="header" href="#function-play_audiofile_path-str">Function: <code>play_audio(file_path: str)</code></a></h2>
+<p>Play an audio file.</p>
+<pre><code>Args:
+    file_path: Path to audio file
+    
+Returns:
+    Boolean indicating success
+</code></pre>
+<h2 id="function-cleanup"><a class="header" href="#function-cleanup">Function: <code>cleanup()</code></a></h2>
+<p>Clean up temporary files.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="resource_manager"><a class="header" href="#resource_manager">resource_manager</a></h1>
+<p>Resource management utilities for the voice control system.
+Provides consistent resource handling patterns across modules.</p>
+<p>Source: <code>audio/resource_manager.py</code></p>
+<h2 id="class-tempaudiofile"><a class="header" href="#class-tempaudiofile">Class: TempAudioFile</a></h2>
+<p>Manages temporary audio files with automatic cleanup.</p>
+<h2 id="function-__init__self-suffix-str--wav-delete-bool--true"><a class="header" href="#function-__init__self-suffix-str--wav-delete-bool--true">Function: <code>__init__(self, suffix: str = '.wav', delete: bool = True)</code></a></h2>
+<p>Create a temporary audio file.</p>
+<pre><code>    Args:
+        suffix: File suffix (default: .wav)
+        delete: Whether to delete file on cleanup (default: True)
+</code></pre>
+<h2 id="function-keepself"><a class="header" href="#function-keepself">Function: <code>keep(self)</code></a></h2>
+<p>Prevent the file from being deleted on cleanup.</p>
+<h2 id="function-save_audio_frames"><a class="header" href="#function-save_audio_frames">Function: `save_audio_frames(</a></h2>
+<pre><code>frames: List[bytes],
+filename: str,
+channels: Optional[int] = None,
+sample_width: Optional[int] = None,
+rate: Optional[int] = None,
+p: Optional[pyaudio.PyAudio] = None
+</code></pre>
+<p>)`</p>
+<p>Save audio frames to a WAV file.</p>
+<pre><code>Args:
+    frames: List of audio frames
+    filename: Output filename
+    channels: Number of channels (default from config)
+    sample_width: Sample width in bytes (default from PyAudio)
+    rate: Sample rate (default from config)
+    p: PyAudio instance (if None, creates temporary instance)
+    
+Returns:
+    True if successful, False otherwise
+</code></pre>
+<h2 id="function-play_system_soundsound_name-str--pop"><a class="header" href="#function-play_system_soundsound_name-str--pop">Function: <code>play_system_sound(sound_name: str = "Pop")</code></a></h2>
+<p>Play a system sound.</p>
+<pre><code>Args:
+    sound_name: Name of system sound (without path or extension)
+    
+Returns:
+    True if successful, False otherwise
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="speech_synthesis"><a class="header" href="#speech_synthesis">speech_synthesis</a></h1>
+<p>Speech synthesis module for the voice control system.
+Provides natural-sounding TTS capabilities using macOS's native voices or custom voice models.
+Supports custom voice models created from your own voice samples.
+Now with support for neural voice models trained with GlowTTS.</p>
+<p>Source: <code>audio/speech_synthesis.py</code></p>
+<h2 id="function-get_random_responsecategory-str"><a class="header" href="#function-get_random_responsecategory-str">Function: <code>get_random_response(category: str)</code></a></h2>
+<p>Get a random response from a specific category.</p>
+<pre><code>Args:
+    category: The category of response to get
+    
+Returns:
+    A random response string
+</code></pre>
+<h2 id="function-speaktext-str-voice-str--default_voice-rate-int--default_rate"><a class="header" href="#function-speaktext-str-voice-str--default_voice-rate-int--default_rate">Function: `speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,</a></h2>
+<pre><code>      block: bool = False, volume: float = 1.0)`
+</code></pre>
+<p>Speak the provided text using macOS TTS.</p>
+<pre><code>Args:
+    text: The text to speak
+    voice: The voice to use
+    rate: The speaking rate (words per minute)
+    block: Whether to block until speech is complete
+    volume: Volume level (0.0 to 1.0)
+</code></pre>
+<h2 id="function-_speak_with_custom_voicetext-str-rate-int--default_rate-volume-float--10"><a class="header" href="#function-_speak_with_custom_voicetext-str-rate-int--default_rate-volume-float--10">Function: <code>_speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float = 1.0)</code></a></h2>
+<p>Use custom voice model for speech.</p>
+<pre><code>Args:
+    text: The text to speak
+    rate: The speaking rate
+    volume: Volume level (0.0 to 1.0)
+
+Returns:
+    Boolean indicating success
+</code></pre>
+<h2 id="function-_speak_nowtext-str-voice-str--default_voice-rate-int--default_rate"><a class="header" href="#function-_speak_nowtext-str-voice-str--default_voice-rate-int--default_rate">Function: `_speak_now(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,</a></h2>
+<pre><code>           volume: float = 1.0)`
+</code></pre>
+<p>Actually execute the TTS command (internal use).</p>
+<pre><code>Args:
+    text: The text to speak
+    voice: The voice to use
+    rate: The speaking rate
+    volume: Volume level (0.0 to 1.0)
+</code></pre>
+<h2 id="function-_process_speech_queue"><a class="header" href="#function-_process_speech_queue">Function: <code>_process_speech_queue()</code></a></h2>
+<p>Process the speech queue in a separate thread.</p>
+<h2 id="function-_ensure_queue_processor_running"><a class="header" href="#function-_ensure_queue_processor_running">Function: <code>_ensure_queue_processor_running()</code></a></h2>
+<p>Ensure the queue processor thread is running.</p>
+<h2 id="function-stop_speaking"><a class="header" href="#function-stop_speaking">Function: <code>stop_speaking()</code></a></h2>
+<p>Stop all speech immediately.</p>
+<h2 id="function-get_voice_infovoice-str"><a class="header" href="#function-get_voice_infovoice-str">Function: <code>get_voice_info(voice: str)</code></a></h2>
+<p>Get information about a specific voice.</p>
+<pre><code>Args:
+    voice: The voice name
+    
+Returns:
+    Dictionary with voice characteristics or None if voice doesn't exist
+</code></pre>
+<h2 id="function-is_speaking"><a class="header" href="#function-is_speaking">Function: <code>is_speaking()</code></a></h2>
+<p>Check if the system is currently speaking.</p>
+<pre><code>Returns:
+    True if speaking, False otherwise
+</code></pre>
+<h2 id="function-greetingname-optionalstr--none"><a class="header" href="#function-greetingname-optionalstr--none">Function: <code>greeting(name: Optional[str] = None)</code></a></h2>
+<p>Speak a greeting.</p>
+<pre><code>Args:
+    name: Optional name to personalize the greeting
+</code></pre>
+<h2 id="function-acknowledge"><a class="header" href="#function-acknowledge">Function: <code>acknowledge()</code></a></h2>
+<p>Speak an acknowledgment phrase.</p>
+<h2 id="function-confirm"><a class="header" href="#function-confirm">Function: <code>confirm()</code></a></h2>
+<p>Speak a confirmation phrase.</p>
+<h2 id="function-thinking"><a class="header" href="#function-thinking">Function: <code>thinking()</code></a></h2>
+<p>Indicate that the system is thinking.</p>
+<h2 id="function-farewell"><a class="header" href="#function-farewell">Function: <code>farewell()</code></a></h2>
+<p>Speak a farewell phrase.</p>
+<h2 id="function-test_voices"><a class="header" href="#function-test_voices">Function: <code>test_voices()</code></a></h2>
+<p>Test all available voices with a sample phrase.</p>
+<h2 id="function-test_neural_voice"><a class="header" href="#function-test_neural_voice">Function: <code>test_neural_voice()</code></a></h2>
+<p>Test the neural voice model specifically.</p>
+<h2 id="function-reload_voice_model"><a class="header" href="#function-reload_voice_model">Function: <code>reload_voice_model()</code></a></h2>
+<p>Reload the active voice model (useful if a new model was just created).</p>
+<h2 id="function-is_neural_voice_active"><a class="header" href="#function-is_neural_voice_active">Function: <code>is_neural_voice_active()</code></a></h2>
+<p>Check if a neural voice model is active.</p>
+<pre><code>Returns:
+    Boolean indicating if neural voice is active
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="trigger_detection"><a class="header" href="#trigger_detection">trigger_detection</a></h1>
+<p>Trigger word detection module for voice control system.
+Detects command and dictation trigger words in audio.</p>
+<p>Source: <code>audio/trigger_detection.py</code></p>
+<h2 id="class-triggerdetector"><a class="header" href="#class-triggerdetector">Class: TriggerDetector</a></h2>
+<p>Detects trigger words in audio to activate command or dictation modes.</p>
+<h2 id="function-__init__self-whisper_modelnone"><a class="header" href="#function-__init__self-whisper_modelnone">Function: <code>__init__(self, whisper_model=None)</code></a></h2>
+<p>Initialize the trigger detector.</p>
+<pre><code>    Args:
+        whisper_model: Pre-loaded Whisper model to use (will load if not provided)
+</code></pre>
+<h2 id="function-ensure_modelself"><a class="header" href="#function-ensure_modelself">Function: <code>ensure_model(self)</code></a></h2>
+<p>Ensure Whisper model is loaded.</p>
+<h2 id="function-process_audio_bufferself-audio_buffer"><a class="header" href="#function-process_audio_bufferself-audio_buffer">Function: <code>process_audio_buffer(self, audio_buffer)</code></a></h2>
+<p>Process audio buffer to detect trigger words.</p>
+<pre><code>    Args:
+        audio_buffer: List of audio frames to process
+        
+    Returns:
+        dict: Detection results with trigger type and transcription
+</code></pre>
+<h2 id="function-detect_triggersself-transcription"><a class="header" href="#function-detect_triggersself-transcription">Function: <code>detect_triggers(self, transcription)</code></a></h2>
+<p>Detect trigger words in transcription.</p>
+<pre><code>    Args:
+        transcription: Transcribed text to check for trigger words
+        
+    Returns:
+        dict: Detection results with trigger type and transcription
+</code></pre>
+<h2 id="function-handle_detectionself-detection_result"><a class="header" href="#function-handle_detectionself-detection_result">Function: <code>handle_detection(self, detection_result)</code></a></h2>
+<p>Handle a detected trigger by starting appropriate mode.</p>
+<pre><code>    Args:
+        detection_result: Dict with detection results
+        
+    Returns:
+        bool: True if trigger was handled, False otherwise
+</code></pre>
+<h2 id="function-_start_recording_threadself-mode-forcefalse"><a class="header" href="#function-_start_recording_threadself-mode-forcefalse">Function: <code>_start_recording_thread(self, mode, force=False)</code></a></h2>
+<p>Start a recording thread with specified mode.</p>
+<pre><code>    Args:
+        mode: Either 'command' or 'dictation'
+        force: If True, will force start recording even if already recording
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="voice_training"><a class="header" href="#voice_training">voice_training</a></h1>
+<p>Voice training utility for whisper-yabai-mac-os-x.
+This script records samples of your voice saying trigger words and commands,
+then uses them to help optimize recognition settings and create custom voice models.</p>
+<p>Source: <code>audio/voice_training.py</code></p>
+<h2 id="function-ensure_directories"><a class="header" href="#function-ensure_directories">Function: <code>ensure_directories()</code></a></h2>
+<p>Make sure the necessary directories exist.</p>
+<h2 id="function-record_sampleseconds-float--30-prompt-str--none-interactive-bool--true"><a class="header" href="#function-record_sampleseconds-float--30-prompt-str--none-interactive-bool--true">Function: <code>record_sample(seconds: float = 3.0, prompt: str = None, interactive: bool = True)</code></a></h2>
+<p>Record an audio sample of specified length.</p>
+<pre><code>Args:
+    seconds: Length of recording in seconds
+    prompt: Optional text to display before recording
+    interactive: Whether to wait for user input before recording
+    
+Returns:
+    Path to the recorded WAV file
+</code></pre>
+<h2 id="function-create_voice_modelname-str--default_voice_model-samples-liststr--none"><a class="header" href="#function-create_voice_modelname-str--default_voice_model-samples-liststr--none">Function: <code>create_voice_model(name: str = DEFAULT_VOICE_MODEL, samples: List[str] = None)</code></a></h2>
+<p>Create a custom voice model using existing voice samples.</p>
+<pre><code>Args:
+    name: Name for the voice model
+    samples: List of WAV file paths with voice samples (if None, uses all training samples)
+    
+Returns:
+    Path to the created voice model directory
+</code></pre>
+<h2 id="function-install_voice_modelname-str--default_voice_model"><a class="header" href="#function-install_voice_modelname-str--default_voice_model">Function: <code>install_voice_model(name: str = DEFAULT_VOICE_MODEL)</code></a></h2>
+<p>Install a custom voice model to be used by the system.</p>
+<pre><code>Args:
+    name: Name of the voice model to install
+    
+Returns:
+    Boolean indicating success
+</code></pre>
+<h2 id="function-create_backup_zipsamples_dir-str--training_dir"><a class="header" href="#function-create_backup_zipsamples_dir-str--training_dir">Function: <code>create_backup_zip(samples_dir: str = TRAINING_DIR)</code></a></h2>
+<p>Create a backup zip file of all recorded samples.</p>
+<pre><code>Args:
+    samples_dir: Directory containing samples to backup
+    
+Returns:
+    Path to the created zip file
+</code></pre>
+<h2 id="function-main"><a class="header" href="#function-main">Function: <code>main()</code></a></h2>
+<p>Main function for voice training.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="config"><a class="header" href="#config">config</a></h1>
+<p>Configuration management system for the voice control application.
+Centralizes configuration from environment variables, settings files, and defaults.</p>
+<p>Source: <code>config/config.py</code></p>
+<h2 id="class-config"><a class="header" href="#class-config">Class: Config</a></h2>
+<p>Centralized configuration for voice control system.
+Implements the Singleton pattern to ensure consistent configuration across modules.</p>
+<h2 id="function-__init__self-resetfalse"><a class="header" href="#function-__init__self-resetfalse">Function: <code>__init__(self, reset=False)</code></a></h2>
+<p>Initialize configuration if not already initialized.</p>
+<pre><code>    Args:
+        reset: If True, force reinitialization (for testing)
+</code></pre>
+<h2 id="function-_load_defaultsself"><a class="header" href="#function-_load_defaultsself">Function: <code>_load_defaults(self)</code></a></h2>
+<p>Load default configuration values.</p>
+<h2 id="function-_load_from_envself"><a class="header" href="#function-_load_from_envself">Function: <code>_load_from_env(self)</code></a></h2>
+<p>Load configuration from environment variables.</p>
+<h2 id="function-_load_from_filesself"><a class="header" href="#function-_load_from_filesself">Function: <code>_load_from_files(self)</code></a></h2>
+<p>Load configuration from JSON files.</p>
+<h2 id="function-getself-key-str-default-any--none"><a class="header" href="#function-getself-key-str-default-any--none">Function: <code>get(self, key: str, default: Any = None)</code></a></h2>
+<p>Get configuration value by key.</p>
+<pre><code>    Args:
+        key: Configuration key
+        default: Default value if key is not found
+        
+    Returns:
+        Configuration value or default
+</code></pre>
+<h2 id="function-setself-key-str-value-any"><a class="header" href="#function-setself-key-str-value-any">Function: <code>set(self, key: str, value: Any)</code></a></h2>
+<p>Set configuration value.</p>
+<pre><code>    Args:
+        key: Configuration key
+        value: Configuration value
+</code></pre>
+<h2 id="function-save_to_fileself-filepath-optionalstr--none"><a class="header" href="#function-save_to_fileself-filepath-optionalstr--none">Function: <code>save_to_file(self, filepath: Optional[str] = None)</code></a></h2>
+<p>Save current configuration to a JSON file.</p>
+<pre><code>    Args:
+        filepath: Path to save configuration file (optional)
+        
+    Returns:
+        True if saved successfully, False otherwise
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="core_dictation"><a class="header" href="#core_dictation">core_dictation</a></h1>
+<p>Core dictation processing module for voice control system.
+Provides common functionality for all dictation implementations.</p>
+<p>Source: <code>core/core_dictation.py</code></p>
+<h2 id="class-coredictationprocessor"><a class="header" href="#class-coredictationprocessor">Class: CoreDictationProcessor</a></h2>
+<p>Core dictation functionality used by all dictation implementations.
+Handles text typing using multiple fallback methods.</p>
+<h2 id="function-__init__self-1"><a class="header" href="#function-__init__self-1">Function: <code>__init__(self)</code></a></h2>
+<p>Initialize core dictation processor.</p>
+<h2 id="function-type_textself-transcription-str"><a class="header" href="#function-type_textself-transcription-str">Function: <code>type_text(self, transcription: str)</code></a></h2>
+<p>Type text using multiple fallback methods.</p>
+<pre><code>    Args:
+        transcription: The text to type
+        
+    Returns:
+        bool: True if text was typed successfully
+</code></pre>
+<h2 id="function-_type_with_applescriptself-text-str"><a class="header" href="#function-_type_with_applescriptself-text-str">Function: <code>_type_with_applescript(self, text: str)</code></a></h2>
+<p>Type text using AppleScript (most reliable on macOS).</p>
+<pre><code>    Args:
+        text: Text to type
+        
+    Returns:
+        bool: True if successful
+</code></pre>
+<h2 id="function-_type_with_clipboardself-text-str"><a class="header" href="#function-_type_with_clipboardself-text-str">Function: <code>_type_with_clipboard(self, text: str)</code></a></h2>
+<p>Type text using clipboard (pbcopy + cmd+v).</p>
+<pre><code>    Args:
+        text: Text to type
+        
+    Returns:
+        bool: True if successful
+</code></pre>
+<h2 id="function-_type_with_pyautoguiself-text-str"><a class="header" href="#function-_type_with_pyautoguiself-text-str">Function: <code>_type_with_pyautogui(self, text: str)</code></a></h2>
+<p>Type text using PyAutoGUI direct typing.</p>
+<pre><code>    Args:
+        text: Text to type
+        
+    Returns:
+        bool: True if successful
+</code></pre>
+<h2 id="function-_log_dictationself-text-str"><a class="header" href="#function-_log_dictationself-text-str">Function: <code>_log_dictation(self, text: str)</code></a></h2>
+<p>Log dictation text to file.</p>
+<pre><code>    Args:
+        text: Text to log
+</code></pre>
+<h2 id="function-_play_completion_soundself"><a class="header" href="#function-_play_completion_soundself">Function: <code>_play_completion_sound(self)</code></a></h2>
+<p>Play a sound to indicate dictation is complete.</p>
+<h2 id="function-_notify_dictation_completeself-text-str-success-bool"><a class="header" href="#function-_notify_dictation_completeself-text-str-success-bool">Function: <code>_notify_dictation_complete(self, text: str, success: bool)</code></a></h2>
+<p>Show notification for completed dictation.</p>
+<pre><code>    Args:
+        text: The transcribed text
+        success: Whether typing was successful
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="error_handler"><a class="header" href="#error_handler">error_handler</a></h1>
+<p>Error handling utilities for the voice control system.
+Provides consistent error handling patterns across modules.</p>
+<p>Source: <code>core/error_handler.py</code></p>
+<h2 id="function-handle_error"><a class="header" href="#function-handle_error">Function: `handle_error(</a></h2>
+<pre><code>error: Exception,
+logger: logging.Logger,
+context: str = "",
+notification_text: Optional[str] = None,
+should_raise: bool = False,
+fallback_action: Optional[Callable[[], Any]] = None
+</code></pre>
+<p>)`</p>
+<p>Standardized error handling across the application.</p>
+<pre><code>Args:
+    error: The exception that was raised
+    logger: The module-specific logger to use
+    context: Optional context about where the error occurred
+    notification_text: Text to show in notification (if None, no notification)
+    should_raise: Whether to re-raise the exception after handling
+    fallback_action: Optional function to call as a fallback
+</code></pre>
+<h2 id="function-safe_execute"><a class="header" href="#function-safe_execute">Function: `safe_execute(</a></h2>
+<pre><code>func: Callable,
+logger: logging.Logger,
+context: str = "",
+error_message: str = "Operation failed",
+notification: bool = False,
+should_raise: bool = False,
+fallback_action: Optional[Callable[[], Any]] = None,
+args: List = None,
+kwargs: Dict = None
+</code></pre>
+<p>)`</p>
+<p>Execute a function with standardized error handling.</p>
+<pre><code>Args:
+    func: The function to execute
+    logger: The module-specific logger to use
+    context: Optional context about the operation
+    error_message: Message to log/notify on error
+    notification: Whether to show notification on error
+    should_raise: Whether to re-raise exception
+    fallback_action: Optional function to call on error
+    args: Positional arguments to pass to the function
+    kwargs: Keyword arguments to pass to the function
+    
+Returns:
+    The result of the function call, or None on error
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="logging_config"><a class="header" href="#logging_config">logging_config</a></h1>
+<p>Centralized logging configuration for the voice control system.
+Configures consistent logging across all modules.</p>
+<p>Source: <code>core/logging_config.py</code></p>
+<h2 id="function-configure_logginglog_level-optionalstr--none-log_file-optionalstr--none"><a class="header" href="#function-configure_logginglog_level-optionalstr--none-log_file-optionalstr--none">Function: <code>configure_logging(log_level: Optional[str] = None, log_file: Optional[str] = None)</code></a></h2>
+<p>Configure logging for the entire application.</p>
+<pre><code>Args:
+    log_level: Override log level from config
+    log_file: Override log file from config
+</code></pre>
+<h2 id="function-configure_module_loggersmodule_levels"><a class="header" href="#function-configure_module_loggersmodule_levels">Function: <code>configure_module_loggers(module_levels)</code></a></h2>
+<p>Configure log levels for specific modules.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="state_manager"><a class="header" href="#state_manager">state_manager</a></h1>
+<p>State manager for the voice control system.
+Centralizes state management to avoid global variables.</p>
+<p>Source: <code>core/state_manager.py</code></p>
+<h2 id="class-statemanager"><a class="header" href="#class-statemanager">Class: StateManager</a></h2>
+<p>Manages application state for the voice control system.</p>
+<h2 id="function-start_recordingself"><a class="header" href="#function-start_recordingself">Function: <code>start_recording(self)</code></a></h2>
+<p>Set recording state to True and record start time.</p>
+<h2 id="function-stop_recordingself-1"><a class="header" href="#function-stop_recordingself-1">Function: <code>stop_recording(self)</code></a></h2>
+<p>Set recording state to False.</p>
+<h2 id="function-toggle_muteself"><a class="header" href="#function-toggle_muteself">Function: <code>toggle_mute(self)</code></a></h2>
+<p>Toggle mute state and notify listeners.</p>
+<h2 id="function-is_recordingself"><a class="header" href="#function-is_recordingself">Function: <code>is_recording(self)</code></a></h2>
+<p>Check if currently recording.</p>
+<h2 id="function-is_mutedself"><a class="header" href="#function-is_mutedself">Function: <code>is_muted(self)</code></a></h2>
+<p>Check if system is muted.</p>
+<h2 id="function-set_key_stateself-key_name-state"><a class="header" href="#function-set_key_stateself-key_name-state">Function: <code>set_key_state(self, key_name, state)</code></a></h2>
+<p>Set state for a specific key.</p>
+<h2 id="function-check_hotkeyself-keys"><a class="header" href="#function-check_hotkeyself-keys">Function: <code>check_hotkey(self, *keys)</code></a></h2>
+<p>Check if a combination of keys is pressed.</p>
+<h2 id="function-enqueue_audioself-audio_file-is_dictationfalse-is_triggerfalse"><a class="header" href="#function-enqueue_audioself-audio_file-is_dictationfalse-is_triggerfalse">Function: <code>enqueue_audio(self, audio_file, is_dictation=False, is_trigger=False)</code></a></h2>
+<p>Add audio file to processing queue.</p>
+<h2 id="function-get_next_audioself-blocktrue-timeoutnone"><a class="header" href="#function-get_next_audioself-blocktrue-timeoutnone">Function: <code>get_next_audio(self, block=True, timeout=None)</code></a></h2>
+<p>Get next audio file from queue.</p>
+<h2 id="function-on_mute_changeself-callback"><a class="header" href="#function-on_mute_changeself-callback">Function: <code>on_mute_change(self, callback)</code></a></h2>
+<p>Register callback for mute state changes.</p>
+<h2 id="function-on_recording_changeself-callback"><a class="header" href="#function-on_recording_changeself-callback">Function: <code>on_recording_change(self, callback)</code></a></h2>
+<p>Register callback for recording state changes.</p>
+<h2 id="function-_notify_recording_changeself"><a class="header" href="#function-_notify_recording_changeself">Function: <code>_notify_recording_change(self)</code></a></h2>
+<p>Notify callbacks of recording state change.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="daemon"><a class="header" href="#daemon">daemon</a></h1>
+<p>Voice command daemon using Whisper and Yabai for Mac OS X control.
+Unified version combining features of original and refactored implementations.</p>
+<p>Source: <code>daemon.py</code></p>
+<h2 id="class-voicecontroldaemon"><a class="header" href="#class-voicecontroldaemon">Class: VoiceControlDaemon</a></h2>
+<p>Main daemon class for voice control system.</p>
+<h2 id="function-__init__self-2"><a class="header" href="#function-__init__self-2">Function: <code>__init__(self)</code></a></h2>
+<p>Initialize the daemon.</p>
+<h2 id="function-_setup_loggingself"><a class="header" href="#function-_setup_loggingself">Function: <code>_setup_logging(self)</code></a></h2>
+<p>Set up logging configuration.</p>
+<h2 id="function-startself-2"><a class="header" href="#function-startself-2">Function: <code>start(self)</code></a></h2>
+<p>Start the daemon.</p>
+<h2 id="function-stopself-2"><a class="header" href="#function-stopself-2">Function: <code>stop(self)</code></a></h2>
+<p>Stop the daemon.</p>
+<h2 id="function-_signal_handlerself-sig-frame"><a class="header" href="#function-_signal_handlerself-sig-frame">Function: <code>_signal_handler(self, sig, frame)</code></a></h2>
+<p>Handle termination signals.</p>
+<h2 id="function-_initialize_componentsself"><a class="header" href="#function-_initialize_componentsself">Function: <code>_initialize_components(self)</code></a></h2>
+<p>Initialize all system components.</p>
+<h2 id="function-_show_startup_bannerself"><a class="header" href="#function-_show_startup_bannerself">Function: <code>_show_startup_banner(self)</code></a></h2>
+<p>Show startup banner with system information.</p>
+<h2 id="function-_delayed_startself"><a class="header" href="#function-_delayed_startself">Function: <code>_delayed_start(self)</code></a></h2>
+<p>Start continuous listening after a delay.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="permissions_check"><a class="header" href="#permissions_check">permissions_check</a></h1>
+<p>Simple utility script to check for and request necessary permissions
+for the voice control daemon to function properly.</p>
+<p>Source: <code>permissions_check.py</code></p>
+<h2 id="function-check_microphone_permission"><a class="header" href="#function-check_microphone_permission">Function: <code>check_microphone_permission()</code></a></h2>
+<p>Check if we have microphone access.</p>
+<h2 id="function-check_accessibility_permission"><a class="header" href="#function-check_accessibility_permission">Function: <code>check_accessibility_permission()</code></a></h2>
+<p>Check if we have accessibility access by testing keyboard monitoring.</p>
+<h2 id="function-main-1"><a class="header" href="#function-main-1">Function: <code>main()</code></a></h2>
+<p>Main function to perform permission checks.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="toast_notifications"><a class="header" href="#toast_notifications">toast_notifications</a></h1>
+<p>Toast notification module for macOS.
+Provides visual and audible feedback for voice control actions.
+Uses osascript to display notifications for maximum compatibility.</p>
+<p>Source: <code>ui/toast_notifications.py</code></p>
+<h2 id="function-send_notificationtitle-str-message-str-identifier-optionalstr--none"><a class="header" href="#function-send_notificationtitle-str-message-str-identifier-optionalstr--none">Function: `send_notification(title: str, message: str, identifier: Optional[str] = None,</a></h2>
+<pre><code>                 timeout: int = 5, sound: bool = True)`
+</code></pre>
+<p>Send a macOS notification.</p>
+<pre><code>Args:
+    title: The notification title
+    message: The notification message
+    identifier: Optional unique identifier for the notification (for updating/removing)
+    timeout: Auto-dismiss after this many seconds (0 = don't auto-dismiss)
+    sound: Whether to play a sound with the notification
+
+Returns:
+    The notification identifier
+</code></pre>
+<h2 id="function-update_notificationidentifier-str-title-str-message-str"><a class="header" href="#function-update_notificationidentifier-str-title-str-message-str">Function: `update_notification(identifier: str, title: str, message: str,</a></h2>
+<pre><code>                   timeout: int = 5, sound: bool = False)`
+</code></pre>
+<p>Update an existing notification or create a new one if it doesn't exist.</p>
+<pre><code>Args:
+    identifier: The notification identifier to update
+    title: The new notification title
+    message: The new notification message
+    timeout: Reset auto-dismiss timer to this many seconds (0 = don't auto-dismiss)
+    sound: Whether to play a sound with the notification
+    
+Returns:
+    The notification identifier
+</code></pre>
+<h2 id="function-remove_notificationidentifier-str"><a class="header" href="#function-remove_notificationidentifier-str">Function: <code>remove_notification(identifier: str)</code></a></h2>
+<p>Remove a notification by its identifier.</p>
+<pre><code>Args:
+    identifier: The notification identifier to remove
+</code></pre>
+<h2 id="function-remove_all_notifications"><a class="header" href="#function-remove_all_notifications">Function: <code>remove_all_notifications()</code></a></h2>
+<p>Remove all active notifications.</p>
+<h2 id="function-notify_listeningtimeout-int--10"><a class="header" href="#function-notify_listeningtimeout-int--10">Function: <code>notify_listening(timeout: int = 10)</code></a></h2>
+<p>Show a notification that we're listening for commands.</p>
+<h2 id="function-notify_processingtimeout-int--30"><a class="header" href="#function-notify_processingtimeout-int--30">Function: <code>notify_processing(timeout: int = 30)</code></a></h2>
+<p>Show a notification that we're processing audio.</p>
+<h2 id="function-notify_command_executedcommand-str-timeout-int--5"><a class="header" href="#function-notify_command_executedcommand-str-timeout-int--5">Function: <code>notify_command_executed(command: str, timeout: int = 5)</code></a></h2>
+<p>Show a notification that a command was executed.</p>
+<h2 id="function-notify_errorerror_msg-str-timeout-int--10"><a class="header" href="#function-notify_errorerror_msg-str-timeout-int--10">Function: <code>notify_error(error_msg: str, timeout: int = 10)</code></a></h2>
+<p>Show an error notification.</p>
+<h2 id="function-test_notifications"><a class="header" href="#function-test_notifications">Function: <code>test_notifications()</code></a></h2>
+<p>Test the notification system.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="assistant"><a class="header" href="#assistant">assistant</a></h1>
+<p>Conversational assistant module for the voice control system.
+Provides JARVIS-like conversational interface with speech synthesis and recognition.</p>
+<p>Source: <code>utils/assistant.py</code></p>
+<h2 id="function-add_to_memoryrole-str-content-str"><a class="header" href="#function-add_to_memoryrole-str-content-str">Function: <code>add_to_memory(role: str, content: str)</code></a></h2>
+<p>Add an interaction to the conversation memory.</p>
+<pre><code>Args:
+    role: Either 'user' or 'assistant'
+    content: The message content
+</code></pre>
+<h2 id="function-get_memory_as_string"><a class="header" href="#function-get_memory_as_string">Function: <code>get_memory_as_string()</code></a></h2>
+<p>Get the conversation memory as a formatted string.</p>
+<pre><code>Returns:
+    A string with the recent conversation history
+</code></pre>
+<h2 id="function-activate_assistantvoice-str--none"><a class="header" href="#function-activate_assistantvoice-str--none">Function: <code>activate_assistant(voice: str = None)</code></a></h2>
+<p>Activate the assistant and announce its presence.</p>
+<pre><code>Args:
+    voice: Optional voice to use (if None, uses current voice)
+</code></pre>
+<h2 id="function-deactivate_assistant"><a class="header" href="#function-deactivate_assistant">Function: <code>deactivate_assistant()</code></a></h2>
+<p>Deactivate the assistant with a farewell message.</p>
+<h2 id="function-handle_user_inputtext-str"><a class="header" href="#function-handle_user_inputtext-str">Function: <code>handle_user_input(text: str)</code></a></h2>
+<p>Process user input and generate appropriate response.</p>
+<pre><code>Args:
+    text: The user's transcribed speech
+    
+Returns:
+    Assistant's response text
+</code></pre>
+<h2 id="function-execute_commandcommand_name-str-full_text-str"><a class="header" href="#function-execute_commandcommand_name-str-full_text-str">Function: <code>execute_command(command_name: str, full_text: str)</code></a></h2>
+<p>Execute a named command based on the user's input.</p>
+<pre><code>Args:
+    command_name: The function name to call
+    full_text: The user's full input text
+    
+Returns:
+    The assistant's response
+</code></pre>
+<h2 id="function-get_time"><a class="header" href="#function-get_time">Function: <code>get_time()</code></a></h2>
+<p>Get the current time as a human-readable string.</p>
+<h2 id="function-get_date"><a class="header" href="#function-get_date">Function: <code>get_date()</code></a></h2>
+<p>Get the current date as a human-readable string.</p>
+<h2 id="function-get_weather"><a class="header" href="#function-get_weather">Function: <code>get_weather()</code></a></h2>
+<p>Get the current weather (placeholder for now).</p>
+<h2 id="function-get_status"><a class="header" href="#function-get_status">Function: <code>get_status()</code></a></h2>
+<p>Get the system status.</p>
+<h2 id="function-get_status_personal"><a class="header" href="#function-get_status_personal">Function: <code>get_status_personal()</code></a></h2>
+<p>Respond to 'how are you' type questions.</p>
+<h2 id="function-tell_joke"><a class="header" href="#function-tell_joke">Function: <code>tell_joke()</code></a></h2>
+<p>Tell a random joke.</p>
+<h2 id="function-identify_self"><a class="header" href="#function-identify_self">Function: <code>identify_self()</code></a></h2>
+<p>Identify the assistant.</p>
+<h2 id="function-list_abilities"><a class="header" href="#function-list_abilities">Function: <code>list_abilities()</code></a></h2>
+<p>List what the assistant can do.</p>
+<h2 id="function-update_statusstatus-str"><a class="header" href="#function-update_statusstatus-str">Function: <code>update_status(status: str)</code></a></h2>
+<p>Update the status display in the terminal.</p>
+<pre><code>Args:
+    status: The status message to display
+</code></pre>
+<h2 id="function-process_voice_commandtranscription-str"><a class="header" href="#function-process_voice_commandtranscription-str">Function: <code>process_voice_command(transcription: str)</code></a></h2>
+<p>Process a voice command from the main voice control system.</p>
+<pre><code>Args:
+    transcription: The transcribed user speech
+</code></pre>
+<h2 id="function-should_timeout"><a class="header" href="#function-should_timeout">Function: <code>should_timeout()</code></a></h2>
+<p>Check if the assistant should timeout due to inactivity.</p>
+<pre><code>Returns:
+    True if the assistant should timeout, False otherwise
+    
+Note:
+    Timeout occurs exactly at TIMEOUT_SECONDS after last interaction.
+    This function is designed to be testable with mock time.time() patches.
+</code></pre>
+<h2 id="function-check_timeout_thread"><a class="header" href="#function-check_timeout_thread">Function: <code>check_timeout_thread()</code></a></h2>
+<p>Thread to check for assistant timeouts.</p>
+<h2 id="function-init_assistant"><a class="header" href="#function-init_assistant">Function: <code>init_assistant()</code></a></h2>
+<p>Initialize the assistant module.</p>
+<h2 id="function-test_assistant"><a class="header" href="#function-test_assistant">Function: <code>test_assistant()</code></a></h2>
+<p>Run comprehensive tests for the assistant functionality.</p>
+<pre><code>This implements a TDD approach to verify all functionality works.
+</code></pre>
+<h2 id="function-run_testname-func"><a class="header" href="#function-run_testname-func">Function: <code>run_test(name, func)</code></a></h2>
+<p>Run a single test and report results</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="command_processor"><a class="header" href="#command_processor">command_processor</a></h1>
+<p>Command processor module for voice control system.
+Executes system commands based on voice input.</p>
+<p>Source: <code>utils/command_processor.py</code></p>
+<h2 id="class-commandprocessor"><a class="header" href="#class-commandprocessor">Class: CommandProcessor</a></h2>
+<p>Processes voice commands and executes corresponding actions.</p>
+<h2 id="function-__init__self-3"><a class="header" href="#function-__init__self-3">Function: <code>__init__(self)</code></a></h2>
+<p>Initialize command processor.</p>
+<h2 id="function-load_commandsself"><a class="header" href="#function-load_commandsself">Function: <code>load_commands(self)</code></a></h2>
+<p>Load command mappings from config/commands.json if it exists.</p>
+<h2 id="function-has_commandself-command"><a class="header" href="#function-has_commandself-command">Function: <code>has_command(self, command)</code></a></h2>
+<p>Check if a command exists.</p>
+<pre><code>    Args:
+        command: Command name to check
+        
+    Returns:
+        bool: True if command exists, False otherwise
+</code></pre>
+<h2 id="function-executeself-command-args"><a class="header" href="#function-executeself-command-args">Function: <code>execute(self, command, args)</code></a></h2>
+<p>Execute a command with args.</p>
+<pre><code>    Args:
+        command: Command to execute
+        args: Arguments for the command
+        
+    Returns:
+        bool: True if command executed successfully
+</code></pre>
+<h2 id="function-parse_and_executeself-text"><a class="header" href="#function-parse_and_executeself-text">Function: <code>parse_and_execute(self, text)</code></a></h2>
+<p>Parse and execute a command string.</p>
+<pre><code>    Args:
+        text: Command text to parse
+        
+    Returns:
+        bool: True if command executed successfully
+</code></pre>
+<h2 id="function-execute_shell_commandself-command"><a class="header" href="#function-execute_shell_commandself-command">Function: <code>execute_shell_command(self, command)</code></a></h2>
+<p>Execute a shell command.</p>
+<pre><code>    Args:
+        command: Shell command to execute
+        
+    Returns:
+        bool: True if command succeeded, False otherwise
+</code></pre>
+<h2 id="function-open_applicationself-args"><a class="header" href="#function-open_applicationself-args">Function: <code>open_application(self, args)</code></a></h2>
+<p>Open an application.</p>
+<pre><code>    Args:
+        args: List of arguments, first being the app name
+        
+    Returns:
+        bool: True if application opened successfully
+</code></pre>
+<h2 id="function-focus_applicationself-args"><a class="header" href="#function-focus_applicationself-args">Function: <code>focus_application(self, args)</code></a></h2>
+<p>Focus on an application using Yabai.</p>
+<pre><code>    Args:
+        args: List of arguments, first being the app name
+        
+    Returns:
+        bool: True if application focused successfully
+</code></pre>
+<h2 id="function-type_textself-args"><a class="header" href="#function-type_textself-args">Function: <code>type_text(self, args)</code></a></h2>
+<p>Type text.</p>
+<pre><code>    Args:
+        args: List of arguments, joined to form the text to type
+        
+    Returns:
+        bool: True if text typed successfully
+</code></pre>
+<h2 id="function-move_windowself-args"><a class="header" href="#function-move_windowself-args">Function: <code>move_window(self, args)</code></a></h2>
+<p>Move the focused window to a position.</p>
+<pre><code>    Args:
+        args: List of arguments, first being the direction
+        
+    Returns:
+        bool: True if window moved successfully
+</code></pre>
+<h2 id="function-resize_windowself-args"><a class="header" href="#function-resize_windowself-args">Function: <code>resize_window(self, args)</code></a></h2>
+<p>Resize the focused window.</p>
+<pre><code>    Args:
+        args: List of arguments, first being the direction
+        
+    Returns:
+        bool: True if window resized successfully
+</code></pre>
+<h2 id="function-move_to_spaceself-args"><a class="header" href="#function-move_to_spaceself-args">Function: <code>move_to_space(self, args)</code></a></h2>
+<p>Move the focused window to a space.</p>
+<pre><code>    Args:
+        args: List of arguments, first being the space number
+        
+    Returns:
+        bool: True if window moved successfully
+</code></pre>
+<h2 id="function-maximize_windowself-args"><a class="header" href="#function-maximize_windowself-args">Function: <code>maximize_window(self, args)</code></a></h2>
+<p>Maximize the focused window.</p>
+<pre><code>    Args:
+        args: List of arguments (not used)
+        
+    Returns:
+        bool: True if window maximized successfully
+</code></pre>
+<h2 id="function-close_windowself-args"><a class="header" href="#function-close_windowself-args">Function: <code>close_window(self, args)</code></a></h2>
+<p>Close the focused window.</p>
+<pre><code>    Args:
+        args: List of arguments (not used)
+        
+    Returns:
+        bool: True if window closed successfully
+</code></pre>
+<h2 id="function-click_mouseself-args"><a class="header" href="#function-click_mouseself-args">Function: <code>click_mouse(self, args)</code></a></h2>
+<p>Click the mouse at the current position.</p>
+<pre><code>    Args:
+        args: List of arguments (not used)
+        
+    Returns:
+        bool: True if mouse clicked successfully
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="dictation"><a class="header" href="#dictation">dictation</a></h1>
+<p>Dictation processing module for voice control system.
+Converts speech to text and types it at the cursor position.</p>
+<p>Source: <code>utils/dictation.py</code></p>
+<h2 id="class-dictationprocessor"><a class="header" href="#class-dictationprocessor">Class: DictationProcessor</a></h2>
+<p>Process dictation by typing text at cursor.
+Extends core dictation with additional functionality.</p>
+<h2 id="function-__init__self-4"><a class="header" href="#function-__init__self-4">Function: <code>__init__(self)</code></a></h2>
+<p>Initialize dictation processor.</p>
+<h2 id="function-processself-transcription-str"><a class="header" href="#function-processself-transcription-str">Function: <code>process(self, transcription: str)</code></a></h2>
+<p>Process dictation by typing text at cursor.</p>
+<pre><code>    Args:
+        transcription: The text to type
+    
+    Returns:
+        bool: True if dictation was processed successfully
+</code></pre>
+<h2 id="function-_preprocess_textself-text-str"><a class="header" href="#function-_preprocess_textself-text-str">Function: <code>_preprocess_text(self, text: str)</code></a></h2>
+<p>Pre-process text before typing.
+Handles capitalization, formatting, and other text transformations.</p>
+<pre><code>    Args:
+        text: Raw transcription text
+        
+    Returns:
+        Processed text ready for typing
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="direct_typing"><a class="header" href="#direct_typing">direct_typing</a></h1>
+<p>Direct typing script that uses pure AppleScript to type text</p>
+<p>Source: <code>utils/direct_typing.py</code></p>
+<h2 id="function-type_texttext"><a class="header" href="#function-type_texttext">Function: <code>type_text(text)</code></a></h2>
+<p>Type text using pure AppleScript - no clipboard involved</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="hotkey_manager"><a class="header" href="#hotkey_manager">hotkey_manager</a></h1>
+<p>Hotkey manager for voice control system.
+Manages keyboard shortcuts for system control.</p>
+<p>Source: <code>utils/hotkey_manager.py</code></p>
+<h2 id="class-hotkeymanager"><a class="header" href="#class-hotkeymanager">Class: HotkeyManager</a></h2>
+<p>Manages keyboard hotkeys for voice control system.</p>
+<h2 id="function-__init__self-5"><a class="header" href="#function-__init__self-5">Function: <code>__init__(self)</code></a></h2>
+<p>Initialize the hotkey manager.</p>
+<h2 id="function-startself-3"><a class="header" href="#function-startself-3">Function: <code>start(self)</code></a></h2>
+<p>Start listening for keyboard hotkeys.</p>
+<h2 id="function-stopself-3"><a class="header" href="#function-stopself-3">Function: <code>stop(self)</code></a></h2>
+<p>Stop listening for keyboard hotkeys.</p>
+<h2 id="function-_on_pressself-key"><a class="header" href="#function-_on_pressself-key">Function: <code>_on_press(self, key)</code></a></h2>
+<p>Handle key press events.</p>
+<pre><code>    Args:
+        key: The key that was pressed
+</code></pre>
+<h2 id="function-_on_releaseself-key"><a class="header" href="#function-_on_releaseself-key">Function: <code>_on_release(self, key)</code></a></h2>
+<p>Handle key release events.</p>
+<pre><code>    Args:
+        key: The key that was released
+    
+    Returns:
+        bool: False if the listener should stop, True otherwise
+</code></pre>
+<h2 id="function-_toggle_muteself"><a class="header" href="#function-_toggle_muteself">Function: <code>_toggle_mute(self)</code></a></h2>
+<p>Toggle mute state.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="llm_interpreter"><a class="header" href="#llm_interpreter">llm_interpreter</a></h1>
+<p>LLM-based interpreter for natural language commands.
+Uses llama.cpp to run local language models for command processing.</p>
+<p>Source: <code>utils/llm_interpreter.py</code></p>
+<h2 id="class-commandinterpreter"><a class="header" href="#class-commandinterpreter">Class: CommandInterpreter</a></h2>
+<p>Interprets natural language commands using a local LLM.
+Translates speech into structured command actions.</p>
+<h2 id="function-__init__self-model_path-optionalstr--none-n_ctx-int--4096"><a class="header" href="#function-__init__self-model_path-optionalstr--none-n_ctx-int--4096">Function: <code>__init__(self, model_path: Optional[str] = None, n_ctx: int = 4096)</code></a></h2>
+<p>Initialize the LLM-based command interpreter.</p>
+<h2 id="function-_determine_model_typeself"><a class="header" href="#function-_determine_model_typeself">Function: <code>_determine_model_type(self)</code></a></h2>
+<p>Determine the model type based on the filename.</p>
+<h2 id="function-_load_modelself"><a class="header" href="#function-_load_modelself">Function: <code>_load_model(self)</code></a></h2>
+<p>Load the LLM model.</p>
+<h2 id="function-_get_qwen_prompt_templateself-commands_list-text"><a class="header" href="#function-_get_qwen_prompt_templateself-commands_list-text">Function: <code>_get_qwen_prompt_template(self, commands_list, text)</code></a></h2>
+<p>Get prompt template optimized for Qwen models.</p>
+<h2 id="function-_get_deepseek_prompt_templateself-commands_list-text"><a class="header" href="#function-_get_deepseek_prompt_templateself-commands_list-text">Function: <code>_get_deepseek_prompt_template(self, commands_list, text)</code></a></h2>
+<p>Get prompt template optimized for DeepSeek models.</p>
+<h2 id="function-_get_llama_prompt_templateself-commands_list-text"><a class="header" href="#function-_get_llama_prompt_templateself-commands_list-text">Function: <code>_get_llama_prompt_template(self, commands_list, text)</code></a></h2>
+<p>Get prompt template for Llama-style models.</p>
+<h2 id="function-_get_qwen_dynamic_promptself-transcription"><a class="header" href="#function-_get_qwen_dynamic_promptself-transcription">Function: <code>_get_qwen_dynamic_prompt(self, transcription)</code></a></h2>
+<p>Get dynamic response prompt for Qwen models.</p>
+<h2 id="function-_get_deepseek_dynamic_promptself-transcription"><a class="header" href="#function-_get_deepseek_dynamic_promptself-transcription">Function: <code>_get_deepseek_dynamic_prompt(self, transcription)</code></a></h2>
+<p>Get dynamic response prompt for DeepSeek models.</p>
+<h2 id="function-_get_llama_dynamic_promptself-transcription"><a class="header" href="#function-_get_llama_dynamic_promptself-transcription">Function: <code>_get_llama_dynamic_prompt(self, transcription)</code></a></h2>
+<p>Get dynamic response prompt for Llama-style models.</p>
+<h2 id="function-_fix_json_stringself-json_str"><a class="header" href="#function-_fix_json_stringself-json_str">Function: <code>_fix_json_string(self, json_str)</code></a></h2>
+<p>Fix common JSON formatting issues in LLM responses.</p>
+<h2 id="function-_extract_key_valuesself-text"><a class="header" href="#function-_extract_key_valuesself-text">Function: <code>_extract_key_values(self, text)</code></a></h2>
+<p>Extract key-value pairs from text when JSON parsing fails.</p>
+<h2 id="function-test_interpreter"><a class="header" href="#function-test_interpreter">Function: <code>test_interpreter()</code></a></h2>
+<p>Test the command interpreter with sample commands.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="simple_dictation"><a class="header" href="#simple_dictation">simple_dictation</a></h1>
+<p>Simplified standalone dictation daemon.
+Uses core dictation functionality with simplified interface.</p>
+<p>Source: <code>utils/simple_dictation.py</code></p>
+<h2 id="class-simpleaudiorecorder"><a class="header" href="#class-simpleaudiorecorder">Class: SimpleAudioRecorder</a></h2>
+<p>Records audio from microphone with simplified interface.</p>
+<h2 id="function-transcribe_and_typeaudio_file-str"><a class="header" href="#function-transcribe_and_typeaudio_file-str">Function: <code>transcribe_and_type(audio_file: str)</code></a></h2>
+<p>Transcribe audio file using Whisper and type it.</p>
+<pre><code>Args:
+    audio_file: Path to audio file to transcribe
+</code></pre>
+<h2 id="function-on_presskey"><a class="header" href="#function-on_presskey">Function: <code>on_press(key)</code></a></h2>
+<p>Handle key press events.</p>
+<pre><code>Args:
+    key: The key that was pressed
+    
+Returns:
+    False to stop listener, None to continue
+</code></pre>
+<h2 id="function-on_releasekey"><a class="header" href="#function-on_releasekey">Function: <code>on_release(key)</code></a></h2>
+<p>Handle key release events.</p>
+<pre><code>Args:
+    key: The key that was released
+    
+Returns:
+    False to stop listener, None to continue
+</code></pre>
+<h2 id="function-show_banner"><a class="header" href="#function-show_banner">Function: <code>show_banner()</code></a></h2>
+<p>Show application banner and instructions.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="ultra_simple_dictation"><a class="header" href="#ultra_simple_dictation">ultra_simple_dictation</a></h1>
+<p>Ultra simplified dictation system.</p>
+<p>Source: <code>utils/ultra_simple_dictation.py</code></p>
+<h2 id="function-record_audioduration5"><a class="header" href="#function-record_audioduration5">Function: <code>record_audio(duration=5)</code></a></h2>
+<p>Record audio from microphone.</p>
+<h2 id="function-main-2"><a class="header" href="#function-main-2">Function: <code>main()</code></a></h2>
+<p>Run the simplified dictation program.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+
+
+        <script>
+            window.playground_line_numbers = true;
+        </script>
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+        <script src="ace.js"></script>
+        <script src="editor.js"></script>
+        <script src="mode-rust.js"></script>
+        <script src="theme-dawn.js"></script>
+        <script src="theme-tomorrow_night.js"></script>
+
+        <script src="elasticlunr.min.js"></script>
+        <script src="mark.min.js"></script>
+        <script src="searcher.js"></script>
+
+        <script src="clipboard.min.js"></script>
+        <script src="highlight.js"></script>
+        <script src="book.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="theme/custom.js"></script>
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+    </div>
+    </body>
+</html>
