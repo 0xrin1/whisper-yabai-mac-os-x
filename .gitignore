@@ -54,21 +54,25 @@ dictation_log.txt
 # Temporary files
 *.tmp
 
-# Test files (except for JARVIS test which should be included)
-src/test_clipboard.py
-src/test_dictation_flag.py
-src/test_e2e.py
-src/test_keyboard.py
-src/test_notifications.py
-src/test_trigger_words.py
-src/test_type_command.py
-src/test_typing_methods.py
-src/simple_dictation.py
-src/direct_typing.py
+# Utility files that shouldn't be committed
 src/direct_dictation.py
+src/utils/direct_typing.py
+
+# Test files (except for JARVIS test which should be included)
+src/tests/test_clipboard.py
+src/tests/test_dictation_flag.py
+src/tests/test_e2e.py
+src/tests/test_keyboard.py
+src/tests/test_notifications.py
+src/tests/test_trigger_words.py
+src/tests/test_type_command.py
+src/tests/test_typing_methods.py
 
 # Test logs
 test_logs_*/
+logs/
+tmp_neural_audio/
+neural_cache/
 
 # Ignore voice training samples and temp files
 training_samples/*.wav

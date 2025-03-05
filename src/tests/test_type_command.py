@@ -44,7 +44,10 @@ class TypeTriggerTest(unittest.TestCase):
         cls.temp_files = []
         
         # Create a directory to store test logs
-        cls.log_dir = f"test_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        logs_base_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs", "test_logs")
+        os.makedirs(logs_base_dir, exist_ok=True)
+        
+        cls.log_dir = os.path.join(logs_base_dir, f"test_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
         os.makedirs(cls.log_dir, exist_ok=True)
         
         # Create test phrase file for verification
