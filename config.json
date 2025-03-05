@@ -1,0 +1,36 @@
+{
+    "MODEL_SIZE": "tiny",
+    "COMMAND_TRIGGER": "hey",
+    "DICTATION_TRIGGER": "type",
+    "ASSISTANT_TRIGGER": "hey jarvis",
+    
+    "RECORDING_TIMEOUT": 7.0,
+    "DICTATION_TIMEOUT": 10.0,
+    "TRIGGER_TIMEOUT": 1.5,
+    
+    "COMMAND_SILENCE_THRESHOLD": 300,
+    "DICTATION_SILENCE_THRESHOLD": 400,
+    "TRIGGER_SILENCE_THRESHOLD": 500,
+    
+    "BUFFER_SECONDS": 5,
+    
+    "USE_LLM": true,
+    
+    "VOICE_NAME": "Daniel",
+    "VOICE_RATE": 220,
+    "VOICE_VOLUME": 1.0,
+    
+    "USE_NEURAL_VOICE": false,
+    
+    "LOG_LEVEL": "INFO",
+    "LOG_TO_FILE": true,
+    "LOG_FILE": "voice_control.log",
+    
+    "PLAY_COMPLETION_SOUND": true,
+    "SHOW_DICTATION_NOTIFICATIONS": true,
+    "DICTATION_COMPLETION_SOUND": "Pop",
+    "DICTATION_LOG_FILE": "dictation_log.txt",
+    
+    "CLIPBOARD_DELAY": 1.0,
+    "TYPING_INTERVAL": 0.03
+}

@@ -290,15 +290,54 @@ You can add custom commands by editing the `commands.json` file. For example:
 
 ### Changing Settings
 
-Edit the `.env` file to change settings like:
+The application now uses a centralized configuration system with multiple configuration sources:
 
-- `VOICE_CONTROL_HOTKEY` - The hotkey used to start command mode recording (default: ctrl+shift+space)
-- `VOICE_DICTATION_HOTKEY` - The hotkey used to start dictation mode (default: ctrl+shift+d)
-- `WHISPER_MODEL_SIZE` - The size of the Whisper model to use (tiny, base, small, medium, large)
-- `RECORDING_DURATION` - How long to record after activation
+1. **Environment Variables**: Set in the `.env` file or system environment
+2. **Configuration File**: Edit `config.json` in the project root or `~/.config/whisper_voice_control/config.json`
+3. **Default Values**: Built-in defaults for all settings
+
+#### Using the Configuration File (Recommended)
+
+Edit `config.json` to customize settings:
+
+```json
+{
+  "MODEL_SIZE": "tiny",
+  "COMMAND_TRIGGER": "hey",
+  "DICTATION_TRIGGER": "type",
+  "RECORDING_TIMEOUT": 7.0,
+  "USE_LLM": true,
+  "LOG_LEVEL": "INFO"
+}
+```
+
+#### Using Environment Variables
+
+Edit the `.env` file to set environment variables:
+
+```
+WHISPER_MODEL_SIZE=tiny
+COMMAND_TRIGGER=hey
+DICTATION_TRIGGER=type
+RECORDING_TIMEOUT=7.0
+USE_LLM=true
+LOG_LEVEL=INFO
+```
+
+#### Key Configuration Options
+
+- `MODEL_SIZE` - The size of the Whisper model to use (tiny, base, small, medium, large)
+- `COMMAND_TRIGGER` - The trigger word for command mode (default: "hey")
+- `DICTATION_TRIGGER` - The trigger word for dictation mode (default: "type")
+- `ASSISTANT_TRIGGER` - The trigger phrase for assistant mode (default: "hey jarvis")
+- `RECORDING_TIMEOUT` - How long to record after trigger detection (in seconds)
+- `DICTATION_TIMEOUT` - How long to record for dictation (in seconds)
 - `USE_LLM` - Enable or disable LLM-based command interpretation (true/false)
 - `LLM_MODEL_PATH` - Path to the local LLM model in GGUF format
-- `LLM_THREADS` - Number of CPU threads to use for LLM inference
+- `LOG_LEVEL` - Set logging verbosity (DEBUG, INFO, WARNING, ERROR)
+- `VOICE_NAME` - System voice to use for speech synthesis
+- `USE_NEURAL_VOICE` - Enable neural voice if available
+- `NEURAL_SERVER` - URL of neural voice server
 
 ## Running as a Service
 
@@ -331,6 +370,48 @@ Examples of commands that work with LLM interpretation:
 - "Move this window a bit to the left"
 - "Make this window take up the full screen"
 - "I need to resize this window to make it smaller"
+
+## Code Architecture and Maintainability
+
+The codebase has been restructured for improved maintainability and extensibility:
+
+### Core Architectural Components
+
+- **Centralized Configuration System**: `config.py` provides unified configuration management from multiple sources
+- **Error Handling Utilities**: `error_handler.py` implements consistent error handling patterns
+- **Resource Management**: `resource_manager.py` ensures proper cleanup of system resources
+- **Centralized Logging**: `logging_config.py` establishes consistent logging practices
+- **Core Dictation Module**: `core_dictation.py` provides shared typing functionality
+
+### Key Design Patterns
+
+- **Singleton Pattern**: Used for config, state manager, and other globally accessible resources
+- **Dependency Injection**: Reduces coupling between components
+- **Resource Context Managers**: Ensures proper cleanup of system resources
+- **Centralized Error Handling**: Standardized approach to error handling
+- **Configuration Hierarchy**: Environment variables → Config files → Default values
+
+### Extending the System
+
+The modular architecture makes it easy to extend the system:
+
+1. **Adding New Commands**: Add to `commands.json` or extend command processor
+2. **Custom Dictation Processing**: Extend `DictationProcessor` or implement a new processor
+3. **New Voice Synthesis Options**: Add to speech synthesis module
+4. **Enhanced Audio Processing**: Extend audio processor with new capabilities 
+
+### Development Guidelines
+
+When contributing to this project:
+
+- Follow existing code organization and patterns
+- Use the error handling utilities for consistent error reporting
+- Let the configuration system manage settings
+- Use resource managers to handle system resources
+- Implement proper type annotations and docstrings
+- Follow the logging conventions
+- Write tests for new functionality
+- Update documentation for new features
 
 ## Troubleshooting
 
