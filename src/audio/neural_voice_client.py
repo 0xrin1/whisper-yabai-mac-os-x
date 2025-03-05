@@ -41,24 +41,25 @@ CONNECTION_TIMEOUT = 2.0  # Server connection timeout in seconds
 server_url = DEFAULT_SERVER
 cache = {}  # text -> file path
 cache_lock = threading.Lock()
-fallback_enabled = True
+fallback_enabled = False  # Fallback is now disabled
 last_connection_time = 0
 connection_status = "unknown"  # "unknown", "connected", "disconnected"
 last_connection_attempt = 0
 connection_cooldown = 5.0  # Seconds to wait between connection attempts
 server_info = None
 
-def configure(server: str = DEFAULT_SERVER, enable_fallback: bool = True):
+def configure(server: str = DEFAULT_SERVER, enable_fallback: bool = False):
     """Configure the neural voice client.
     
     Args:
         server: URL of the neural voice server (including protocol and port)
         enable_fallback: Whether to enable fallback to local TTS if server is unavailable
+                        (Kept for backward compatibility but defaults to False and is ignored)
     """
     global server_url, fallback_enabled, connection_status
     
     server_url = server
-    fallback_enabled = enable_fallback
+    fallback_enabled = False  # Always disable fallback regardless of parameter
     connection_status = "unknown"
     
     # Create cache directory
@@ -104,13 +105,13 @@ def check_server_connection():
         else:
             connection_status = "disconnected"
             server_info = None
-            logger.warning(f"Failed to connect to neural voice server: {response.status_code}")
+            logger.error(f"Failed to connect to neural voice server: HTTP {response.status_code}. Neural voice is required for this feature.")
             return False
             
     except requests.exceptions.RequestException as e:
         connection_status = "disconnected"
         server_info = None
-        logger.warning(f"Failed to connect to neural voice server: {e}")
+        logger.error(f"Failed to connect to neural voice server: {e}. Neural voice is required for this feature.")
         return False
 
 def synthesize_speech(text: str) -> Optional[str]:
@@ -131,11 +132,8 @@ def synthesize_speech(text: str) -> Optional[str]:
             check_server_connection()
             
     if connection_status != "connected":
-        logger.warning("Neural voice server not available, using fallback")
-        if fallback_enabled:
-            return synthesize_speech_fallback(text)
-        else:
-            return None
+        logger.error("Neural voice server not available. Connection required for neural voice synthesis.")
+        return None
             
     # Check cache
     with cache_lock:
@@ -145,8 +143,8 @@ def synthesize_speech(text: str) -> Optional[str]:
             return cache[cache_key]
     
     if not REQUESTS_AVAILABLE:
-        logger.error("Requests library not available")
-        return synthesize_speech_fallback(text) if fallback_enabled else None
+        logger.error("Requests library not available. Required for neural voice synthesis.")
+        return None
         
     try:
         # Generate unique filename
@@ -162,8 +160,8 @@ def synthesize_speech(text: str) -> Optional[str]:
         )
         
         if response.status_code != 200:
-            logger.error(f"Server error: {response.status_code}")
-            return synthesize_speech_fallback(text) if fallback_enabled else None
+            logger.error(f"Neural voice server error: {response.status_code}")
+            return None
             
         # Save audio to file
         with open(output_file, 'wb') as f:
@@ -186,80 +184,23 @@ def synthesize_speech(text: str) -> Optional[str]:
         return output_file
         
     except Exception as e:
-        logger.error(f"Error synthesizing speech: {e}")
-        if fallback_enabled:
-            return synthesize_speech_fallback(text)
+        logger.error(f"Error synthesizing speech with neural voice: {e}")
         return None
 
 def synthesize_speech_fallback(text: str) -> Optional[str]:
-    """Fallback to local TTS if neural voice server is unavailable.
+    """DEPRECATED: Fallback is disabled. Function kept for backward compatibility.
+    
+    This function is deprecated and will always return None. The system now requires
+    a working neural voice server connection.
     
     Args:
-        text: Text to synthesize
+        text: Text to synthesize (ignored)
         
     Returns:
-        Path to output audio file or None if failed
+        None (always)
     """
-    try:
-        # Create temp directory if it doesn't exist
-        os.makedirs(TEMP_DIR, exist_ok=True)
-        
-        # Generate unique filename
-        timestamp = int(time.time() * 1000)
-        output_file = os.path.join(TEMP_DIR, f"fallback_{timestamp}.wav")
-        
-        # For macOS, use say command
-        if sys.platform == "darwin":
-            # macOS say can't output directly to WAV, use AIFF first
-            temp_file = os.path.join(TEMP_DIR, f"temp_{timestamp}.aiff")
-            
-            # Call say command
-            cmd = [
-                "say",
-                "-v", "Daniel",  # Default voice
-                "-r", "180",     # Speaking rate
-                "-o", temp_file, # Output file
-                text
-            ]
-            
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-            
-            # Try to convert to WAV with ffmpeg if available
-            try:
-                convert_cmd = [
-                    "ffmpeg",
-                    "-i", temp_file,
-                    "-y",  # Overwrite if exists
-                    output_file
-                ]
-                subprocess.run(convert_cmd, check=True, capture_output=True, text=True)
-            except:
-                # If ffmpeg fails, just use the original
-                import shutil
-                shutil.copy(temp_file, output_file)
-                
-            # Clean up temp file
-            if os.path.exists(temp_file):
-                os.remove(temp_file)
-                
-        else:
-            # For other platforms, use espeak if available
-            try:
-                cmd = [
-                    "espeak",
-                    "-w", output_file,
-                    text
-                ]
-                subprocess.run(cmd, check=True, capture_output=True, text=True)
-            except:
-                logger.error("No TTS engine available for fallback")
-                return None
-                
-        return output_file
-        
-    except Exception as e:
-        logger.error(f"Error in fallback speech synthesis: {e}")
-        return None
+    logger.warning("synthesize_speech_fallback is deprecated and disabled")
+    return None
 
 def play_audio(file_path: str) -> bool:
     """Play an audio file.
