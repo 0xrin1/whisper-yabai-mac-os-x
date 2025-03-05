@@ -217,12 +217,12 @@ def load_neural_model(model_info: Dict[str, Any]) -> Optional[Any]:
         Loaded model or None if loading failed
     """
     if not HAS_TORCH or not NEURAL_VOICE_ENABLED:
-        logger.warning("Neural voice synthesis not available (PyTorch not installed)")
+        logger.error("Neural voice synthesis not available (PyTorch not installed)")
         return None
         
     model_path = model_info.get("path")
     if not model_path or not os.path.exists(model_path):
-        logger.warning(f"Invalid model path: {model_path}")
+        logger.error(f"Invalid model path: {model_path}")
         return None
         
     # Check if model is already cached
@@ -231,7 +231,7 @@ def load_neural_model(model_info: Dict[str, Any]) -> Optional[Any]:
         return NEURAL_MODEL_CACHE[model_path]
         
     try:
-        # If we have the TTS library, try to load with Synthesizer
+        # We require the TTS library for proper neural synthesis
         if HAS_TTS:
             logger.info(f"Loading neural model with TTS library from {model_path}")
             
@@ -255,20 +255,9 @@ def load_neural_model(model_info: Dict[str, Any]) -> Optional[Any]:
             return synthesizer
             
         else:
-            # Create a simple placeholder with voice profile info
-            logger.info(f"Creating neural model placeholder (TTS lib not available)")
-            voice_profile = model_info.get("voice_profile", {})
-            
-            model = {
-                "model_info": model_info,
-                "voice_profile": voice_profile,
-                "type": "neural_placeholder",
-                "loaded": True
-            }
-            
-            # Cache the model
-            NEURAL_MODEL_CACHE[model_path] = model
-            return model
+            # No placeholder - we require TTS library
+            logger.error("TTS library is required for neural voice synthesis")
+            return None
             
     except Exception as e:
         logger.error(f"Error loading neural model: {e}")
@@ -304,83 +293,14 @@ def synthesize_with_neural_model(model: Any, text: str) -> Optional[str]:
             # wav = synthesizer.tts(text)
             # synthesizer.save_wav(wav, output_path)
             
-            # For now, since we don't have the actual model files,
-            # we'll use the parameter-based model with enhanced settings
-            voice_profile = model.get("voice_profile", {})
-            model_info = model.get("model_info", {})
-            
-            # Use a high-quality parameter-based speech
-            voice = voice_profile.get("base_voice", "Daniel")
-            pitch_mod = voice_profile.get("pitch_modifier", 0.92)
-            rate_mod = voice_profile.get("speaking_rate", 1.05)
-            
-            # Generate speech with macOS say
-            temp_audio = os.path.join(DEFAULT_NEURAL_TMP_DIR, f"temp_speech_{timestamp}.aiff")
-            
-            # Generate with native voice
-            base_cmd = [
-                "say",
-                "-v", voice,
-                "-r", str(int(DEFAULT_RATE * rate_mod)),
-                "-o", temp_audio,
-                text
-            ]
-            
-            subprocess.run(base_cmd, check=True, capture_output=True, text=True)
-            
-            # Convert to WAV with enhanced quality
-            convert_cmd = [
-                "ffmpeg",
-                "-i", temp_audio,
-                "-ar", "44100",  # High quality audio
-                "-ac", "1",      # Mono
-                "-y",            # Overwrite if exists
-                output_path
-            ]
-            
-            try:
-                subprocess.run(convert_cmd, check=True, capture_output=True, text=True)
-            except:
-                # If ffmpeg fails, just use the original
-                shutil.copy(temp_audio, output_path)
-            
-            # Clean up temp file
-            if os.path.exists(temp_audio):
-                os.remove(temp_audio)
-                
-            return output_path
+            # However, we need actual neural TTS capability
+            logger.error("Actual neural TTS synthesis is required but not available")
+            return None
             
         else:
-            # Fallback to parameter-based synthesis
-            logger.warning(f"Neural synthesis not available, using parameter-based")
-            voice_profile = model.get("voice_profile", {}) if isinstance(model, dict) else {}
-            
-            # Generate with native voice
-            voice = voice_profile.get("base_voice", "Daniel")
-            rate_mod = voice_profile.get("speaking_rate", 1.05)
-            
-            # MacOS say can't save directly to wav, use .aiff first
-            temp_audio = os.path.join(DEFAULT_NEURAL_TMP_DIR, f"temp_speech_{timestamp}.aiff")
-            
-            # Generate speech with macOS say
-            cmd = [
-                "say",
-                "-v", voice,
-                "-r", str(int(DEFAULT_RATE * rate_mod)),
-                "-o", temp_audio,
-                text
-            ]
-            
-            subprocess.run(cmd, check=True, capture_output=True, text=True)
-            
-            # Copy the aiff file to the output path
-            shutil.copy(temp_audio, output_path)
-            
-            # Clean up temp file
-            if os.path.exists(temp_audio):
-                os.remove(temp_audio)
-                
-            return output_path
+            # No fallback - explicitly error out
+            logger.error("Neural synthesis is required but not available (TTS library missing or model not loaded)")
+            return None
             
     except Exception as e:
         logger.error(f"Error in neural synthesis: {e}")
@@ -397,7 +317,7 @@ if ACTIVE_VOICE_MODEL and NEURAL_VOICE_ENABLED:
         if neural_model:
             logger.info("Neural voice model loaded successfully")
         else:
-            logger.warning("Failed to load neural voice model, will use parameter-based fallback")
+            logger.error("Failed to load neural voice model - neural voice synthesis requires TTS library and proper model")
 
 def get_random_response(category: str) -> str:
     """Get a random response from a specific category.
@@ -543,9 +463,16 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
                         
                     return True
             
-            # If neural synthesis failed, fall back to parameter-based
-            logger.warning("Neural synthesis failed, falling back to parameter-based")
+            # If neural synthesis failed, error out - no fallback anymore
+            logger.error("Neural voice synthesis failed - no fallback available")
+            return False
         
+        # Only proceed with parameter-based synthesis if engine_type is not "neural"
+        # We've already failed and returned false above if neural synthesis was required
+        if engine_type == "neural":
+            logger.error("Neural voice was requested but synthesis failed. No fallback available.")
+            return False
+            
         # For parameter-based voice synthesis, we adjust voice parameters
         # to match the user's voice characteristics
         
@@ -938,6 +865,12 @@ def test_neural_voice():
     if not is_neural_voice_active():
         print("No neural voice model is active. Please activate a neural voice model first.")
         return False
+    
+    # Check if TTS library is available - now required for neural voice
+    if not HAS_TTS:
+        print("ERROR: TTS library is required for neural voice synthesis but not available.")
+        print("Install with: pip install TTS")
+        return False
         
     # Get model details
     model_name = ACTIVE_VOICE_MODEL.get("name", "Unknown")
@@ -948,9 +881,31 @@ def test_neural_voice():
     print(f"Model type: {model_type}")
     print(f"Voice profile: {voice_profile}")
     
-    # Test with different types of phrases
+    # Test with a single phrase first to verify neural synthesis works
+    test_phrase = "Hello, I'm your neural voice assistant."
+    print(f"Testing neural synthesis with: '{test_phrase}'")
+    
+    # Try to synthesize speech
+    timestamp = int(time.time() * 1000)
+    output_path = os.path.join(DEFAULT_NEURAL_TMP_DIR, f"neural_test_{timestamp}.wav")
+    
+    # Load neural model
+    neural_model = NEURAL_MODEL_CACHE.get(ACTIVE_VOICE_MODEL.get("path")) 
+    if not neural_model:
+        neural_model = load_neural_model(ACTIVE_VOICE_MODEL)
+        
+    if not neural_model:
+        print("ERROR: Failed to load neural model")
+        return False
+        
+    # Test direct synthesis to verify it works
+    result = synthesize_with_neural_model(neural_model, test_phrase)
+    if not result or not os.path.exists(result):
+        print("ERROR: Neural voice synthesis failed. No parameter-based fallback is available.")
+        return False
+        
+    # If we got here, neural synthesis works - test with more phrases
     test_phrases = [
-        "Hello, I'm your neural voice assistant.",
         "How can I help you today?",
         "This is a test of my neural voice model with maximum quality settings.",
         "I was trained with GPU acceleration and 5000 epochs.",
@@ -959,9 +914,13 @@ def test_neural_voice():
     
     for phrase in test_phrases:
         print(f"Speaking: '{phrase}'")
-        speak(phrase, block=True)
+        output = speak(phrase, block=True)
+        if not output:
+            print(f"ERROR: Failed to synthesize: '{phrase}'")
+            return False
         time.sleep(0.5)
     
+    print("Neural voice synthesis test completed successfully")
     return True
 
 def reload_voice_model():
