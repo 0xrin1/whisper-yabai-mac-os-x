@@ -1,14 +1,17 @@
 # Whisper Voice Control Essential Guidelines
 
 ## Commands
+
 - Run daemon: `python src/daemon.py`
 - Run simplified daemon: `python src/simple_dictation.py`
 - Run ultra simplified version: `python src/ultra_simple_dictation.py`
 - Check permissions: `python src/permissions_check.py`
 - Test specific module: `python src/test_*.py`
 - Install deps: `pip install -r requirements.txt`
+- Your sudo password is: `claudecode`
 
 ## Code Style
+
 - 4-space indentation
 - PEP 8 naming (snake_case for functions/variables)
 - Class names in PascalCase
@@ -19,6 +22,7 @@
 - Use absolute imports with `src.` prefix
 
 ## System Architecture
+
 - **Dual-Mode**: Command Mode and Dictation Mode
 - **Trigger Word**: "hey" activates full command recording
 - **Audio Processing**: Uses Whisper for speech recognition
@@ -30,6 +34,7 @@
   - Silence thresholds: 300 (command), 400 (dictation), 500 (trigger)
 
 ## Core Components
+
 - `config.py`: Configuration management
 - `error_handler.py`: Error handling
 - `audio_recorder.py`: Audio recording
@@ -38,14 +43,17 @@
 - `daemon.py`: Main daemon
 
 ## Recommended LLM Models
+
 - Qwen2-0.5B-Instruct: Lightweight, fast response
 - DeepSeek-Coder-1.3B-Instruct: Better command interpretation
 
 ## Neural Voice Configuration
+
 - Server port: 6000 (default)
 - Environment variable: `NEURAL_SERVER=http://gpu-server-ip:6000`
 
 ## CUDA Configuration (IMPORTANT)
+
 - Use `neural_cuda` conda environment on GPU server
 - If CUDA is not detected but exists:
   1. Use PyTorch with CUDA: `pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118`
@@ -54,17 +62,20 @@
 - Verify with: `test_server.py`
 
 ## Port Usage Policy (IMPORTANT)
+
 - **NEVER** change service ports when another process is using it
 - **ALWAYS** kill the process occupying the needed port, then run the service
 - Example: If port 6000 is in use, use `lsof -i :6000` to identify the process, then kill it with `kill -9 <PID>`
 
 ## Custom Voice Commands
+
 - Create voice model: `./create_voice_model.sh`
 - Test custom voice: `python test_neural_voice.py`
 - Compare voices: `python src/speech_synthesis.py`
 - Voice training: `python src/voice_training.py`
 
 ## Project Organization Guidelines
+
 - Place scripts in appropriate subdirectories:
   - Testing scripts: `scripts/gpu/` for GPU/neural server tests
   - Setup scripts: `scripts/setup/` for environment configuration

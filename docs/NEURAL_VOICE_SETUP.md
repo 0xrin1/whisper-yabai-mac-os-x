@@ -45,7 +45,7 @@ We've created a script that sets up a dedicated conda environment with all depen
 
 ```bash
 # Create the dedicated CUDA-enabled environment
-./scripts/gpu/setup_neural_cuda_env.sh
+./scripts/gpu/manage_neural_server.sh setup-env
 ```
 
 This script:
@@ -56,7 +56,6 @@ This script:
 - Creates necessary directories for audio caching
 - Creates an activation script that ensures consistent environment setup
 - Tests CUDA detection and availability
-- Updates the server management script to use the new environment
 
 #### 2. Use the Existing Environment (Legacy)
 
@@ -183,7 +182,7 @@ python test_client.py
 ### Common Issues
 
 1. **CUDA Not Detected**:
-   - Use the new setup script to create a dedicated environment: `./scripts/gpu/setup_neural_cuda_env.sh`
+   - Use the setup-env command to create a dedicated environment: `./scripts/gpu/manage_neural_server.sh setup-env`
    - Check if CUDA libraries are properly installed on the server
    - Ensure PyTorch is installed with CUDA support
    - Check the environment variables are properly set (CUDA_HOME, LD_LIBRARY_PATH)
@@ -191,7 +190,18 @@ python test_client.py
 2. **Connection Errors**:
    - Ensure the GPU server is running
    - Check if the neural voice server process is active
-   - Verify firewall settings allow connections to port 6000
+   - If port 6000 is occupied by another process:
+     ```bash
+     # Find the process using port 6000
+     lsof -i :6000
+     
+     # Kill the process
+     kill -9 <PID>
+     
+     # Restart the neural server
+     ./scripts/gpu/manage_neural_server.sh restart
+     ```
+   - NEVER change the server port. Always kill the process occupying port 6000 instead
    - Make sure the server is started with `./scripts/gpu/start_neural_server_remote.sh`
 
 3. **Synthesis Fails**:
@@ -242,6 +252,12 @@ The server runs on port 6000 and provides the following API endpoints:
 - `GET /` - Basic server information
 - `GET /info` - Detailed model and server information
 - `POST /synthesize` - Text-to-speech synthesis endpoint
+
+**Important Port Configuration**:
+- The neural voice server MUST run on port 6000
+- NEVER modify the port in the server code
+- If port 6000 is already in use, find and terminate the process using it
+- Changing the port would require updating all clients and documentation
 
 Example API call:
 ```python

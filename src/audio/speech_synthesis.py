@@ -7,6 +7,7 @@ Now with support for neural voice models trained with GlowTTS.
 """
 
 import os
+import sys
 import subprocess
 import threading
 import time
@@ -76,20 +77,9 @@ except ImportError:
     HAS_TTS = False
     logger.warning("PyTorch not available, neural voice synthesis disabled")
     
-# Try to import the neural voice client
-try:
-    from src.audio import neural_voice_client
-    HAS_NEURAL_CLIENT = True
-    logger.info("Neural voice client available")
-except ImportError:
-    try:
-        # Try alternative import path
-        import neural_voice_client
-        HAS_NEURAL_CLIENT = True
-        logger.info("Neural voice client available (alternate path)")
-    except ImportError:
-        HAS_NEURAL_CLIENT = False
-        logger.warning("Neural voice client not available")
+# We'll import the neural_voice_client when needed to avoid circular imports
+HAS_NEURAL_CLIENT = True  # Set to True by default, will be checked when actually using it
+logger.info("Neural voice client will be loaded on demand")
 
 # Track if speech is currently in progress
 _speaking_lock = threading.Lock()
@@ -421,12 +411,9 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
             neural_server = os.environ.get("NEURAL_SERVER", "http://192.168.191.55:6000")
             logger.info(f"Using GPU neural voice client for '{text}' with server {neural_server}")
             
-            # Try to use neural_voice_client directly without imports
+            # Try to use the neural voice client API dynamically
             try:
-                from src.audio import neural_voice_client
-                neural_voice_client.configure(server=neural_server)
-                
-                # Just check basic server connectivity first
+                # First, try direct API call without importing the client
                 basic_connection = False
                 try:
                     import requests
@@ -491,17 +478,28 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
                     except Exception as e:
                         logger.error(f"Error with direct API call: {e}")
                 
-                # Try the regular client API as backup
-                connection_status = neural_voice_client.check_server_connection()
-                logger.info(f"Neural server connection status: {connection_status}")
-                
-                if connection_status:
-                    # Use the neural voice client to synthesize and play speech
-                    output_file = neural_voice_client.speak(text, play=True)
+                # If direct API call failed, try the client API
+                # Only import here to avoid circular imports
+                try:
+                    from src.audio import neural_voice_client
+                    neural_voice_client.configure(server=neural_server)
                     
-                    if output_file and os.path.exists(output_file):
-                        logger.info(f"Successfully synthesized speech with neural voice client")
-                        return True
+                    # Try the regular client API
+                    connection_status = neural_voice_client.check_server_connection()
+                    logger.info(f"Neural server connection status: {connection_status}")
+                    
+                    if connection_status:
+                        # Use the neural voice client to synthesize and play speech
+                        output_file = neural_voice_client.speak(text, play=True)
+                        
+                        if output_file and os.path.exists(output_file):
+                            logger.info(f"Successfully synthesized speech with neural voice client")
+                            return True
+                except ImportError:
+                    logger.warning("Could not import neural_voice_client module")
+                except Exception as e:
+                    logger.error(f"Error with neural voice client API: {e}")
+                    
             except Exception as e:
                 logger.error(f"Error connecting to neural voice server: {e}")
                 
