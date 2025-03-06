@@ -596,6 +596,397 @@ check_comprehensive_status() {
     fi
 }
 
+# Function to run neural voice tests
+run_neural_voice_test() {
+    echo -e "${GREEN}===== Running Neural Voice System Tests =====${NC}"
+    
+    # Create a temporary Python test script
+    TMP_TEST_SCRIPT="/tmp/neural_voice_test_${PORT}_$(date +%s).py"
+    
+    cat > "$TMP_TEST_SCRIPT" << 'PYTHON_EOF'
+#!/usr/bin/env python3
+"""
+Neural voice system test script integrated into manage_neural_server.sh
+Tests server connection, voice model info, and speech synthesis
+"""
+
+import sys
+import time
+import os
+import json
+import argparse
+import logging
+from typing import List, Dict, Any, Optional
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger("neural-voice-test")
+
+# ANSI color codes for terminal output
+GREEN = '\033[32m'
+YELLOW = '\033[33m'
+BLUE = '\033[34m'
+MAGENTA = '\033[35m'
+CYAN = '\033[36m'
+RED = '\033[31m'
+RESET = '\033[0m'
+
+# Default server URL - will be overridden by command line arg
+SERVER_URL = 'http://localhost:6000'
+
+def print_color(text: str, color: str = GREEN) -> None:
+    """Print colored text to the terminal."""
+    colors = {
+        'green': GREEN,
+        'yellow': YELLOW,
+        'blue': BLUE,
+        'magenta': MAGENTA,
+        'cyan': CYAN,
+        'red': RED,
+        'reset': RESET
+    }
+    print(f"{colors.get(color, '')}{text}{colors['reset']}")
+
+def print_section(title: str) -> None:
+    """Print a section header."""
+    print("\n" + "=" * 60)
+    print_color(f" {title}", 'cyan')
+    print("=" * 60)
+
+def print_subsection(title: str) -> None:
+    """Print a subsection header."""
+    print("\n" + "-" * 50)
+    print_color(f" {title}", 'magenta')
+    print("-" * 50)
+
+def test_server_connection() -> bool:
+    """Test connection to the neural voice server."""
+    print_subsection("Testing Neural Voice Server Connection")
+    print(f"Server URL: {SERVER_URL}")
+    
+    try:
+        # Import requests here to avoid hard dependency
+        import requests
+        
+        # Test basic endpoint
+        response = requests.get(f'{SERVER_URL}', timeout=5)
+        status_color = 'green' if response.status_code == 200 else 'red'
+        print_color(f"Status: {response.status_code}", status_color)
+        
+        # Pretty print the JSON response
+        try:
+            data = response.json()
+            print_color("Server response:", 'blue')
+            print(json.dumps(data, indent=2))
+            
+            # Check CUDA status
+            if data.get('cuda') is True:
+                print_color("✅ CUDA is available on the server", 'green')
+            else:
+                print_color("❌ CUDA is NOT available on the server", 'red')
+                
+        except json.JSONDecodeError:
+            print(response.text)
+        
+        # If basic connection works, try info endpoint
+        if response.status_code == 200:
+            try:
+                info_response = requests.get(f'{SERVER_URL}/info', timeout=5)
+                if info_response.status_code == 200:
+                    info_data = info_response.json()
+                    print_color("\nServer information:", 'blue')
+                    print(json.dumps(info_data, indent=2))
+                    
+                    # Extract GPU info
+                    if 'stats' in info_data and 'gpu_info' in info_data['stats']:
+                        gpu_info = info_data['stats']['gpu_info']
+                        if gpu_info['device_count'] > 0:
+                            print_color(f"\n✅ Found {gpu_info['device_count']} GPU(s):", 'green')
+                            for i, device in enumerate(gpu_info['devices']):
+                                print_color(f"   Device {i}: {device}", 'green')
+                        else:
+                            print_color("❌ No GPU devices found", 'red')
+            except Exception as e:
+                print_color(f"Error getting server info: {e}", 'red')
+        
+        return response.status_code == 200
+        
+    except ImportError:
+        print_color("❌ Requests module not installed. Cannot check server connection.", 'red')
+        print_color("Install with: pip install requests", 'yellow')
+        return False
+    except Exception as e:
+        print_color(f"❌ Error: {e}", 'red')
+        return False
+
+def test_basic_synthesis() -> bool:
+    """Test basic speech synthesis with the custom voice model."""
+    try:
+        from src import speech_synthesis as speech
+        
+        print_subsection("Testing Basic Speech Synthesis")
+        
+        # Check if custom voice model is loaded
+        if speech.ACTIVE_VOICE_MODEL:
+            print_color(f"✅ Custom voice model loaded: {speech.ACTIVE_VOICE_MODEL.get('name', 'Unknown')}", 'green')
+            print(f"   Created: {speech.ACTIVE_VOICE_MODEL.get('created', 'Unknown')}")
+            print(f"   Samples: {speech.ACTIVE_VOICE_MODEL.get('sample_count', 0)}")
+        else:
+            print_color("⚠️ No custom voice model detected. Using standard system voices.", 'yellow')
+        
+        # Test custom voice with a simple phrase
+        print_color("\nTesting neural voice synthesis:", 'blue')
+        test_phrase = "Hello, this is a test of the neural voice synthesis system."
+        
+        print(f"Speaking: \"{test_phrase}\"")
+        result = speech.speak(test_phrase, block=True)
+        
+        if result:
+            print_color("✅ Speech synthesis successful", 'green')
+            return True
+        else:
+            print_color("❌ Speech synthesis failed", 'red')
+            return False
+            
+    except ImportError as e:
+        print_color(f"\n❌ Error importing speech synthesis module: {e}", 'red')
+        print_color("Make sure you are running from the project root directory", 'yellow')
+        return False
+    except Exception as e:
+        print_color(f"\n❌ Error during synthesis test: {e}", 'red')
+        return False
+
+def test_synthesis_api_directly() -> bool:
+    """Test the synthesis API directly without using the client library."""
+    print_subsection("Testing Synthesis API Directly")
+    
+    try:
+        import requests
+        import tempfile
+        import subprocess
+        
+        # Create a temp file for the audio
+        temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        temp_path = temp_file.name
+        temp_file.close()
+        
+        # Test text to synthesize
+        test_text = "This is a direct test of the neural voice synthesis API."
+        print(f"Synthesizing: \"{test_text}\"")
+        
+        # Send POST request to synthesize endpoint
+        response = requests.post(
+            f"{SERVER_URL}/synthesize",
+            json={"text": test_text},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            # Save the audio
+            with open(temp_path, 'wb') as f:
+                f.write(response.content)
+                
+            print_color(f"✅ Synthesis successful, audio saved to {temp_path}", 'green')
+            
+            # Try to play the audio on macOS
+            if sys.platform == "darwin":
+                print("Playing audio...")
+                try:
+                    subprocess.run(["afplay", temp_path], check=True)
+                    print_color("✅ Audio playback successful", 'green')
+                except Exception as e:
+                    print_color(f"⚠️ Audio playback failed: {e}", 'yellow')
+            
+            return True
+        else:
+            print_color(f"❌ Synthesis API call failed with status {response.status_code}", 'red')
+            print(response.text)
+            return False
+    
+    except ImportError:
+        print_color("❌ Requests module not installed", 'red')
+        return False
+    except Exception as e:
+        print_color(f"❌ Error in direct API test: {e}", 'red')
+        return False
+    finally:
+        # Cleanup temp file
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            try:
+                os.unlink(temp_path)
+            except:
+                pass
+
+def display_voice_model_info() -> bool:
+    """Display detailed information about the current voice model."""
+    try:
+        from src import speech_synthesis as speech
+        
+        print_subsection("Active Voice Model Details")
+        
+        if not speech.ACTIVE_VOICE_MODEL:
+            print_color("No active voice model found.", 'yellow')
+            return False
+        
+        model = speech.ACTIVE_VOICE_MODEL
+        
+        model_name = model.get("name", "Unknown")
+        model_path = model.get("path", "Unknown")
+        engine_type = model.get("engine", "parameter-based")
+        sample_count = model.get("sample_count", 0)
+        
+        print(f"Model name: {model_name}")
+        print(f"Model path: {model_path}")
+        print(f"Engine type: {engine_type}")
+        print(f"Sample count: {sample_count}")
+        
+        # Display voice profile if available
+        if "voice_profile" in model:
+            voice_profile = model["voice_profile"]
+            print_subsection("Voice Profile Parameters")
+            
+            for key, value in voice_profile.items():
+                if key in ["context_modifiers", "emotion_markers"] and isinstance(value, dict):
+                    # Handle nested dictionaries
+                    print(f"\n{key}:")
+                    for subkey, subvalue in value.items():
+                        print(f"  {subkey}: {subvalue}")
+                else:
+                    print(f"{key}: {value}")
+        
+        return True
+        
+    except ImportError as e:
+        print_color(f"❌ Error importing speech synthesis module: {e}", 'red')
+        return False
+    except Exception as e:
+        print_color(f"❌ Error displaying model info: {e}", 'red')
+        return False
+
+def main():
+    """Main function for testing neural voice capabilities."""
+    global SERVER_URL
+    
+    parser = argparse.ArgumentParser(description="Test neural voice synthesis capabilities")
+    parser.add_argument("--server-only", action="store_true", help="Only test server connection")
+    parser.add_argument("--api-only", action="store_true", help="Only test direct API synthesis")
+    parser.add_argument("--synthesis-only", action="store_true", help="Only test basic speech synthesis")
+    parser.add_argument("--model-info", action="store_true", help="Display voice model information")
+    parser.add_argument("--server", default=SERVER_URL, help="Neural voice server URL")
+    args = parser.parse_args()
+    
+    # Print header
+    print_section("Neural Voice System Test")
+    
+    # Update server URL
+    SERVER_URL = args.server
+    
+    # Check server connection - this is always done
+    server_ok = test_server_connection()
+    
+    # If server connection test fails and we're only testing the server, exit
+    if not server_ok:
+        print_color("\n❌ Server connection failed.", 'red')
+        if args.server_only:
+            return False
+        print_color("Continuing with local tests...", 'yellow')
+    
+    # Stop here if only testing server
+    if args.server_only:
+        return server_ok
+    
+    # Determine which tests to run
+    run_all = not (args.api_only or args.synthesis_only or args.model_info)
+    
+    test_results = []
+    
+    try:
+        # Show model info if requested or running all tests
+        if run_all or args.model_info:
+            model_info_ok = display_voice_model_info()
+            test_results.append(("Model Info", model_info_ok))
+        
+        # Test direct API if requested or running all tests and server is ok
+        if (run_all or args.api_only) and server_ok:
+            api_ok = test_synthesis_api_directly()
+            test_results.append(("Direct API", api_ok))
+        
+        # Test synthesis if requested or running all tests
+        if run_all or args.synthesis_only:
+            synthesis_ok = test_basic_synthesis()
+            test_results.append(("Speech Synthesis", synthesis_ok))
+        
+        # Print summary
+        print_section("Test Results Summary")
+        
+        for test_name, result in test_results:
+            status = "✅ PASS" if result else "❌ FAIL"
+            color = "green" if result else "red"
+            print_color(f"{test_name}: {status}", color)
+        
+        # Overall result
+        if all(result for _, result in test_results):
+            print_color("\nAll tests passed successfully!", 'green')
+        else:
+            print_color("\nSome tests failed. See details above.", 'yellow')
+        
+        # Return overall result
+        return all(result for _, result in test_results) if test_results else server_ok
+        
+    except Exception as e:
+        print_color(f"\n❌ Unexpected error: {e}", 'red')
+        return False
+
+if __name__ == "__main__":
+    try:
+        success = main()
+        sys.exit(0 if success else 1)
+    except KeyboardInterrupt:
+        print_color("\nTest interrupted by user.", 'yellow')
+        sys.exit(0)
+    except Exception as e:
+        print_color(f"\nUnexpected error: {e}", 'red')
+        sys.exit(1)
+PYTHON_EOF
+
+    # Make script executable
+    chmod +x "$TMP_TEST_SCRIPT"
+    
+    # Determine test arguments
+    TEST_ARGS=""
+    case "$2" in
+        server)
+            TEST_ARGS="--server-only"
+            ;;
+        api)
+            TEST_ARGS="--api-only"
+            ;;
+        synthesis)
+            TEST_ARGS="--synthesis-only"
+            ;;
+        model)
+            TEST_ARGS="--model-info"
+            ;;
+        *)
+            # Run all tests by default
+            TEST_ARGS=""
+            ;;
+    esac
+    
+    # Execute the test script with proper Python environment
+    if [ -d "venv" ]; then
+        source venv/bin/activate 2>/dev/null || true
+    fi
+    
+    python "$TMP_TEST_SCRIPT" --server "http://${GPU_HOST}:${PORT}" $TEST_ARGS
+    
+    # Clean up
+    rm -f "$TMP_TEST_SCRIPT"
+}
+
 # Execute the requested action based on first argument
     case "$ACTION" in
         start)
@@ -632,6 +1023,9 @@ check_comprehensive_status() {
         full-status|check|test)
             check_comprehensive_status
             ;;
+        test-voice|voice-test)
+            run_neural_voice_test "$2"
+            ;;
         logs)
             get_logs
             ;;
@@ -654,6 +1048,7 @@ check_comprehensive_status() {
             echo -e "  ${BLUE}check${NC}      - Run comprehensive status check (server + client)"
             echo -e "  ${BLUE}full-status${NC} - Same as check: comprehensive status check"
             echo -e "  ${BLUE}test${NC}       - Same as check: comprehensive status check"
+            echo -e "  ${BLUE}test-voice${NC} - Run neural voice tests (accepts: server|api|synthesis|model)"
             echo -e "  ${BLUE}logs${NC}       - View server logs"
             echo -e "  ${BLUE}gpu${NC}        - Check GPU status on server"
             echo -e "  ${BLUE}setup-env${NC}  - Set up CUDA environment on GPU server"
