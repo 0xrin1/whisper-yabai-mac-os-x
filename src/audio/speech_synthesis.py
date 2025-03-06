@@ -329,7 +329,7 @@ def get_random_response(category: str) -> str:
     return "I'm listening."
 
 def speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE, 
-          block: bool = False, volume: float = 1.0) -> None:
+          block: bool = False, volume: float = 1.0) -> bool:
     """
     Speak the provided text using macOS TTS.
     
@@ -339,9 +339,12 @@ def speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
         rate: The speaking rate (words per minute)
         block: Whether to block until speech is complete
         volume: Volume level (0.0 to 1.0)
+        
+    Returns:
+        Boolean indicating if speech synthesis was successful
     """
     if not text:
-        return
+        return False
         
     # Sanitize input
     text = text.replace('"', '\\"')
@@ -354,6 +357,23 @@ def speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
     # Normalize volume (0.0 to 1.0)
     volume = max(0.0, min(1.0, volume))
     
+    # Check if we're using neural voice model - if so, we need to handle immediately
+    if CUSTOM_VOICE_MODE and ACTIVE_VOICE_MODEL:
+        engine_type = ACTIVE_VOICE_MODEL.get("engine", "")
+        if engine_type == "neural":
+            logger.info("Using neural voice synthesis without queueing")
+            
+            # For neural voices, we don't want to queue - direct processing for better error handling
+            if block:
+                return _speak_now(text, voice, rate, volume)
+            else:
+                # Run in a separate thread if non-blocking
+                def speak_thread():
+                    _speak_now(text, voice, rate, volume)
+                threading.Thread(target=speak_thread, daemon=True).start()
+                return True
+    
+    # For non-neural voices, we can use the queue system
     # Add to queue
     with _queue_lock:
         _speech_queue.append({
@@ -369,6 +389,7 @@ def speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
     # If blocking mode requested, wait until this specific text is spoken
     if block:
         # Wait until our text is no longer in the queue and not currently speaking
+        success = False
         while True:
             with _queue_lock:
                 text_in_queue = any(item["text"] == text for item in _speech_queue)
@@ -377,9 +398,13 @@ def speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
                 is_speaking = _currently_speaking
                 
             if not text_in_queue and not is_speaking:
+                success = True
                 break
                 
             time.sleep(0.1)
+        return success
+    
+    return True
 
 def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float = 1.0) -> bool:
     """Use custom voice model for speech.
@@ -742,7 +767,7 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
 
 
 def _speak_now(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE, 
-               volume: float = 1.0) -> None:
+               volume: float = 1.0) -> bool:
     """
     Actually execute the TTS command (internal use).
     
@@ -751,17 +776,36 @@ def _speak_now(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
         voice: The voice to use
         rate: The speaking rate
         volume: Volume level (0.0 to 1.0)
+        
+    Returns:
+        Boolean indicating if speech synthesis was successful
     """
+    success = False
     try:
         with _speaking_lock:
             _currently_speaking = True
             
-        # Try custom voice model first if enabled
+        # Try custom voice model if enabled
         if CUSTOM_VOICE_MODE and ACTIVE_VOICE_MODEL:
-            if _speak_with_custom_voice(text, rate, volume):
-                return
+            engine_type = ACTIVE_VOICE_MODEL.get("engine", "")
+            
+            # If it's a neural model, we MUST use it - no fallback
+            if engine_type == "neural":
+                # Try neural voice synthesis - if it fails, return false
+                success = _speak_with_custom_voice(text, rate, volume)
                 
-        # Fall back to standard macOS 'say' command with voice and rate parameters
+                # If neural synthesis failed, we will not fall back to system voices
+                if not success:
+                    logger.error("Neural voice synthesis failed and no fallback is allowed")
+                    return False
+                return True
+            
+            # For non-neural models, try the custom voice
+            elif _speak_with_custom_voice(text, rate, volume):
+                return True
+        
+        # Use standard macOS 'say' command with voice and rate parameters
+        # This is only reached for standard system voices or parameter-based models
         cmd = [
             "say", 
             "-v", voice,
@@ -777,12 +821,15 @@ def _speak_now(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
         
         # Execute the command
         subprocess.run(cmd, check=True, capture_output=True, text=True)
+        success = True
         
     except Exception as e:
-        print(f"TTS Error: {e}")
+        logger.error(f"TTS Error: {e}")
+        success = False
     finally:
         with _speaking_lock:
             _currently_speaking = False
+        return success
 
 def _process_speech_queue() -> None:
     """Process the speech queue in a separate thread."""
@@ -801,17 +848,20 @@ def _process_speech_queue() -> None:
                 item = _speech_queue.pop(0)
             
             # Speak the text
-            _speak_now(
+            success = _speak_now(
                 item["text"],
                 item["voice"],
                 item["rate"],
                 item["volume"]
             )
             
+            if not success:
+                logger.error(f"Failed to speak text: {item['text'][:30]}...")
+            
             # Small delay between queue items
             time.sleep(0.2)
     except Exception as e:
-        print(f"Queue processor error: {e}")
+        logger.error(f"Queue processor error: {e}")
         _queue_running = False
 
 def _ensure_queue_processor_running() -> None:
@@ -863,32 +913,51 @@ def is_speaking() -> bool:
     with _speaking_lock:
         return _currently_speaking
 
-def greeting(name: Optional[str] = None) -> None:
+def greeting(name: Optional[str] = None) -> bool:
     """Speak a greeting.
     
     Args:
         name: Optional name to personalize the greeting
+        
+    Returns:
+        Boolean indicating if speech synthesis was successful
     """
     if name:
-        speak(f"Hello, {name}. How can I help you today?")
+        return speak(f"Hello, {name}. How can I help you today?")
     else:
-        speak(get_random_response("greeting"))
+        return speak(get_random_response("greeting"))
 
-def acknowledge() -> None:
-    """Speak an acknowledgment phrase."""
-    speak(get_random_response("acknowledgment"))
+def acknowledge() -> bool:
+    """Speak an acknowledgment phrase.
+    
+    Returns:
+        Boolean indicating if speech synthesis was successful
+    """
+    return speak(get_random_response("acknowledgment"))
 
-def confirm() -> None:
-    """Speak a confirmation phrase."""
-    speak(get_random_response("confirmation"))
+def confirm() -> bool:
+    """Speak a confirmation phrase.
+    
+    Returns:
+        Boolean indicating if speech synthesis was successful
+    """
+    return speak(get_random_response("confirmation"))
 
-def thinking() -> None:
-    """Indicate that the system is thinking."""
-    speak(get_random_response("thinking"))
+def thinking() -> bool:
+    """Indicate that the system is thinking.
+    
+    Returns:
+        Boolean indicating if speech synthesis was successful
+    """
+    return speak(get_random_response("thinking"))
 
-def farewell() -> None:
-    """Speak a farewell phrase."""
-    speak(get_random_response("farewell"))
+def farewell() -> bool:
+    """Speak a farewell phrase.
+    
+    Returns:
+        Boolean indicating if speech synthesis was successful
+    """
+    return speak(get_random_response("farewell"))
 
 # Test function
 def test_voices():
