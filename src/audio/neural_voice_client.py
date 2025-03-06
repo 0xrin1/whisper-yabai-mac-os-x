@@ -12,6 +12,7 @@ import logging
 import threading
 import tempfile
 import subprocess
+import traceback
 from typing import Optional, Dict, Any
 from pathlib import Path
 
@@ -31,7 +32,7 @@ except ImportError:
     logger.error("Requests library not available. Install with: pip install requests")
 
 # Default settings
-DEFAULT_SERVER = os.environ.get("NEURAL_SERVER", "http://localhost:5001")
+DEFAULT_SERVER = os.environ.get("NEURAL_SERVER", "http://192.168.191.55:6000")
 TEMP_DIR = "tmp_neural_audio"
 CACHE_DIR = "neural_cache"
 MAX_CACHE_SIZE = 100  # Maximum number of cached audio files
@@ -91,13 +92,25 @@ def check_server_connection():
         return False
         
     try:
-        # Test connection to server
-        response = requests.get(f"{server_url}/info", timeout=CONNECTION_TIMEOUT)
+        # Test connection to server with reduced timeout
+        logger.info(f"Testing connection to neural voice server: {server_url}")
+        response = requests.get(f"{server_url}", timeout=CONNECTION_TIMEOUT)
         
         if response.status_code == 200:
+            # Basic connection works, now try the info endpoint
+            try:
+                info_response = requests.get(f"{server_url}/info", timeout=CONNECTION_TIMEOUT)
+                if info_response.status_code == 200:
+                    server_info = info_response.json()
+                else:
+                    # If info endpoint fails but root works, create minimal server info
+                    server_info = {"model": response.json()}
+            except:
+                # If info endpoint fails, use minimal information
+                server_info = {"model": response.json()}
+                
             connection_status = "connected"
             last_connection_time = current_time
-            server_info = response.json()
             logger.info(f"Connected to neural voice server: {server_url}")
             logger.info(f"Server model: {server_info.get('model', {}).get('name', 'unknown')}")
             logger.info(f"CUDA available: {server_info.get('stats', {}).get('cuda_available', False)}")
@@ -126,14 +139,16 @@ def synthesize_speech(text: str) -> Optional[str]:
     if not text:
         return None
         
-    # Check if server is available
+    # Check if server is available and reconnect if needed
     if connection_status != "connected":
-        if time.time() - last_connection_attempt > connection_cooldown:
-            check_server_connection()
-            
-    if connection_status != "connected":
-        logger.error("Neural voice server not available. Connection required for neural voice synthesis.")
-        return None
+        # Always try to reconnect before synthesizing
+        connection_result = check_server_connection()
+        if not connection_result:
+            logger.error("Neural voice server not available. Connection required for neural voice synthesis.")
+            return None
+    
+    # If we get here, we should have a connection
+    logger.info(f"Synthesizing speech with neural voice server: '{text[:30]}...'")
             
     # Check cache
     with cache_lock:
@@ -147,22 +162,47 @@ def synthesize_speech(text: str) -> Optional[str]:
         return None
         
     try:
+        # Create directories if they don't exist
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        os.makedirs(TEMP_DIR, exist_ok=True)
+        
         # Generate unique filename
         timestamp = int(time.time() * 1000)
         rand_id = os.urandom(4).hex()
         output_file = os.path.join(CACHE_DIR, f"speech_{timestamp}_{rand_id}.wav")
         
-        # Send request to server
-        response = requests.post(
-            f"{server_url}/synthesize",
-            json={"text": text},
-            timeout=10.0
-        )
+        # Send request to server with exponential backoff
+        max_retries = 2
+        retry_delay = 0.5  # Initial delay in seconds
         
-        if response.status_code != 200:
-            logger.error(f"Neural voice server error: {response.status_code}")
-            return None
-            
+        for retry in range(max_retries + 1):
+            try:
+                # Send request to server
+                if retry > 0:
+                    logger.info(f"Retry attempt {retry}/{max_retries} for synthesizing: '{text[:30]}...'")
+                
+                response = requests.post(
+                    f"{server_url}/synthesize",
+                    json={"text": text},
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    # Success
+                    break
+                else:
+                    logger.error(f"Neural voice server error: {response.status_code}")
+                    if retry == max_retries:
+                        return None
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Request error: {e}")
+                if retry == max_retries:
+                    return None
+                
+            # Wait before retrying with exponential backoff
+            time.sleep(retry_delay)
+            retry_delay *= 2
+        
         # Save audio to file
         with open(output_file, 'wb') as f:
             f.write(response.content)
@@ -180,11 +220,13 @@ def synthesize_speech(text: str) -> Optional[str]:
                 
             # Add new item to cache
             cache[cache_key] = output_file
-            
+        
+        logger.info(f"Successfully synthesized speech: '{text[:30]}...'")    
         return output_file
         
     except Exception as e:
         logger.error(f"Error synthesizing speech with neural voice: {e}")
+        logger.error(traceback.format_exc())
         return None
 
 

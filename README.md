@@ -183,19 +183,21 @@ For truly lifelike voice that sounds like you:
 
 5. Start the neural voice server on your GPU machine:
    ```
-   cd neural_voice_model/code
-   ./start_neural_server.sh
+   cd whisper-yabai-mac-os-x
+   scripts/gpu/manage_neural_server.sh start
    ```
-   The server will provide high-quality voice synthesis via HTTP API on port 5001
+   The server will provide high-quality voice synthesis via HTTP API on port 6000
 
 6. On your client machine, configure the neural server address:
    ```
-   export NEURAL_SERVER="http://your-gpu-server-ip:5001"
+   scripts/gpu/manage_neural_server.sh setup
+   # Or manually set
+   export NEURAL_SERVER="http://your-gpu-server-ip:6000"
    ```
 
 7. Test your neural voice:
    ```
-   python test_neural_voice.py
+   python test_client.py
    ```
 
 The system will automatically use the best available voice, prioritizing the GPU-based neural model when available and falling back to parameter-based voice when the GPU server is offline.
@@ -523,11 +525,13 @@ The documentation website includes:
 #### Neural Voice Model Issues
 
 - If the neural voice client can't connect to the server:
-  - Check that the GPU server is running with `./start_neural_server.sh` on the GPU server
+  - Check that the GPU server is running with `scripts/gpu/manage_neural_server.sh status` 
+  - Start the server if needed with `scripts/gpu/manage_neural_server.sh start`
   - Verify the server URL is correct in the `NEURAL_SERVER` environment variable
-  - Check that port 5001 is open on the GPU server's firewall
-  - Ensure the client can reach the server (try `curl http://your-gpu-server-ip:5001/info`)
+  - Check that port 6000 is open on the GPU server's firewall
+  - Test server connection with `scripts/gpu/manage_neural_server.sh test` or `python test_server.py`
   - Verify the GPU server is on the same network or properly port-forwarded
+  - For detailed setup instructions, see `docs/NEURAL_VOICE_SETUP.md`
 
 - If the neural voice quality is not good enough:
   - Increase the training epochs to 10000 for extended training

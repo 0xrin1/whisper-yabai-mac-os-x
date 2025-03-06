@@ -78,12 +78,18 @@ except ImportError:
     
 # Try to import the neural voice client
 try:
-    from src import neural_voice_client
+    from src.audio import neural_voice_client
     HAS_NEURAL_CLIENT = True
     logger.info("Neural voice client available")
 except ImportError:
-    HAS_NEURAL_CLIENT = False
-    logger.warning("Neural voice client not available")
+    try:
+        # Try alternative import path
+        import neural_voice_client
+        HAS_NEURAL_CLIENT = True
+        logger.info("Neural voice client available (alternate path)")
+    except ImportError:
+        HAS_NEURAL_CLIENT = False
+        logger.warning("Neural voice client not available")
 
 # Track if speech is currently in progress
 _speaking_lock = threading.Lock()
@@ -409,63 +415,176 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
             logger.warning("Invalid model information")
             return False
             
-        # Check if we should use the GPU neural voice client
-        if engine_type == "neural" and NEURAL_VOICE_ENABLED and HAS_NEURAL_CLIENT:
-            logger.info(f"Using GPU neural voice client for '{text}'")
-            
-            # Configure server details (default is localhost but can be overridden)
-            neural_server = os.environ.get("NEURAL_SERVER", "http://localhost:5000")
-            neural_voice_client.configure(server=neural_server)
-            
-            # Use the neural voice client to synthesize and play speech
-            output_file = neural_voice_client.speak(text, play=True)
-            
-            if output_file and os.path.exists(output_file):
-                logger.info(f"Successfully synthesized speech with neural voice client")
-                return True
-                
-            # If client connection failed, continue with local methods
-            logger.warning("Neural voice client failed, trying local neural synthesis")
-            
-        # Check if we need to use neural synthesis locally
+        # Prioritize GPU neural voice client for neural engine
         if engine_type == "neural" and NEURAL_VOICE_ENABLED:
-            logger.info(f"Using local neural voice synthesis for '{text}'")
+            # Configure and test server connection
+            neural_server = os.environ.get("NEURAL_SERVER", "http://192.168.191.55:6000")
+            logger.info(f"Using GPU neural voice client for '{text}' with server {neural_server}")
             
-            # Load neural model if not already in cache
-            neural_model = None
-            if model_path in NEURAL_MODEL_CACHE:
-                neural_model = NEURAL_MODEL_CACHE[model_path]
-            else:
-                neural_model = load_neural_model(ACTIVE_VOICE_MODEL)
-                if neural_model:
-                    logger.info("Neural model loaded successfully")
+            # Try to use neural_voice_client directly without imports
+            try:
+                from src.audio import neural_voice_client
+                neural_voice_client.configure(server=neural_server)
                 
-            # If we have a neural model, use it
-            if neural_model:
-                # Synthesize speech with neural model
-                output_path = synthesize_with_neural_model(neural_model, text)
+                # Just check basic server connectivity first
+                basic_connection = False
+                try:
+                    import requests
+                    response = requests.get(neural_server, timeout=2)
+                    basic_connection = response.status_code == 200
+                    logger.info(f"Basic server connection: {basic_connection}")
+                except Exception as e:
+                    logger.warning(f"Error in basic server connectivity check: {e}")
                 
-                if output_path and os.path.exists(output_path):
-                    # Play the synthesized audio
-                    play_cmd = [
-                        "afplay",
-                        "-v", str(volume),
-                        output_path
-                    ]
-                    
-                    subprocess.run(play_cmd, check=True)
-                    
-                    # Clean up temporary file
+                if basic_connection:
+                    # Direct call to synthesize without using the client API
                     try:
-                        os.remove(output_path)
-                    except:
-                        pass
+                        import requests
+                        import tempfile
+                        import subprocess
                         
-                    return True
+                        # Make direct synthesize request
+                        response = requests.post(
+                            f"{neural_server}/synthesize",
+                            json={"text": text},
+                            timeout=10.0
+                        )
+                        
+                        if response.status_code == 200:
+                            # Save audio to temp file
+                            fd, output_file = tempfile.mkstemp(suffix=".wav")
+                            with open(output_file, 'wb') as f:
+                                f.write(response.content)
+                            
+                            # Play the audio
+                            if sys.platform == "darwin":  # macOS
+                                cmd = ["afplay", output_file]
+                            elif sys.platform.startswith("linux"):  # Linux
+                                cmd = ["aplay", output_file]
+                            else:
+                                cmd = None
+                                
+                            if cmd:
+                                subprocess.run(cmd, check=True)
+                                logger.info(f"Successfully played synthesized speech with direct API call")
+                                return True
+                        else:
+                            # If server returns error, use macOS say as fallback
+                            logger.warning(f"Server returned error {response.status_code}, using local fallback")
+                            # Create temp file for audio
+                            fd, output_file = tempfile.mkstemp(suffix=".aiff")
+                            os.close(fd)
+                            
+                            # Generate speech with macOS say
+                            cmd = ["say", "-v", "Daniel", "-o", output_file, text]
+                            subprocess.run(cmd, check=True)
+                            
+                            # Play the audio
+                            cmd = ["afplay", output_file]
+                            subprocess.run(cmd, check=True)
+                            
+                            # Clean up
+                            os.remove(output_file)
+                            
+                            logger.info(f"Successfully used local fallback for speech synthesis")
+                            return True
+                    except Exception as e:
+                        logger.error(f"Error with direct API call: {e}")
+                
+                # Try the regular client API as backup
+                connection_status = neural_voice_client.check_server_connection()
+                logger.info(f"Neural server connection status: {connection_status}")
+                
+                if connection_status:
+                    # Use the neural voice client to synthesize and play speech
+                    output_file = neural_voice_client.speak(text, play=True)
+                    
+                    if output_file and os.path.exists(output_file):
+                        logger.info(f"Successfully synthesized speech with neural voice client")
+                        return True
+            except Exception as e:
+                logger.error(f"Error connecting to neural voice server: {e}")
+                
+            # If we got here, the client connection failed
+            logger.warning("Neural voice client failed to connect to server")
             
-            # If neural synthesis failed, error out - no fallback anymore
-            logger.error("Neural voice synthesis failed - no fallback available")
-            return False
+            # Try local neural synthesis if TTS is available
+            if HAS_TTS:
+                logger.info(f"Using local neural voice synthesis for '{text}'")
+                
+                # Load neural model if not already in cache
+                neural_model = None
+                if model_path in NEURAL_MODEL_CACHE:
+                    neural_model = NEURAL_MODEL_CACHE[model_path]
+                else:
+                    neural_model = load_neural_model(ACTIVE_VOICE_MODEL)
+                    if neural_model:
+                        logger.info("Neural model loaded successfully")
+                    
+                # If we have a neural model, use it
+                if neural_model:
+                    # Synthesize speech with neural model
+                    output_path = synthesize_with_neural_model(neural_model, text)
+                    
+                    if output_path and os.path.exists(output_path):
+                        # Play the synthesized audio
+                        play_cmd = [
+                            "afplay",
+                            "-v", str(volume),
+                            output_path
+                        ]
+                        
+                        subprocess.run(play_cmd, check=True)
+                        
+                        # Clean up temporary file
+                        try:
+                            os.remove(output_path)
+                        except:
+                            pass
+                            
+                        return True
+            
+            # If neural synthesis failed, try fallback to macOS say
+            logger.error("Neural voice synthesis failed - falling back to system voice")
+            # Create unique temp file for this speech
+            unique_id = int(time.time() * 1000)
+            temp_dir = os.path.join(model_path, "temp")
+            if not os.path.exists(temp_dir):
+                os.makedirs(temp_dir)
+            temp_audio = os.path.join(temp_dir, f"voice_{unique_id}.aiff")
+            
+            # Get voice profile from model metadata
+            voice_profile = ACTIVE_VOICE_MODEL.get("voice_profile", {})
+            base_voice = voice_profile.get("base_voice", "Daniel")
+            temp_pitch = voice_profile.get("pitch_modifier", 0.95)
+            adjusted_rate = int(rate * voice_profile.get("speaking_rate", 1.0))
+            
+            # Generate speech with macOS high-quality voice
+            base_cmd = [
+                "say",
+                "-v", base_voice,
+                "-r", str(adjusted_rate),
+                "-o", temp_audio,
+                text
+            ]
+            
+            subprocess.run(base_cmd, check=True, capture_output=True, text=True)
+            
+            # Play with customized parameters
+            play_cmd = [
+                "afplay",
+                "-v", str(volume),
+                "-r", str(temp_pitch),  # Adjusted pitch
+                temp_audio
+            ]
+            
+            subprocess.run(play_cmd, check=True)
+            
+            # Clean up
+            if os.path.exists(temp_audio):
+                os.remove(temp_audio)
+                
+            return True
         
         # Only proceed with parameter-based synthesis if engine_type is not "neural"
         # We've already failed and returned false above if neural synthesis was required
