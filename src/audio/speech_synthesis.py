@@ -456,25 +456,9 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
                                 logger.info(f"Successfully played synthesized speech with direct API call")
                                 return True
                         else:
-                            # If server returns error, use macOS say as fallback
-                            logger.warning(f"Server returned error {response.status_code}, using local fallback")
-                            # Create temp file for audio
-                            fd, output_file = tempfile.mkstemp(suffix=".aiff")
-                            os.close(fd)
-                            
-                            # Generate speech with macOS say
-                            cmd = ["say", "-v", "Daniel", "-o", output_file, text]
-                            subprocess.run(cmd, check=True)
-                            
-                            # Play the audio
-                            cmd = ["afplay", output_file]
-                            subprocess.run(cmd, check=True)
-                            
-                            # Clean up
-                            os.remove(output_file)
-                            
-                            logger.info(f"Successfully used local fallback for speech synthesis")
-                            return True
+                            # If server returns error, neural voice is required
+                            logger.error(f"Server returned error {response.status_code}, neural voice synthesis failed")
+                            return False
                     except Exception as e:
                         logger.error(f"Error with direct API call: {e}")
                 
@@ -542,47 +526,9 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
                             
                         return True
             
-            # If neural synthesis failed, try fallback to macOS say
-            logger.error("Neural voice synthesis failed - falling back to system voice")
-            # Create unique temp file for this speech
-            unique_id = int(time.time() * 1000)
-            temp_dir = os.path.join(model_path, "temp")
-            if not os.path.exists(temp_dir):
-                os.makedirs(temp_dir)
-            temp_audio = os.path.join(temp_dir, f"voice_{unique_id}.aiff")
-            
-            # Get voice profile from model metadata
-            voice_profile = ACTIVE_VOICE_MODEL.get("voice_profile", {})
-            base_voice = voice_profile.get("base_voice", "Daniel")
-            temp_pitch = voice_profile.get("pitch_modifier", 0.95)
-            adjusted_rate = int(rate * voice_profile.get("speaking_rate", 1.0))
-            
-            # Generate speech with macOS high-quality voice
-            base_cmd = [
-                "say",
-                "-v", base_voice,
-                "-r", str(adjusted_rate),
-                "-o", temp_audio,
-                text
-            ]
-            
-            subprocess.run(base_cmd, check=True, capture_output=True, text=True)
-            
-            # Play with customized parameters
-            play_cmd = [
-                "afplay",
-                "-v", str(volume),
-                "-r", str(temp_pitch),  # Adjusted pitch
-                temp_audio
-            ]
-            
-            subprocess.run(play_cmd, check=True)
-            
-            # Clean up
-            if os.path.exists(temp_audio):
-                os.remove(temp_audio)
-                
-            return True
+            # Neural voice synthesis failed - no fallback available
+            logger.error("Neural voice synthesis failed - no fallback available")
+            return False
         
         # Only proceed with parameter-based synthesis if engine_type is not "neural"
         # We've already failed and returned false above if neural synthesis was required

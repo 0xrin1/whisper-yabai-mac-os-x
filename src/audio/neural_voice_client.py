@@ -42,25 +42,21 @@ CONNECTION_TIMEOUT = 2.0  # Server connection timeout in seconds
 server_url = DEFAULT_SERVER
 cache = {}  # text -> file path
 cache_lock = threading.Lock()
-fallback_enabled = False  # Fallback is now disabled
 last_connection_time = 0
 connection_status = "unknown"  # "unknown", "connected", "disconnected"
 last_connection_attempt = 0
 connection_cooldown = 5.0  # Seconds to wait between connection attempts
 server_info = None
 
-def configure(server: str = DEFAULT_SERVER, enable_fallback: bool = False):
+def configure(server: str = DEFAULT_SERVER):
     """Configure the neural voice client.
     
     Args:
         server: URL of the neural voice server (including protocol and port)
-        enable_fallback: Whether to enable fallback to local TTS if server is unavailable
-                        (Kept for backward compatibility but defaults to False and is ignored)
     """
-    global server_url, fallback_enabled, connection_status
+    global server_url, connection_status
     
     server_url = server
-    fallback_enabled = False  # Always disable fallback regardless of parameter
     connection_status = "unknown"
     
     # Create cache directory
