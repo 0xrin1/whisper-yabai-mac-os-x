@@ -102,3 +102,10 @@
   - Testing scripts: `scripts/gpu/` for GPU/neural server tests
   - Setup scripts: `scripts/setup/` for environment configuration
   - Neural voice scripts: `scripts/neural_voice/` for voice-related utilities
+
+## Claude Code Guidelines
+
+- NEVER create new files when asked to delete files
+- Focus on consolidating functionality into existing files rather than creating new ones
+- Always check if functionality can be added to existing scripts first
+- When refactoring, prioritize removing redundant code/files

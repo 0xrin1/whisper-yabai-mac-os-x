@@ -105,6 +105,31 @@ check_server_status() {
             return 1
         else
             echo -e "${YELLOW}Neural voice server process exists but is not responding on port ${PORT}${NC}"
+            
+            # Get process details
+            local pid=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'pgrep -f \"python.*neural_voice_server.py.*--port ${PORT}\" | head -n1'")
+            echo -e "${BLUE}Process information (PID: ${pid}):${NC}"
+            
+            # Check if process is running with correct parameters
+            local cmd_line=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'ps -p ${pid} -o args='")
+            echo -e "${BLUE}Command line: ${cmd_line}${NC}"
+            
+            # Check if process is binding to any interface or just localhost
+            local netstat_cmd="ss -tlnp 2>/dev/null | grep ${pid} || netstat -tlnp 2>/dev/null | grep ${pid}"
+            local binding_info=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c '$netstat_cmd'")
+            if [[ -z "$binding_info" ]]; then
+                echo -e "${RED}No network binding information found for PID ${pid}${NC}"
+                echo -e "${YELLOW}Process might be failing to bind to port ${PORT}${NC}"
+            else
+                echo -e "${BLUE}Network binding: ${binding_info}${NC}"
+                
+                # Check if binding to localhost only
+                if [[ "$binding_info" == *"127.0.0.1:${PORT}"* || "$binding_info" == *"localhost:${PORT}"* ]]; then
+                    echo -e "${YELLOW}WARNING: Server is only bound to localhost, not external interfaces${NC}"
+                    echo -e "${YELLOW}This is why remote clients cannot connect. Use --host 0.0.0.0 to bind to all interfaces${NC}"
+                fi
+            fi
+            
             return 0
         fi
     else
@@ -187,11 +212,18 @@ start_server() {
     # Activate environment with CUDA support
     if ${USE_SPECIAL_ACTIVATION}; then
         echo "Using custom neural_cuda_activate.sh script..."
-        source ~/neural_cuda_activate.sh
+        if [ -f ~/neural_cuda_activate.sh ]; then
+            source ~/neural_cuda_activate.sh
+        else
+            echo "Warning: neural_cuda_activate.sh not found!"
+            # Use default environment setup
+            export CUDA_HOME=/usr
+            export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH
+            export CUDA_VISIBLE_DEVICES=0,1,2,3
+            export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+        fi
     else
         echo "Using standard conda activation..."
-    # Use our custom activation script that sets up CUDA properly
-    source ~/neural_cuda_activate.sh        
         # Set CUDA environment variables
         export CUDA_HOME=/usr
         export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH
@@ -204,14 +236,16 @@ start_server() {
     
     # Check CUDA status before starting server
     echo "===== CUDA SETUP VERIFICATION =====" > \${LOG_FILE}
-    python -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count() if torch.cuda.is_available() else 0)" >> \${LOG_FILE} 2>&1
+    python3 -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count() if torch.cuda.is_available() else 0)" >> \${LOG_FILE} 2>&1
     
     # Make sure model directory exists
     mkdir -p ${MODEL_DIR}
     
     # Start the server
     echo "Starting neural voice server..." >> \${LOG_FILE}
-    nohup python -u ${SERVER_SCRIPT} --port ${PORT} --host 0.0.0.0 --model ${MODEL_DIR} >> \${LOG_FILE} 2>&1 &
+    # IMPORTANT: Using --host 0.0.0.0 to ensure server binds to all interfaces, not just localhost
+    echo "Using host 0.0.0.0 to bind to all interfaces for external access" >> \${LOG_FILE}
+    nohup python3 -u ${SERVER_SCRIPT} --port ${PORT} --host 0.0.0.0 --model ${MODEL_DIR} >> \${LOG_FILE} 2>&1 &
     
     # Wait a moment to let server start
     sleep 5
@@ -259,10 +293,47 @@ get_logs() {
     ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'cat ${log_file} 2>/dev/null || echo \"Log file not found: ${log_file}\"'"
 }
 
-# Check GPU information
+# Check detailed GPU information
 check_gpu() {
     echo -e "${GREEN}Checking GPU status on server...${NC}"
     ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'nvidia-smi || echo \"No NVIDIA GPU found or nvidia-smi not available\"'"
+}
+
+# Check full GPU server status
+check_full_gpu_status() {
+    echo -e "${GREEN}=== Checking GPU Server Status ===${NC}"
+    echo -e "${GREEN}Host: ${GPU_HOST}${NC}"
+    echo -e "${GREEN}User: ${GPU_USER}${NC}"
+    echo
+
+    # Check GPU status with nvidia-smi
+    echo -e "${GREEN}=== GPU Information ===${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'sudo nvidia-smi || nvidia-smi || echo \"Failed to run nvidia-smi. GPU info not available.\"'"
+
+    # Check system load
+    echo
+    echo -e "${GREEN}=== System Load ===${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'uptime && echo && echo \"CPU Usage:\" && top -bn1 | head -20'"
+
+    # Check disk space
+    echo
+    echo -e "${GREEN}=== Disk Space ===${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'df -h | grep -E \"/$|/home\"'"
+
+    # Check RAM usage
+    echo
+    echo -e "${GREEN}=== Memory Usage ===${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'free -h'"
+
+    # Find Python and pip
+    echo
+    echo -e "${GREEN}=== Python Environment ===${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'which python3 && python3 --version && which pip3 || which pip || echo \"pip not found in PATH\"'"
+
+    # List installed ML packages
+    echo
+    echo -e "${GREEN}=== Installed ML Packages ===${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'python3 -m pip list 2>/dev/null | grep -E \"torch|transformers|tts|tensorflow|voice|clone\" || echo \"No ML packages found or pip not available\"'"
 }
 
 # Restart the neural voice server
@@ -433,7 +504,99 @@ main() {
         exit 1
     fi
     
-    # Execute the requested action based on first argument
+    # Comprehensive check including both server status and client connection
+check_comprehensive_status() {
+    echo -e "${GREEN}=== Comprehensive Neural Voice Server Status Check ===${NC}"
+    
+    # First check server status
+    check_server_status
+    
+    # Check GPU status
+    check_full_gpu_status
+    
+    # First check network connectivity using telnet or nc
+    echo -e "${GREEN}=== Testing Network Connectivity ===${NC}"
+    echo -e "${BLUE}Checking network connectivity to port ${PORT}...${NC}"
+    
+    # Check which tool is available
+    if command -v nc &> /dev/null; then
+        if timeout 2 nc -zv ${GPU_HOST} ${PORT} &> /dev/null; then
+            echo -e "${GREEN}✅ Port ${PORT} is reachable${NC}"
+            port_reachable=true
+        else
+            echo -e "${RED}❌ Port ${PORT} is NOT reachable${NC}"
+            echo -e "${YELLOW}This suggests the server is running but not binding to the port correctly${NC}"
+            echo -e "${YELLOW}or there may be a firewall blocking the connection.${NC}"
+            port_reachable=false
+            
+            # Offer to fix by restarting the server
+            echo -e "${BLUE}Would you like to restart the server to fix the issue? (y/n)${NC}"
+            read -t 10 -n 1 answer || answer="n"
+            echo
+            
+            if [[ "$answer" == "y" ]]; then
+                echo -e "${GREEN}Restarting the neural voice server...${NC}"
+                restart_server
+            else
+                echo -e "${YELLOW}You can restart manually with: ./scripts/gpu/manage_neural_server.sh restart${NC}"
+            fi
+        fi
+    else
+        # Fallback to timeout and curl
+        if timeout 2 curl --connect-timeout 1 -s ${GPU_HOST}:${PORT} &> /dev/null; then
+            echo -e "${GREEN}✅ Port ${PORT} is reachable${NC}"
+            port_reachable=true
+        else
+            echo -e "${RED}❌ Port ${PORT} is NOT reachable${NC}" 
+            echo -e "${YELLOW}This suggests the server is running but not binding to the port correctly${NC}"
+            echo -e "${YELLOW}or there may be a firewall blocking the connection.${NC}"
+            port_reachable=false
+            
+            # Offer to fix by restarting the server
+            echo -e "${BLUE}Would you like to restart the server to fix the issue? (y/n)${NC}"
+            read -t 10 -n 1 answer || answer="n"
+            echo
+            
+            if [[ "$answer" == "y" ]]; then
+                echo -e "${GREEN}Restarting the neural voice server...${NC}"
+                restart_server
+            else
+                echo -e "${YELLOW}You can restart manually with: ./scripts/gpu/manage_neural_server.sh restart${NC}"
+            fi
+        fi
+    fi
+    
+    # Check if firewall is enabled on the GPU server
+    echo -e "${BLUE}Checking firewall status on GPU server...${NC}"
+    firewall_status=$(ssh "${GPU_USER}@${GPU_HOST}" "sudo -n systemctl status ufw 2>/dev/null || true")
+    
+    if [[ $firewall_status == *"Active: active"* ]]; then
+        echo -e "${YELLOW}⚠️ Firewall is active on GPU server${NC}"
+        echo -e "${YELLOW}Check if port ${PORT} is allowed:${NC}"
+        ssh "${GPU_USER}@${GPU_HOST}" "sudo -n ufw status 2>/dev/null || echo 'Cannot check firewall rules (requires sudo)'" 
+    else
+        echo -e "${GREEN}✅ No active firewall detected${NC}"
+    fi
+    
+    # Test client connection - only if the server is running
+    if check_server_status > /dev/null; then
+        echo -e "${GREEN}=== Testing Client Connection ===${NC}"
+        # Check if we have venv activated
+        if [ -d "venv" ]; then
+            # Activate the venv and run client test
+            source venv/bin/activate 2>/dev/null || true
+            echo -e "${GREEN}Running client connection test...${NC}"
+            python ./scripts/neural_voice/test_neural_voice.py --server-only --server "http://${GPU_HOST}:${PORT}"
+        else
+            echo -e "${YELLOW}Virtual environment not found, skipping client connection test${NC}"
+            echo -e "${YELLOW}Run 'python ./scripts/neural_voice/test_neural_voice.py --server-only' to test client connection${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Server not running, skipping client connection test${NC}"
+    fi
+}
+
+# Execute the requested action based on first argument
     case "$ACTION" in
         start)
             # Check conda environment before starting
@@ -464,6 +627,10 @@ main() {
             ;;
         status)
             check_server_status
+            check_full_gpu_status
+            ;;
+        full-status|check|test)
+            check_comprehensive_status
             ;;
         logs)
             get_logs
@@ -484,6 +651,9 @@ main() {
             echo -e "  ${BLUE}stop${NC}       - Stop the neural voice server"
             echo -e "  ${BLUE}restart${NC}    - Restart the neural voice server"
             echo -e "  ${BLUE}status${NC}     - Check if the server is running"
+            echo -e "  ${BLUE}check${NC}      - Run comprehensive status check (server + client)"
+            echo -e "  ${BLUE}full-status${NC} - Same as check: comprehensive status check"
+            echo -e "  ${BLUE}test${NC}       - Same as check: comprehensive status check"
             echo -e "  ${BLUE}logs${NC}       - View server logs"
             echo -e "  ${BLUE}gpu${NC}        - Check GPU status on server"
             echo -e "  ${BLUE}setup-env${NC}  - Set up CUDA environment on GPU server"
