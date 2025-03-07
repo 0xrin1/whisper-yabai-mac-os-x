@@ -3,17 +3,13 @@
 ![CI Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/ci.yml/badge.svg)
 ![Lint Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/lint.yml/badge.svg)
 
-A voice command daemon that uses OpenAI's Whisper model locally to control your Mac, with Yabai window manager integration, LLM-powered natural language command interpretation, and customized voice synthesis that sounds like you.
+A voice command daemon that uses OpenAI's Whisper model locally to control your Mac, with Yabai window manager integration, LLM-powered natural language command interpretation, and text-to-speech feedback via external API.
 
 ## Features
 
 - Voice control for your Mac using a local Whisper model
 - Dictation mode for converting speech directly to text at cursor position
-- **Enhanced custom voice model** with advanced voice personalization:
-  - Voice profile extraction from your recordings
-  - Dynamic voice adjustments based on context
-  - Intelligent base voice selection tailored to your voice characteristics
-  - Customized pitch, rate, and tone based on your speech patterns
+- Text-to-speech API integration for voice feedback
 - Audio feedback with sounds for recording start/stop and completion
 - Yabai window manager integration for advanced window management
 - Continuous listening mode that automatically processes commands
@@ -124,85 +120,22 @@ There are two versions of the daemon:
 
 3. To exit, press Ctrl+C in the terminal or press ESC to exit gracefully.
 
-### Creating an Enhanced Custom Voice Model
+### Configuring the Speech Synthesis API
 
-The system supports two types of voice models:
+The system uses an external API for speech synthesis:
 
-#### 1. Parameter-Based Voice Model (Simple)
-
-The system uses an advanced voice model based on your voice characteristics:
-
-1. Record voice samples with the training utility:
+1. Set the API URL and key in your environment:
    ```
-   python src/voice_training.py
-   ```
-   This records samples and creates a baseline voice profile.
-
-2. Create your personalized voice model:
-   ```
-   ./create_voice_model.sh
-   ```
-   This analyzes your voice recordings to extract unique characteristics:
-   - Speech patterns and energy levels
-   - Voice profile with optimal parameters
-   - Context-aware speech adjustments
-
-3. Test your custom voice:
-   ```
-   python -c "import src.speech_synthesis as speech; speech.test_voices()"
-   ```
-   This compares your custom voice with standard system voices.
-
-#### 2. GPU-Accelerated Neural Voice Model (Advanced)
-
-For truly lifelike voice that sounds like you:
-
-1. Record voice samples as above (40+ samples recommended for best quality)
-
-2. Configure your GPU server details in `.env` file:
-   ```
-   GPU_SERVER_HOST=your-gpu-server-ip
-   GPU_SERVER_PORT=22
-   GPU_SERVER_USER=your-username
-   GPU_SERVER_PASSWORD=your-password
+   export SPEECH_API_URL="https://api.example.com/synthesize"
+   export SPEECH_API_KEY="your_api_key_here"
    ```
 
-3. Set up neural voice environment on GPU server:
+2. Test the speech synthesis:
    ```
-   ./setup_neural_voice.sh
-   ```
-   This transfers your samples and sets up the environment on your GPU server
-
-4. Train a high-performance neural model directly on your GPU server:
-   ```
-   ssh your-username@your-gpu-server-ip
-   cd neural_voice_model/code
-   python train_neural_voice.py --samples-dir ../samples --output-dir ../models --epochs 5000
-   ```
-   This creates a maximum-quality Tacotron2 model utilizing the full power of your RTX 3090 GPU
-
-5. Start the neural voice server on your GPU machine:
-   ```
-   cd whisper-yabai-mac-os-x
-   scripts/gpu/manage_neural_server.sh start
-   ```
-   The server will provide high-quality voice synthesis via HTTP API on port 6000
-
-6. On your client machine, configure the neural server address:
-   ```
-   scripts/gpu/manage_neural_server.sh setup
-   # Or manually set
-   export NEURAL_SERVER="http://your-gpu-server-ip:6000"
+   python -c "from src.audio.speech_synthesis import speak; speak('Hello, testing speech synthesis')"
    ```
 
-7. Test your neural voice:
-   ```
-   python test_client.py
-   ```
-
-The system will automatically use the best available voice, prioritizing the GPU-based neural model when available and falling back to parameter-based voice when the GPU server is offline.
-
-For detailed setup instructions, see `NEURAL_VOICE_GUIDE.md`
+For detailed API configuration instructions, see `docs/NEURAL_VOICE_SETUP.md`
 
 ## Voice Commands
 
@@ -338,8 +271,8 @@ LOG_LEVEL=INFO
 - `LLM_MODEL_PATH` - Path to the local LLM model in GGUF format
 - `LOG_LEVEL` - Set logging verbosity (DEBUG, INFO, WARNING, ERROR)
 - `VOICE_NAME` - System voice to use for speech synthesis
-- `USE_NEURAL_VOICE` - Enable neural voice if available
-- `NEURAL_SERVER` - URL of neural voice server
+- `SPEECH_API_URL` - URL for the speech synthesis API
+- `SPEECH_API_KEY` - Authentication key for the speech synthesis API
 
 ## Running as a Service
 
@@ -396,13 +329,8 @@ The project follows a modular directory structure:
 │   └── test_logs/          # Test log output
 ├── scripts/                # Shell scripts
 │   ├── docs/               # Documentation generation scripts
-│   ├── neural_voice/       # Neural voice scripts
-│   ├── gpu/                # GPU-related scripts
 │   └── setup/              # Setup scripts
-├── models/                 # Model files
-├── voice_models/           # Voice model data
-├── neural_cache/           # Neural voice cache
-└── tmp_neural_audio/       # Temporary neural audio files
+└── models/                 # Model files
 ```
 
 Each source directory contains a README.md with detailed information about its components and usage.
@@ -498,56 +426,25 @@ The documentation website includes:
   - Try clicking on the text field before dictating
   - For non-standard keyboard layouts, the clipboard-based paste approach should work
 
-### Voice Model Troubleshooting
+### Speech Synthesis Troubleshooting
 
-#### Parameter-Based Voice Model Issues
+- If speech synthesis is not working:
+  - Check that the API URL and key are correctly set in your environment
+  - Verify network connectivity to the API endpoint
+  - Check the logs for API error responses
+  - Try manually testing the API with a curl request
 
-- If the custom voice isn't working properly:
-  - Check that `voice_models/active_model.json` exists and points to a valid model
-  - Verify the voice profile was created correctly in the metadata.json file
-  - Run `python -c "import src.speech_synthesis as speech; speech.test_voices()"` to test voices
-  - Try `python src/speech_synthesis.py` to test individual voices
-
-- For better parameter-based voice quality:
-  - Record at least 40+ voice samples with diverse speech patterns
-  - Include a mix of commands, dictation, and natural speech
-  - Record in a quiet environment with a good microphone
-  - Use varied intonation for different types of phrases
-  - Record some questions, statements, and exclamations
-
-- Fine-tuning your parameter-based voice model:
-  - Customize parameters in `speech_synthesis.py` for your specific voice
-  - Adjust base voice selection (`Daniel`, `Samantha`, `Alex` work best)
-  - Try different pitch modifiers (0.92-0.98 range)
-  - Modify rate parameters for more natural speed
-  - Create a new model with `./create_voice_model.sh` after making changes
-
-#### Neural Voice Model Issues
-
-- If the neural voice client can't connect to the server:
-  - Check that the GPU server is running with `scripts/gpu/manage_neural_server.sh status` 
-  - Start the server if needed with `scripts/gpu/manage_neural_server.sh start`
-  - Verify the server URL is correct in the `NEURAL_SERVER` environment variable
-  - Check that port 6000 is open on the GPU server's firewall
-  - Test server connection with `scripts/gpu/manage_neural_server.sh test` or `python test_server.py`
-  - Verify the GPU server is on the same network or properly port-forwarded
+- API access issues:
+  - Verify your API key has not expired
+  - Check if there are rate limits on the API
+  - Ensure your network allows outbound connections to the API endpoint
   - For detailed setup instructions, see `docs/NEURAL_VOICE_SETUP.md`
 
-- If the neural voice quality is not good enough:
-  - Increase the training epochs to 10000 for extended training
-  - Check GPU logs to ensure full GPU utilization during training
-  - Provide more voice samples (40+ high-quality samples recommended)
-  - Make sure samples include diverse speech patterns and intonations
-  - Ensure your GPU has enough VRAM (RTX 3090 with 24GB recommended)
-  - Try adjusting the model configuration parameters in `train_neural_voice.py`
-
-- Server performance issues:
-  - Use a dedicated GPU for inference (RTX 3090 or better recommended)
-  - Check GPU memory usage with `nvidia-smi` while the server is running
-  - Increase the server's cache size in `neural_voice_server.py`
-  - Use a faster network connection between client and server
-  - Consider running the server on the same network as the client to reduce latency
-  - Try increasing the batch size for faster inference if your GPU has sufficient memory
+- Audio playback issues:
+  - Make sure your system's audio output is properly configured
+  - Check that audio is not muted
+  - Verify appropriate audio playback permissions
+  - Test audio playback with a simple system command like `afplay sample.wav`
 
 ### LLM Troubleshooting
 
