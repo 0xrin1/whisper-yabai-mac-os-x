@@ -2,6 +2,9 @@
 # Neural Voice Server Management Script
 # This script manages the neural voice server on the remote GPU machine with CUDA-enabled environment
 
+# Get the script directory
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -85,50 +88,11 @@ check_activation_script() {
     if ! ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'test -f ~/neural_cuda_activate.sh'"; then
         echo -e "${YELLOW}Activation script not found, creating one now...${NC}"
         
-        # Create a basic activation script
-        ssh "${GPU_USER}@${GPU_HOST}" << 'EOF'
-cat > ~/neural_cuda_activate.sh << 'ACTIVATE'
-#!/bin/bash
-# Script to activate the neural_cuda environment with proper CUDA settings
-
-# Activate conda environment using various methods
-if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    . "$HOME/miniconda3/etc/profile.d/conda.sh"
-    conda activate neural_cuda
-elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-    . "$HOME/anaconda3/etc/profile.d/conda.sh"
-    conda activate neural_cuda
-elif [ -f "$HOME/miniconda3/bin/activate" ]; then
-    source "$HOME/miniconda3/bin/activate" neural_cuda
-else
-    echo "WARNING: Could not find conda activation script"
-    # Try direct path to python in environment
-    if [ -f "$HOME/miniconda3/envs/neural_cuda/bin/python" ]; then
-        export PATH="$HOME/miniconda3/envs/neural_cuda/bin:$PATH"
-        echo "Using direct path to neural_cuda environment"
-    fi
-fi
-
-# Set CUDA environment variables for proper detection
-export CUDA_HOME=/usr/local/cuda
-[ -d /usr/local/cuda-11.8 ] && export CUDA_HOME=/usr/local/cuda-11.8
-[ -d /usr/lib/x86_64-linux-gnu ] && export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-[ -d $CUDA_HOME/lib64 ] && export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-
-# Make sure all GPUs are visible
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_DEVICE_ORDER=PCI_BUS_ID
-
-# For PyTorch optimization
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-
-# Print environment info
-echo "Activated neural_cuda environment with CUDA support"
-echo "Python: $(which python 2>/dev/null || echo 'not found')"
-ACTIVATE
-
-chmod +x ~/neural_cuda_activate.sh
-EOF
+        # Upload the activation script from the utils directory
+        scp "${SCRIPT_DIR}/utils/neural_cuda_activate.sh" "${GPU_USER}@${GPU_HOST}:~/neural_cuda_activate.sh"
+        
+        # Make it executable
+        ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/neural_cuda_activate.sh"
         
         if [ $? -eq 0 ]; then
             USE_SPECIAL_ACTIVATION=true
@@ -337,32 +301,11 @@ start_server() {
     # Create necessary directories
     mkdir -p ~/whisper-yabai-mac-os-x/gpu_scripts/audio_cache ~/audio_cache
     
-    # Debug CUDA detection
+    # Upload and run the CUDA detection test script
     echo "===== CUDA DETECTION TEST =====" >> \${LOG_FILE}
-    python -c "
-import os
-print('Environment variables:')
-print('- CUDA_HOME:', os.environ.get('CUDA_HOME', 'Not set'))
-print('- LD_LIBRARY_PATH:', os.environ.get('LD_LIBRARY_PATH', 'Not set'))
-print('- CUDA_VISIBLE_DEVICES:', os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set'))
-print('- PYTHONPATH:', os.environ.get('PYTHONPATH', 'Not set'))
-
-import sys
-print('\\nSystem paths:')
-for p in sys.path:
-    print(f'- {p}')
-
-# Look for CUDA libraries
-print('\\nCUDA library search:')
-cuda_paths = [
-    '/usr/local/cuda/lib64/libcudart.so',
-    '/usr/lib/x86_64-linux-gnu/libcudart.so',
-    '/usr/lib/x86_64-linux-gnu/libcuda.so',
-    '/usr/local/cuda-11/lib64/libcudart.so',
-]
-for path in cuda_paths:
-    print(f'- {path}: {os.path.exists(path)}')
-" >> \${LOG_FILE} 2>&1
+    scp "${SCRIPT_DIR}/utils/cuda_detection_test.py" "${GPU_USER}@${GPU_HOST}:~/cuda_detection_test.py"
+    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/cuda_detection_test.py"
+    ssh "${GPU_USER}@${GPU_HOST}" "~/cuda_detection_test.py" >> \${LOG_FILE} 2>&1
 
     # Check if required packages are available
     echo "===== PACKAGE VERIFICATION =====" >> \${LOG_FILE}
@@ -390,17 +333,10 @@ for path in cuda_paths:
         pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> \${LOG_FILE} 2>&1
     fi
     
-    # Verify CUDA is now available
-    python -c "
-import torch
-print('PyTorch CUDA check after installation:')
-print('- CUDA Available:', torch.cuda.is_available())
-if torch.cuda.is_available():
-    print('- CUDA Version:', torch.version.cuda)
-    print('- Device Count:', torch.cuda.device_count())
-    for i in range(torch.cuda.device_count()):
-        print(f'- Device {i}:', torch.cuda.get_device_name(i))
-" >> \${LOG_FILE} 2>&1
+    # Upload and run the PyTorch CUDA check script
+    scp "${SCRIPT_DIR}/utils/pytorch_cuda_check.py" "${GPU_USER}@${GPU_HOST}:~/pytorch_cuda_check.py"
+    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/pytorch_cuda_check.py"
+    ssh "${GPU_USER}@${GPU_HOST}" "~/pytorch_cuda_check.py" >> \${LOG_FILE} 2>&1
     
     # Check TTS 
     if python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> \${LOG_FILE} 2>&1; then
@@ -652,67 +588,7 @@ setup_cuda_env() {
     
     # Create or update the activation script
     echo "Creating activation script..." >> $LOG_FILE
-    cat > ~/neural_cuda_activate.sh << 'ACTIVATE'
-#!/bin/bash
-# Script to activate the neural_cuda environment with proper CUDA settings
-
-# Activate conda environment using various methods
-if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-    . "$HOME/miniconda3/etc/profile.d/conda.sh"
-    conda activate neural_cuda
-elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-    . "$HOME/anaconda3/etc/profile.d/conda.sh"
-    conda activate neural_cuda
-elif [ -f "$HOME/miniconda3/bin/activate" ]; then
-    source "$HOME/miniconda3/bin/activate" neural_cuda
-else
-    echo "WARNING: Could not find conda activation script"
-    # Try direct path to python in environment
-    if [ -f "$HOME/miniconda3/envs/neural_cuda/bin/python" ]; then
-        export PATH="$HOME/miniconda3/envs/neural_cuda/bin:$PATH"
-        echo "Using direct path to neural_cuda environment"
-    fi
-fi
-
-# Set CUDA environment variables for proper detection
-export CUDA_HOME=/usr/local/cuda
-[ -d /usr/local/cuda-11.8 ] && export CUDA_HOME=/usr/local/cuda-11.8
-[ -d /usr/lib/x86_64-linux-gnu ] && export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
-[ -d $CUDA_HOME/lib64 ] && export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-[ -d $CUDA_HOME/extras/CUPTI/lib64 ] && export LD_LIBRARY_PATH=$CUDA_HOME/extras/CUPTI/lib64:$LD_LIBRARY_PATH
-
-# Make sure all GPUs are visible
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-export CUDA_DEVICE_ORDER=PCI_BUS_ID
-
-# For PyTorch optimization
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-
-# Print environment info
-echo "Activated neural_cuda environment with CUDA support"
-if command -v python &> /dev/null; then
-    echo "Python: $(which python)"
-    echo "Python version: $(python --version)"
-    
-    # Test PyTorch CUDA detection
-    python -c "
-import torch
-print('PyTorch CUDA available:', torch.cuda.is_available())
-if torch.cuda.is_available():
-    print('  CUDA version:', torch.version.cuda)
-    print('  Device count:', torch.cuda.device_count())
-    for i in range(torch.cuda.device_count()):
-        print(f'  Device {i}:', torch.cuda.get_device_name(i))
-else:
-    import os
-    print('CUDA HOME:', os.environ.get('CUDA_HOME', 'Not set'))
-    print('LD_LIBRARY_PATH:', os.environ.get('LD_LIBRARY_PATH', 'Not set'))
-"
-else
-    echo "WARNING: Python not found in PATH after activation"
-fi
-ACTIVATE
-
+    cp "$SCRIPT_DIR/utils/neural_cuda_activate.sh" ~/neural_cuda_activate.sh
     chmod +x ~/neural_cuda_activate.sh
     
     # Create audio cache directories
