@@ -310,6 +310,18 @@ Examples of commands that work with LLM interpretation:
 
 The codebase has been restructured for improved maintainability and extensibility:
 
+### System Architecture
+
+The system uses a modular architecture with key components including:
+
+- Audio recording and processing
+- Speech recognition using Whisper
+- Command and dictation processing
+- External text-to-speech API integration
+- UI and system integration
+
+For detailed architecture documentation, including sequence diagrams of key processes, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ### Directory Structure
 
 The project follows a modular directory structure:

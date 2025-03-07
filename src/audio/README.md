@@ -80,51 +80,29 @@ recorder.stop()   # Stop listening
 
 ### `speech_synthesis.py`
 
-Handles text-to-speech functionality with support for custom voices.
+Handles text-to-speech functionality using an external API.
 
 **Key Features:**
-- Multiple synthesis methods (system voices, custom parameter-based, neural)
-- Voice customization with pitch, rate, and volume modifiers
-- Context-aware speech adaptations (questions, statements, commands)
-- Automatic fallback between voice synthesis methods
-- Caching mechanism for frequently spoken phrases
-- Support for different speech styles and emphasis
+- Integration with external TTS API for high-quality speech
+- Speech queuing system to prevent overlapping speech
+- Automatic caching of frequently spoken phrases
+- Support for both blocking and non-blocking speech
+- Predefined casual responses for common interactions
+- Robust error handling and fallback options
 
 **Usage Example:**
 ```python
-import src.audio.speech_synthesis as tts
+from src.audio.speech_synthesis import speak, speak_random
 
 # Basic speech synthesis
-tts.speak("Hello, how can I help you?")
+speak("Hello, how can I help you?")
 
-# Use specific voice
-tts.speak("This is an important message", voice_name="Alex")
+# Use blocking speech for important messages
+speak("This is an important message", block=True)
 
-# Test all available voices
-tts.test_voices()
-```
-
-### `neural_voice_client.py`
-
-Client for the neural voice synthesis server with local caching.
-
-**Key Features:**
-- Connects to GPU-accelerated neural voice server
-- Caches synthesized speech for performance
-- Implements automatic fallback to parameter-based voices
-- Handles network errors and server unavailability
-- Optimizes audio quality and latency
-- Supports custom voice models
-
-**Usage Example:**
-```python
-from src.audio.neural_voice_client import NeuralVoiceClient
-
-client = NeuralVoiceClient()
-# Synthesize speech using neural model
-audio_path = client.synthesize("Hello world", cache=True)
-# Play the synthesized audio
-client.play_audio(audio_path)
+# Use random responses from categories
+speak_random("greeting")    # Selects random greeting
+speak_random("confirmation") # Selects random confirmation
 ```
 
 ## Utility Components

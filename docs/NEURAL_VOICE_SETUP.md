@@ -14,6 +14,8 @@ The speech synthesis system now uses an external API for text-to-speech generati
 └─────────────────┘                └─────────────────┘
 ```
 
+For detailed system architecture and sequence diagrams showing how the TTS integration works, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Configuration
 
 The speech synthesis module is configured using environment variables:
