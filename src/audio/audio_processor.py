@@ -12,7 +12,7 @@ import whisper
 import torch
 
 from src.core.state_manager import state
-from src.utils.dictation import dictation
+from src.core.core_dictation import core_dictation
 from src.utils.llm_interpreter import CommandInterpreter
 
 # Import for command processing
@@ -222,7 +222,7 @@ class AudioProcessor:
                 # Process based on mode
                 if is_dictation_mode:
                     logger.debug(f"Processing as dictation text: '{transcription}'")
-                    dictation.process(transcription)
+                    core_dictation.type_text(transcription)
                     logger.debug("Dictation processing completed")
                 elif confidence >= self.min_confidence:
                     logger.debug("========== PROCESSING COMMAND ==========")
