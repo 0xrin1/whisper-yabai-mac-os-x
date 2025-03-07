@@ -83,8 +83,60 @@ find_server_script() {
 # Check activation script
 check_activation_script() {
     if ! ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'test -f ~/neural_cuda_activate.sh'"; then
-        echo -e "${YELLOW}Activation script not found, will use standard conda activation${NC}"
-        USE_SPECIAL_ACTIVATION=false
+        echo -e "${YELLOW}Activation script not found, creating one now...${NC}"
+        
+        # Create a basic activation script
+        ssh "${GPU_USER}@${GPU_HOST}" << 'EOF'
+cat > ~/neural_cuda_activate.sh << 'ACTIVATE'
+#!/bin/bash
+# Script to activate the neural_cuda environment with proper CUDA settings
+
+# Activate conda environment using various methods
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    . "$HOME/miniconda3/etc/profile.d/conda.sh"
+    conda activate neural_cuda
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    . "$HOME/anaconda3/etc/profile.d/conda.sh"
+    conda activate neural_cuda
+elif [ -f "$HOME/miniconda3/bin/activate" ]; then
+    source "$HOME/miniconda3/bin/activate" neural_cuda
+else
+    echo "WARNING: Could not find conda activation script"
+    # Try direct path to python in environment
+    if [ -f "$HOME/miniconda3/envs/neural_cuda/bin/python" ]; then
+        export PATH="$HOME/miniconda3/envs/neural_cuda/bin:$PATH"
+        echo "Using direct path to neural_cuda environment"
+    fi
+fi
+
+# Set CUDA environment variables for proper detection
+export CUDA_HOME=/usr/local/cuda
+[ -d /usr/local/cuda-11.8 ] && export CUDA_HOME=/usr/local/cuda-11.8
+[ -d /usr/lib/x86_64-linux-gnu ] && export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+[ -d $CUDA_HOME/lib64 ] && export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Make sure all GPUs are visible
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+
+# For PyTorch optimization
+export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+
+# Print environment info
+echo "Activated neural_cuda environment with CUDA support"
+echo "Python: $(which python 2>/dev/null || echo 'not found')"
+ACTIVATE
+
+chmod +x ~/neural_cuda_activate.sh
+EOF
+        
+        if [ $? -eq 0 ]; then
+            USE_SPECIAL_ACTIVATION=true
+            echo -e "${GREEN}Created neural_cuda_activate.sh script${NC}"
+        else
+            USE_SPECIAL_ACTIVATION=false
+            echo -e "${RED}Failed to create activation script, will use standard conda activation${NC}"
+        fi
     else
         USE_SPECIAL_ACTIVATION=true
         echo -e "${GREEN}Found neural_cuda_activate.sh script${NC}"
@@ -144,35 +196,57 @@ check_server_status() {
 stop_server() {
     echo -e "${GREEN}Stopping neural voice server on GPU host...${NC}"
     
-    # Check if the server is running
-    if ! check_server_status; then
+    # Get the PID of the process on the specific port
+    local pid=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'lsof -t -i:${PORT} || echo \"\"'")
+    
+    if [ -z "$pid" ]; then
+        # Try the pattern match approach as a fallback
+        pid=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'pgrep -f \"python.*neural_voice_server.py.*--port ${PORT}\" || echo \"\"'")
+    fi
+    
+    if [ -z "$pid" ]; then
         echo -e "${YELLOW}Neural voice server is not running on port ${PORT}${NC}"
         return 0
     fi
     
-    # Use a direct approach to kill all neural voice server processes on that port
-    echo -e "${GREEN}Killing neural voice server processes${NC}"
-    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'pkill -f \"python.*neural_voice_server.py.*--port ${PORT}\"'"
-    sleep 1
-        
-    # Wait a moment and check if it's still running
+    # First try gentle kill
+    echo -e "${GREEN}Killing neural voice server process (PID: ${pid})${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'kill ${pid} 2>/dev/null || true'"
     sleep 2
-    if ! check_server_status; then
+    
+    # Check if the process is still running
+    pid=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'lsof -t -i:${PORT} 2>/dev/null || echo \"\"'")
+    if [ -z "$pid" ]; then
         echo -e "${GREEN}Neural voice server stopped successfully${NC}"
         return 0
+    fi
+    
+    # Try force kill
+    echo -e "${RED}Failed to stop neural voice server. Using force kill...${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'kill -9 ${pid} 2>/dev/null || true'"
+    sleep 2
+    
+    # Check one more time
+    pid=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'lsof -t -i:${PORT} 2>/dev/null || echo \"\"'")
+    if [ -z "$pid" ]; then
+        echo -e "${GREEN}Neural voice server force-stopped successfully${NC}"
+        return 0
+    fi
+    
+    # Last resort - use the port directly
+    echo -e "${RED}Failed to stop by PID. Trying extreme measures...${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'fuser -k ${PORT}/tcp 2>/dev/null || true'"
+    sleep 2
+    
+    # Final check
+    pid=$(ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'lsof -t -i:${PORT} 2>/dev/null || echo \"\"'")
+    if [ -z "$pid" ]; then
+        echo -e "${GREEN}Neural voice server stopped by port kill${NC}"
+        return 0
     else
-        echo -e "${RED}Failed to stop neural voice server. Using force kill...${NC}"
-        # Use force kill (-9) with pkill
-        ssh "${GPU_USER}@${GPU_HOST}" "bash -l -c 'pkill -9 -f \"python.*neural_voice_server.py.*--port ${PORT}\"'"
-        sleep 1
-        
-        if ! check_server_status; then
-            echo -e "${GREEN}Neural voice server force-stopped successfully${NC}"
-            return 0
-        else
-            echo -e "${RED}Failed to force-stop neural voice server${NC}"
-            return 1
-        fi
+        echo -e "${RED}Failed to force-stop neural voice server. Manual intervention needed.${NC}"
+        echo -e "${YELLOW}Run manually on server: sudo lsof -i:${PORT} and then kill -9 PID${NC}"
+        return 1
     fi
 }
 
@@ -188,6 +262,12 @@ start_server() {
     # Find the server script
     if ! find_server_script; then
         return 1
+    fi
+    
+    # Check if the neural_cuda environment exists
+    if ! check_conda_env; then
+        echo -e "${YELLOW}Neural CUDA environment not found. Setting it up now...${NC}"
+        setup_cuda_env
     fi
     
     # Check activation script
@@ -210,20 +290,21 @@ start_server() {
     cd ~
     
     # Activate environment with CUDA support
-    if ${USE_SPECIAL_ACTIVATION}; then
-        echo "Using custom neural_cuda_activate.sh script..."
-        if [ -f ~/neural_cuda_activate.sh ]; then
-            source ~/neural_cuda_activate.sh
-        else
-            echo "Warning: neural_cuda_activate.sh not found!"
-            # Use default environment setup
-            export CUDA_HOME=/usr
-            export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH
-            export CUDA_VISIBLE_DEVICES=0,1,2,3
-            export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-        fi
+    if [ -f ~/neural_cuda_activate.sh ]; then
+        echo "Using neural_cuda_activate.sh script..."
+        source ~/neural_cuda_activate.sh
     else
-        echo "Using standard conda activation..."
+        echo "Warning: neural_cuda_activate.sh not found!"
+        
+        # Try to source conda directly
+        if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+            . "$HOME/miniconda3/etc/profile.d/conda.sh"
+            conda activate neural_cuda
+        else
+            echo "Trying direct environment path..."
+            export PATH="$HOME/miniconda3/envs/neural_cuda/bin:$PATH"
+        fi
+        
         # Set CUDA environment variables
         export CUDA_HOME=/usr
         export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH
@@ -231,21 +312,124 @@ start_server() {
         export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
     fi
     
+    # Verify Python is working
+    if ! command -v python &> /dev/null; then
+        echo "ERROR: Python not found after activation. Check environment setup."
+        exit 1
+    fi
+    
+    # Set proper CUDA environment variables
+    export CUDA_HOME=/usr/local/cuda
+    export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+    export CUDA_VISIBLE_DEVICES=0,1,2,3
+    export CUDA_DEVICE_ORDER=PCI_BUS_ID
+    echo "===== CUDA ENVIRONMENT SETUP =====" > \${LOG_FILE}
+    echo "CUDA_HOME: $CUDA_HOME" >> \${LOG_FILE}
+    echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH" >> \${LOG_FILE}
+    echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES" >> \${LOG_FILE}
+    
+    # Display Python and environment info
+    echo "===== PYTHON ENVIRONMENT =====" >> \${LOG_FILE}
+    echo "Python path: \$(which python)" >> \${LOG_FILE}
+    echo "Python version: \$(python --version 2>&1)" >> \${LOG_FILE}
+    echo "pip path: \$(which pip 2>/dev/null || echo 'pip not found')" >> \${LOG_FILE}
+    
     # Create necessary directories
     mkdir -p ~/whisper-yabai-mac-os-x/gpu_scripts/audio_cache ~/audio_cache
     
-    # Check CUDA status before starting server
-    echo "===== CUDA SETUP VERIFICATION =====" > \${LOG_FILE}
-    python3 -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('Device count:', torch.cuda.device_count() if torch.cuda.is_available() else 0)" >> \${LOG_FILE} 2>&1
+    # Debug CUDA detection
+    echo "===== CUDA DETECTION TEST =====" >> \${LOG_FILE}
+    python -c "
+import os
+print('Environment variables:')
+print('- CUDA_HOME:', os.environ.get('CUDA_HOME', 'Not set'))
+print('- LD_LIBRARY_PATH:', os.environ.get('LD_LIBRARY_PATH', 'Not set'))
+print('- CUDA_VISIBLE_DEVICES:', os.environ.get('CUDA_VISIBLE_DEVICES', 'Not set'))
+print('- PYTHONPATH:', os.environ.get('PYTHONPATH', 'Not set'))
+
+import sys
+print('\\nSystem paths:')
+for p in sys.path:
+    print(f'- {p}')
+
+# Look for CUDA libraries
+print('\\nCUDA library search:')
+cuda_paths = [
+    '/usr/local/cuda/lib64/libcudart.so',
+    '/usr/lib/x86_64-linux-gnu/libcudart.so',
+    '/usr/lib/x86_64-linux-gnu/libcuda.so',
+    '/usr/local/cuda-11/lib64/libcudart.so',
+]
+for path in cuda_paths:
+    print(f'- {path}: {os.path.exists(path)}')
+" >> \${LOG_FILE} 2>&1
+
+    # Check if required packages are available
+    echo "===== PACKAGE VERIFICATION =====" >> \${LOG_FILE}
+    
+    # Check NumPy
+    if python -c "import numpy; print(f'NumPy version: {numpy.__version__}')" >> \${LOG_FILE} 2>&1; then
+        echo "✓ NumPy is available" >> \${LOG_FILE}
+    else
+        echo "✗ NumPy not available, installing..." >> \${LOG_FILE}
+        pip install numpy==1.22.0 >> \${LOG_FILE} 2>&1
+    fi
+    
+    # Check PyTorch with specific CUDA version
+    if python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')" >> \${LOG_FILE} 2>&1; then
+        echo "✓ PyTorch is available" >> \${LOG_FILE}
+        
+        # If PyTorch is available but CUDA is not detected, try reinstall with specific version
+        if ! python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'" >> \${LOG_FILE} 2>&1; then
+            echo "✗ PyTorch installed but CUDA not detected, reinstalling with specific CUDA version..." >> \${LOG_FILE}
+            pip uninstall -y torch torchvision torchaudio >> \${LOG_FILE} 2>&1
+            pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> \${LOG_FILE} 2>&1
+        fi
+    else
+        echo "✗ PyTorch not available, installing..." >> \${LOG_FILE}
+        pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> \${LOG_FILE} 2>&1
+    fi
+    
+    # Verify CUDA is now available
+    python -c "
+import torch
+print('PyTorch CUDA check after installation:')
+print('- CUDA Available:', torch.cuda.is_available())
+if torch.cuda.is_available():
+    print('- CUDA Version:', torch.version.cuda)
+    print('- Device Count:', torch.cuda.device_count())
+    for i in range(torch.cuda.device_count()):
+        print(f'- Device {i}:', torch.cuda.get_device_name(i))
+" >> \${LOG_FILE} 2>&1
+    
+    # Check TTS 
+    if python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> \${LOG_FILE} 2>&1; then
+        echo "✓ TTS is available" >> \${LOG_FILE}
+    else
+        echo "✗ TTS not available, installing..." >> \${LOG_FILE}
+        pip install TTS==0.13.0 >> \${LOG_FILE} 2>&1
+    fi
+    
+    # Check Flask
+    if python -c "import flask; print(f'Flask version: {flask.__version__}')" >> \${LOG_FILE} 2>&1; then
+        echo "✓ Flask is available" >> \${LOG_FILE}
+    else
+        echo "✗ Flask not available, installing..." >> \${LOG_FILE}
+        pip install flask >> \${LOG_FILE} 2>&1
+    fi
     
     # Make sure model directory exists
     mkdir -p ${MODEL_DIR}
     
     # Start the server
-    echo "Starting neural voice server..." >> \${LOG_FILE}
+    echo "===== STARTING NEURAL VOICE SERVER =====" >> \${LOG_FILE}
     # IMPORTANT: Using --host 0.0.0.0 to ensure server binds to all interfaces, not just localhost
     echo "Using host 0.0.0.0 to bind to all interfaces for external access" >> \${LOG_FILE}
-    nohup python3 -u ${SERVER_SCRIPT} --port ${PORT} --host 0.0.0.0 --model ${MODEL_DIR} >> \${LOG_FILE} 2>&1 &
+    
+    # Run server with explicit python path to ensure we use the right environment
+    PYTHON_PATH=\$(which python)
+    echo "Using Python: \${PYTHON_PATH}" >> \${LOG_FILE}
+    nohup \${PYTHON_PATH} -u ${SERVER_SCRIPT} --port ${PORT} --host 0.0.0.0 --model ${MODEL_DIR} >> \${LOG_FILE} 2>&1 &
     
     # Wait a moment to let server start
     sleep 5
@@ -358,125 +542,204 @@ setup_cuda_env() {
     echo "===== Neural CUDA Environment Setup Log =====" > $LOG_FILE
     date >> $LOG_FILE
     
-    # Check CUDA availability on the system
-    echo "===== CUDA System Check =====" >> $LOG_FILE
-    ls -la /usr/local/cuda* >> $LOG_FILE 2>&1
-    ls -la /usr/lib/x86_64-linux-gnu/libcuda* >> $LOG_FILE 2>&1
-    nvidia-smi >> $LOG_FILE 2>&1
+    # Check if miniconda is installed correctly
+    echo "Checking for Miniconda..." >> $LOG_FILE
+    if [ -d "$HOME/miniconda3" ]; then
+        echo "Miniconda found at $HOME/miniconda3" >> $LOG_FILE
+    else
+        echo "Miniconda not found in expected location. Will use system conda if available." >> $LOG_FILE
+    fi
     
-    # Check if conda is available
-    if ! command -v conda &> /dev/null; then
-        echo "Conda not found. Cannot proceed." >> $LOG_FILE
-        echo "Conda not found. Please install Miniconda or Anaconda first."
+    # Try different methods to activate conda
+    if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+        echo "Sourcing conda.sh from miniconda3..." >> $LOG_FILE
+        . "$HOME/miniconda3/etc/profile.d/conda.sh"
+        CONDA_CMD="conda"
+    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        echo "Sourcing conda.sh from anaconda3..." >> $LOG_FILE
+        . "$HOME/anaconda3/etc/profile.d/conda.sh"
+        CONDA_CMD="conda"
+    elif command -v conda &> /dev/null; then
+        echo "Using system conda command..." >> $LOG_FILE
+        CONDA_CMD="conda"
+    elif [ -f "$HOME/miniconda3/bin/conda" ]; then
+        echo "Using miniconda3/bin/conda directly..." >> $LOG_FILE
+        CONDA_CMD="$HOME/miniconda3/bin/conda"
+    else
+        echo "ERROR: Conda not found in any standard location. Cannot proceed." >> $LOG_FILE
+        echo "ERROR: Conda not found in any standard location. Cannot proceed."
         exit 1
     fi
     
-    # Check if environment already exists and remove it if it does
+    echo "Using conda command: $CONDA_CMD" >> $LOG_FILE
+    
+    # Check CUDA availability on the system
+    echo "===== CUDA System Check =====" >> $LOG_FILE
+    ls -la /usr/local/cuda* >> $LOG_FILE 2>&1 || echo "No CUDA found in /usr/local" >> $LOG_FILE
+    ls -la /usr/lib/x86_64-linux-gnu/libcuda* >> $LOG_FILE 2>&1 || echo "No CUDA libs found in standard location" >> $LOG_FILE
+    nvidia-smi >> $LOG_FILE 2>&1 || echo "nvidia-smi failed, may need permissions" >> $LOG_FILE
+    
+    # Check if environment already exists
     echo "Checking for existing neural_cuda environment..." >> $LOG_FILE
-    if conda env list | grep -q "^$CONDA_ENV "; then
-        echo "Removing existing neural_cuda environment..." >> $LOG_FILE
-        conda env remove -n $CONDA_ENV -y >> $LOG_FILE 2>&1
+    if $CONDA_CMD env list | grep -q "neural_cuda"; then
+        echo "Neural CUDA environment already exists" >> $LOG_FILE
+        
+        # Check if the environment already has the required packages
+        echo "Checking for required packages in existing environment..." >> $LOG_FILE
+        if $CONDA_CMD run -n neural_cuda python -c "import sys, numpy, torch, flask; print('Key packages available')" >> $LOG_FILE 2>&1; then
+            echo "✓ Basic packages found in environment" >> $LOG_FILE
+            NEEDS_CORE_PACKAGES=false
+        else
+            echo "✗ Some basic packages missing, will install them" >> $LOG_FILE
+            NEEDS_CORE_PACKAGES=true
+        fi
+        
+        # Check for TTS specifically since it's often missing
+        if $CONDA_CMD run -n neural_cuda python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> $LOG_FILE 2>&1; then
+            echo "✓ TTS package already installed" >> $LOG_FILE
+            NEEDS_TTS=false
+        else
+            echo "✗ TTS package missing, will install it" >> $LOG_FILE
+            NEEDS_TTS=true
+        fi
+    else
+        echo "Creating neural_cuda environment from scratch..." >> $LOG_FILE
+        $CONDA_CMD create -n neural_cuda python=3.9 -y >> $LOG_FILE 2>&1
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to create conda environment" >> $LOG_FILE
+            echo "ERROR: Failed to create conda environment"
+            exit 1
+        fi
+        NEEDS_CORE_PACKAGES=true
+        NEEDS_TTS=true
     fi
     
-    # Create fresh conda environment with Python 3.9
-    echo "Creating fresh neural_cuda conda environment..." >> $LOG_FILE
-    conda create -n $CONDA_ENV python=3.9 -y >> $LOG_FILE 2>&1
-    
-    # Activate the environment and install dependencies
-    echo "Installing dependencies in the new environment..." >> $LOG_FILE
-    
-    # Create a temporary requirements file with exact versions
-    cat > /tmp/neural_requirements.txt << 'REQUIREMENTS'
-numpy>=1.20.0
-scipy>=1.7.0
-librosa>=0.9.1
-soundfile>=0.10.3
-matplotlib>=3.5.0
-phonemizer>=3.0.0
-flask>=2.0.1
-TTS>=0.12.0
-REQUIREMENTS
-    
-    # Install base dependencies
-    conda activate $CONDA_ENV && pip install -r /tmp/neural_requirements.txt >> $LOG_FILE 2>&1
-    
-    # Install PyTorch with CUDA - using pip to ensure we get the CUDA version
-    echo "Installing PyTorch with CUDA support..." >> $LOG_FILE
-    conda activate $CONDA_ENV && pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> $LOG_FILE 2>&1
-    
-    # Create a test script to verify CUDA is working
-    cat > /tmp/cuda_test.py << 'PYEOF'
-import torch
-import sys
-
-print("Python version:", sys.version)
-print("PyTorch version:", torch.__version__)
-print("CUDA available:", torch.cuda.is_available())
-print("CUDA version:", torch.version.cuda if torch.cuda.is_available() else "Not available")
-print("GPU count:", torch.cuda.device_count() if torch.cuda.is_available() else 0)
-
-if torch.cuda.is_available():
-    for i in range(torch.cuda.device_count()):
-        print(f"Device {i}: {torch.cuda.get_device_name(i)}")
+    # Function to install packages
+    install_packages() {
+        echo "Installing required packages..." >> $LOG_FILE
         
-    # Run a small test tensor operation on GPU
-    try:
-        x = torch.rand(100, 100).cuda()
-        y = torch.rand(100, 100).cuda()
-        z = torch.matmul(x, y)
-        print("Tensor operation successful on GPU")
-    except Exception as e:
-        print(f"Error running GPU tensor operation: {e}")
-else:
-    import os
-    print("Environment variables:")
-    print("- CUDA_HOME:", os.environ.get('CUDA_HOME', 'Not set'))
-    print("- LD_LIBRARY_PATH:", os.environ.get('LD_LIBRARY_PATH', 'Not set'))
-PYEOF
+        # Make sure conda environment is activated properly
+        if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+            . "$HOME/miniconda3/etc/profile.d/conda.sh"
+        fi
+        
+        # Activate the environment
+        $CONDA_CMD activate neural_cuda
+        
+        if [ $NEEDS_CORE_PACKAGES = true ]; then
+            echo "Installing core packages..." >> $LOG_FILE
+            pip install numpy scipy flask >> $LOG_FILE 2>&1
+            pip install librosa soundfile matplotlib phonemizer >> $LOG_FILE 2>&1
+            
+            # Install PyTorch with CUDA
+            echo "Installing PyTorch with CUDA support..." >> $LOG_FILE
+            # Use CUDA 11.8 for best compatibility
+            pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> $LOG_FILE 2>&1
+        else
+            echo "Core packages already installed, skipping" >> $LOG_FILE
+        fi
+        
+        if [ $NEEDS_TTS = true ]; then
+            echo "Installing TTS package..." >> $LOG_FILE
+            pip install TTS==0.13.0 >> $LOG_FILE 2>&1
+        else
+            echo "TTS already installed, skipping" >> $LOG_FILE
+        fi
+    }
     
-    # Run the CUDA test with environment variables set
-    echo "Testing CUDA with PyTorch..." >> $LOG_FILE
-    conda activate $CONDA_ENV && \
-    export CUDA_HOME=/usr && \
-    export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH && \
-    python /tmp/cuda_test.py >> $LOG_FILE 2>&1
+    # Install required packages
+    install_packages
     
-    # Create a shell script that will properly set up the environment when running the neural server
+    # Create or update the activation script
+    echo "Creating activation script..." >> $LOG_FILE
     cat > ~/neural_cuda_activate.sh << 'ACTIVATE'
 #!/bin/bash
 # Script to activate the neural_cuda environment with proper CUDA settings
 
-# Activate conda environment
-source ~/miniconda3/bin/activate neural_cuda
+# Activate conda environment using various methods
+if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+    . "$HOME/miniconda3/etc/profile.d/conda.sh"
+    conda activate neural_cuda
+elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+    . "$HOME/anaconda3/etc/profile.d/conda.sh"
+    conda activate neural_cuda
+elif [ -f "$HOME/miniconda3/bin/activate" ]; then
+    source "$HOME/miniconda3/bin/activate" neural_cuda
+else
+    echo "WARNING: Could not find conda activation script"
+    # Try direct path to python in environment
+    if [ -f "$HOME/miniconda3/envs/neural_cuda/bin/python" ]; then
+        export PATH="$HOME/miniconda3/envs/neural_cuda/bin:$PATH"
+        echo "Using direct path to neural_cuda environment"
+    fi
+fi
 
-# Set CUDA environment variables
-export CUDA_HOME=/usr
-export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+# Set CUDA environment variables for proper detection
+export CUDA_HOME=/usr/local/cuda
+[ -d /usr/local/cuda-11.8 ] && export CUDA_HOME=/usr/local/cuda-11.8
+[ -d /usr/lib/x86_64-linux-gnu ] && export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+[ -d $CUDA_HOME/lib64 ] && export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+[ -d $CUDA_HOME/extras/CUPTI/lib64 ] && export LD_LIBRARY_PATH=$CUDA_HOME/extras/CUPTI/lib64:$LD_LIBRARY_PATH
+
+# Make sure all GPUs are visible
 export CUDA_VISIBLE_DEVICES=0,1,2,3
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
 
 # For PyTorch optimization
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 
 # Print environment info
 echo "Activated neural_cuda environment with CUDA support"
-echo "Python: $(which python)"
-echo "CUDA_HOME: $CUDA_HOME"
-echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+if command -v python &> /dev/null; then
+    echo "Python: $(which python)"
+    echo "Python version: $(python --version)"
+    
+    # Test PyTorch CUDA detection
+    python -c "
+import torch
+print('PyTorch CUDA available:', torch.cuda.is_available())
+if torch.cuda.is_available():
+    print('  CUDA version:', torch.version.cuda)
+    print('  Device count:', torch.cuda.device_count())
+    for i in range(torch.cuda.device_count()):
+        print(f'  Device {i}:', torch.cuda.get_device_name(i))
+else:
+    import os
+    print('CUDA HOME:', os.environ.get('CUDA_HOME', 'Not set'))
+    print('LD_LIBRARY_PATH:', os.environ.get('LD_LIBRARY_PATH', 'Not set'))
+"
+else
+    echo "WARNING: Python not found in PATH after activation"
+fi
 ACTIVATE
 
     chmod +x ~/neural_cuda_activate.sh
     
-    # Check if TTS is properly installed
-    echo "Testing TTS installation..." >> $LOG_FILE
-    conda activate $CONDA_ENV && python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> $LOG_FILE 2>&1
+    # Create audio cache directories
+    echo "Creating cache directories..." >> $LOG_FILE
+    mkdir -p ~/whisper-yabai-mac-os-x/gpu_scripts/audio_cache >> $LOG_FILE 2>&1
+    mkdir -p ~/audio_cache >> $LOG_FILE 2>&1
     
-    # Create audio cache directory for neural server
-    mkdir -p ~/whisper-yabai-mac-os-x/gpu_scripts/audio_cache
-    mkdir -p ~/audio_cache
+    # Test the environment
+    echo "Testing environment setup..." >> $LOG_FILE
+    source ~/neural_cuda_activate.sh >> $LOG_FILE 2>&1
     
-    # Show final status
-    echo "===== Environment Setup Complete =====" >> $LOG_FILE
-    conda activate $CONDA_ENV && pip list >> $LOG_FILE 2>&1
+    # Verify Python and key packages
+    echo "Verifying Python and packages..." >> $LOG_FILE
+    which python >> $LOG_FILE 2>&1
+    python --version >> $LOG_FILE 2>&1
+    
+    # Verify NumPy
+    echo "Verifying NumPy..." >> $LOG_FILE
+    python -c "import numpy; print(f'NumPy version: {numpy.__version__}')" >> $LOG_FILE 2>&1 || echo "NumPy verification failed" >> $LOG_FILE
+    
+    # Verify PyTorch and CUDA
+    echo "Verifying PyTorch and CUDA..." >> $LOG_FILE
+    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda if torch.cuda.is_available() else \"Not available\"}')" >> $LOG_FILE 2>&1 || echo "PyTorch verification failed" >> $LOG_FILE
+    
+    # Verify TTS
+    echo "Verifying TTS..." >> $LOG_FILE
+    python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> $LOG_FILE 2>&1 || echo "TTS verification failed" >> $LOG_FILE
     
     # Copy the log to a more accessible location
     cp $LOG_FILE ~/neural_env_setup.log
@@ -491,7 +754,7 @@ EOF
 
     # Display the remote setup log
     echo -e "${YELLOW}Setup process completed. Fetching logs...${NC}"
-    ssh "${GPU_USER}@${GPU_HOST}" "cat ~/neural_env_setup.log"
+    ssh "${GPU_USER}@${GPU_HOST}" "cat ~/neural_env_setup.log 2>/dev/null || echo 'Log file not found, but setup may have succeeded'"
     
     echo -e "${GREEN}Neural CUDA environment setup completed!${NC}"
     return 0
@@ -581,15 +844,18 @@ check_comprehensive_status() {
     # Test client connection - only if the server is running
     if check_server_status > /dev/null; then
         echo -e "${GREEN}=== Testing Client Connection ===${NC}"
-        # Check if we have venv activated
-        if [ -d "venv" ]; then
-            # Activate the venv and run client test
-            source venv/bin/activate 2>/dev/null || true
+        # Check if we have venv activated and test script exists
+        if [ -f ./scripts/neural_voice/test_neural_voice.py ]; then
+            # Activate the venv if available
+            if [ -d "venv" ]; then
+                source venv/bin/activate 2>/dev/null || true
+            fi
+            
             echo -e "${GREEN}Running client connection test...${NC}"
             python ./scripts/neural_voice/test_neural_voice.py --server-only --server "http://${GPU_HOST}:${PORT}"
         else
-            echo -e "${YELLOW}Virtual environment not found, skipping client connection test${NC}"
-            echo -e "${YELLOW}Run 'python ./scripts/neural_voice/test_neural_voice.py --server-only' to test client connection${NC}"
+            echo -e "${YELLOW}Test script not found, skipping client connection test${NC}"
+            echo -e "${YELLOW}Please run the consolidated neural voice test script${NC}"
         fi
     else
         echo -e "${YELLOW}Server not running, skipping client connection test${NC}"
@@ -600,360 +866,15 @@ check_comprehensive_status() {
 run_neural_voice_test() {
     echo -e "${GREEN}===== Running Neural Voice System Tests =====${NC}"
     
-    # Create a temporary Python test script
-    TMP_TEST_SCRIPT="/tmp/neural_voice_test_${PORT}_$(date +%s).py"
+    # Check if the consolidated test script exists
+    if [ ! -f "./scripts/neural_voice/test_neural_voice.py" ]; then
+        echo -e "${RED}Error: Consolidated test script not found at ./scripts/neural_voice/test_neural_voice.py${NC}"
+        echo -e "${YELLOW}Please make sure the neural voice test script is properly installed${NC}"
+        return 1
+    fi
     
-    cat > "$TMP_TEST_SCRIPT" << 'PYTHON_EOF'
-#!/usr/bin/env python3
-"""
-Neural voice system test script integrated into manage_neural_server.sh
-Tests server connection, voice model info, and speech synthesis
-"""
-
-import sys
-import time
-import os
-import json
-import argparse
-import logging
-from typing import List, Dict, Any, Optional
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("neural-voice-test")
-
-# ANSI color codes for terminal output
-GREEN = '\033[32m'
-YELLOW = '\033[33m'
-BLUE = '\033[34m'
-MAGENTA = '\033[35m'
-CYAN = '\033[36m'
-RED = '\033[31m'
-RESET = '\033[0m'
-
-# Default server URL - will be overridden by command line arg
-SERVER_URL = 'http://localhost:6000'
-
-def print_color(text: str, color: str = GREEN) -> None:
-    """Print colored text to the terminal."""
-    colors = {
-        'green': GREEN,
-        'yellow': YELLOW,
-        'blue': BLUE,
-        'magenta': MAGENTA,
-        'cyan': CYAN,
-        'red': RED,
-        'reset': RESET
-    }
-    print(f"{colors.get(color, '')}{text}{colors['reset']}")
-
-def print_section(title: str) -> None:
-    """Print a section header."""
-    print("\n" + "=" * 60)
-    print_color(f" {title}", 'cyan')
-    print("=" * 60)
-
-def print_subsection(title: str) -> None:
-    """Print a subsection header."""
-    print("\n" + "-" * 50)
-    print_color(f" {title}", 'magenta')
-    print("-" * 50)
-
-def test_server_connection() -> bool:
-    """Test connection to the neural voice server."""
-    print_subsection("Testing Neural Voice Server Connection")
-    print(f"Server URL: {SERVER_URL}")
-    
-    try:
-        # Import requests here to avoid hard dependency
-        import requests
-        
-        # Test basic endpoint
-        response = requests.get(f'{SERVER_URL}', timeout=5)
-        status_color = 'green' if response.status_code == 200 else 'red'
-        print_color(f"Status: {response.status_code}", status_color)
-        
-        # Pretty print the JSON response
-        try:
-            data = response.json()
-            print_color("Server response:", 'blue')
-            print(json.dumps(data, indent=2))
-            
-            # Check CUDA status
-            if data.get('cuda') is True:
-                print_color("✅ CUDA is available on the server", 'green')
-            else:
-                print_color("❌ CUDA is NOT available on the server", 'red')
-                
-        except json.JSONDecodeError:
-            print(response.text)
-        
-        # If basic connection works, try info endpoint
-        if response.status_code == 200:
-            try:
-                info_response = requests.get(f'{SERVER_URL}/info', timeout=5)
-                if info_response.status_code == 200:
-                    info_data = info_response.json()
-                    print_color("\nServer information:", 'blue')
-                    print(json.dumps(info_data, indent=2))
-                    
-                    # Extract GPU info
-                    if 'stats' in info_data and 'gpu_info' in info_data['stats']:
-                        gpu_info = info_data['stats']['gpu_info']
-                        if gpu_info['device_count'] > 0:
-                            print_color(f"\n✅ Found {gpu_info['device_count']} GPU(s):", 'green')
-                            for i, device in enumerate(gpu_info['devices']):
-                                print_color(f"   Device {i}: {device}", 'green')
-                        else:
-                            print_color("❌ No GPU devices found", 'red')
-            except Exception as e:
-                print_color(f"Error getting server info: {e}", 'red')
-        
-        return response.status_code == 200
-        
-    except ImportError:
-        print_color("❌ Requests module not installed. Cannot check server connection.", 'red')
-        print_color("Install with: pip install requests", 'yellow')
-        return False
-    except Exception as e:
-        print_color(f"❌ Error: {e}", 'red')
-        return False
-
-def test_basic_synthesis() -> bool:
-    """Test basic speech synthesis with the custom voice model."""
-    try:
-        from src import speech_synthesis as speech
-        
-        print_subsection("Testing Basic Speech Synthesis")
-        
-        # Check if custom voice model is loaded
-        if speech.ACTIVE_VOICE_MODEL:
-            print_color(f"✅ Custom voice model loaded: {speech.ACTIVE_VOICE_MODEL.get('name', 'Unknown')}", 'green')
-            print(f"   Created: {speech.ACTIVE_VOICE_MODEL.get('created', 'Unknown')}")
-            print(f"   Samples: {speech.ACTIVE_VOICE_MODEL.get('sample_count', 0)}")
-        else:
-            print_color("⚠️ No custom voice model detected. Using standard system voices.", 'yellow')
-        
-        # Test custom voice with a simple phrase
-        print_color("\nTesting neural voice synthesis:", 'blue')
-        test_phrase = "Hello, this is a test of the neural voice synthesis system."
-        
-        print(f"Speaking: \"{test_phrase}\"")
-        result = speech.speak(test_phrase, block=True)
-        
-        if result:
-            print_color("✅ Speech synthesis successful", 'green')
-            return True
-        else:
-            print_color("❌ Speech synthesis failed", 'red')
-            return False
-            
-    except ImportError as e:
-        print_color(f"\n❌ Error importing speech synthesis module: {e}", 'red')
-        print_color("Make sure you are running from the project root directory", 'yellow')
-        return False
-    except Exception as e:
-        print_color(f"\n❌ Error during synthesis test: {e}", 'red')
-        return False
-
-def test_synthesis_api_directly() -> bool:
-    """Test the synthesis API directly without using the client library."""
-    print_subsection("Testing Synthesis API Directly")
-    
-    try:
-        import requests
-        import tempfile
-        import subprocess
-        
-        # Create a temp file for the audio
-        temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        temp_path = temp_file.name
-        temp_file.close()
-        
-        # Test text to synthesize
-        test_text = "This is a direct test of the neural voice synthesis API."
-        print(f"Synthesizing: \"{test_text}\"")
-        
-        # Send POST request to synthesize endpoint
-        response = requests.post(
-            f"{SERVER_URL}/synthesize",
-            json={"text": test_text},
-            timeout=10
-        )
-        
-        if response.status_code == 200:
-            # Save the audio
-            with open(temp_path, 'wb') as f:
-                f.write(response.content)
-                
-            print_color(f"✅ Synthesis successful, audio saved to {temp_path}", 'green')
-            
-            # Try to play the audio on macOS
-            if sys.platform == "darwin":
-                print("Playing audio...")
-                try:
-                    subprocess.run(["afplay", temp_path], check=True)
-                    print_color("✅ Audio playback successful", 'green')
-                except Exception as e:
-                    print_color(f"⚠️ Audio playback failed: {e}", 'yellow')
-            
-            return True
-        else:
-            print_color(f"❌ Synthesis API call failed with status {response.status_code}", 'red')
-            print(response.text)
-            return False
-    
-    except ImportError:
-        print_color("❌ Requests module not installed", 'red')
-        return False
-    except Exception as e:
-        print_color(f"❌ Error in direct API test: {e}", 'red')
-        return False
-    finally:
-        # Cleanup temp file
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            try:
-                os.unlink(temp_path)
-            except:
-                pass
-
-def display_voice_model_info() -> bool:
-    """Display detailed information about the current voice model."""
-    try:
-        from src import speech_synthesis as speech
-        
-        print_subsection("Active Voice Model Details")
-        
-        if not speech.ACTIVE_VOICE_MODEL:
-            print_color("No active voice model found.", 'yellow')
-            return False
-        
-        model = speech.ACTIVE_VOICE_MODEL
-        
-        model_name = model.get("name", "Unknown")
-        model_path = model.get("path", "Unknown")
-        engine_type = model.get("engine", "parameter-based")
-        sample_count = model.get("sample_count", 0)
-        
-        print(f"Model name: {model_name}")
-        print(f"Model path: {model_path}")
-        print(f"Engine type: {engine_type}")
-        print(f"Sample count: {sample_count}")
-        
-        # Display voice profile if available
-        if "voice_profile" in model:
-            voice_profile = model["voice_profile"]
-            print_subsection("Voice Profile Parameters")
-            
-            for key, value in voice_profile.items():
-                if key in ["context_modifiers", "emotion_markers"] and isinstance(value, dict):
-                    # Handle nested dictionaries
-                    print(f"\n{key}:")
-                    for subkey, subvalue in value.items():
-                        print(f"  {subkey}: {subvalue}")
-                else:
-                    print(f"{key}: {value}")
-        
-        return True
-        
-    except ImportError as e:
-        print_color(f"❌ Error importing speech synthesis module: {e}", 'red')
-        return False
-    except Exception as e:
-        print_color(f"❌ Error displaying model info: {e}", 'red')
-        return False
-
-def main():
-    """Main function for testing neural voice capabilities."""
-    global SERVER_URL
-    
-    parser = argparse.ArgumentParser(description="Test neural voice synthesis capabilities")
-    parser.add_argument("--server-only", action="store_true", help="Only test server connection")
-    parser.add_argument("--api-only", action="store_true", help="Only test direct API synthesis")
-    parser.add_argument("--synthesis-only", action="store_true", help="Only test basic speech synthesis")
-    parser.add_argument("--model-info", action="store_true", help="Display voice model information")
-    parser.add_argument("--server", default=SERVER_URL, help="Neural voice server URL")
-    args = parser.parse_args()
-    
-    # Print header
-    print_section("Neural Voice System Test")
-    
-    # Update server URL
-    SERVER_URL = args.server
-    
-    # Check server connection - this is always done
-    server_ok = test_server_connection()
-    
-    # If server connection test fails and we're only testing the server, exit
-    if not server_ok:
-        print_color("\n❌ Server connection failed.", 'red')
-        if args.server_only:
-            return False
-        print_color("Continuing with local tests...", 'yellow')
-    
-    # Stop here if only testing server
-    if args.server_only:
-        return server_ok
-    
-    # Determine which tests to run
-    run_all = not (args.api_only or args.synthesis_only or args.model_info)
-    
-    test_results = []
-    
-    try:
-        # Show model info if requested or running all tests
-        if run_all or args.model_info:
-            model_info_ok = display_voice_model_info()
-            test_results.append(("Model Info", model_info_ok))
-        
-        # Test direct API if requested or running all tests and server is ok
-        if (run_all or args.api_only) and server_ok:
-            api_ok = test_synthesis_api_directly()
-            test_results.append(("Direct API", api_ok))
-        
-        # Test synthesis if requested or running all tests
-        if run_all or args.synthesis_only:
-            synthesis_ok = test_basic_synthesis()
-            test_results.append(("Speech Synthesis", synthesis_ok))
-        
-        # Print summary
-        print_section("Test Results Summary")
-        
-        for test_name, result in test_results:
-            status = "✅ PASS" if result else "❌ FAIL"
-            color = "green" if result else "red"
-            print_color(f"{test_name}: {status}", color)
-        
-        # Overall result
-        if all(result for _, result in test_results):
-            print_color("\nAll tests passed successfully!", 'green')
-        else:
-            print_color("\nSome tests failed. See details above.", 'yellow')
-        
-        # Return overall result
-        return all(result for _, result in test_results) if test_results else server_ok
-        
-    except Exception as e:
-        print_color(f"\n❌ Unexpected error: {e}", 'red')
-        return False
-
-if __name__ == "__main__":
-    try:
-        success = main()
-        sys.exit(0 if success else 1)
-    except KeyboardInterrupt:
-        print_color("\nTest interrupted by user.", 'yellow')
-        sys.exit(0)
-    except Exception as e:
-        print_color(f"\nUnexpected error: {e}", 'red')
-        sys.exit(1)
-PYTHON_EOF
-
-    # Make script executable
-    chmod +x "$TMP_TEST_SCRIPT"
+    # Make sure the script is executable
+    chmod +x "./scripts/neural_voice/test_neural_voice.py"
     
     # Determine test arguments
     TEST_ARGS=""
@@ -964,8 +885,8 @@ PYTHON_EOF
         api)
             TEST_ARGS="--api-only"
             ;;
-        synthesis)
-            TEST_ARGS="--synthesis-only"
+        client)
+            TEST_ARGS="--client-only"
             ;;
         model)
             TEST_ARGS="--model-info"
@@ -981,10 +902,8 @@ PYTHON_EOF
         source venv/bin/activate 2>/dev/null || true
     fi
     
-    python "$TMP_TEST_SCRIPT" --server "http://${GPU_HOST}:${PORT}" $TEST_ARGS
-    
-    # Clean up
-    rm -f "$TMP_TEST_SCRIPT"
+    echo -e "${GREEN}Running consolidated neural voice test script...${NC}"
+    python "./scripts/neural_voice/test_neural_voice.py" --server "http://${GPU_HOST}:${PORT}" $TEST_ARGS
 }
 
 # Execute the requested action based on first argument
