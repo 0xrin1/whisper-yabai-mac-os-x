@@ -234,156 +234,27 @@ start_server() {
         setup_cuda_env
     fi
     
-    # Check activation script
+    # Check and upload activation script
     check_activation_script
     
-    # Simple start command
-    echo -e "${GREEN}Starting fresh neural voice server...${NC}"
+    # Upload package check script
+    echo -e "${GREEN}Uploading package check script...${NC}"
+    scp "${SCRIPT_DIR}/utils/package_check.py" "${GPU_USER}@${GPU_HOST}:~/package_check.py"
+    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/package_check.py"
+    
+    # Upload and run the server startup script
+    echo -e "${GREEN}Starting neural voice server...${NC}"
     local timestamp=$(date +%s)
     local log_file="/tmp/neural_server_${PORT}_${timestamp}.log"
     
-    # Print the command we're about to run
-    echo -e "${YELLOW}Running command on remote server...${NC}"
+    # Upload the server startup script
+    echo -e "${YELLOW}Uploading server startup script...${NC}"
+    scp "${SCRIPT_DIR}/utils/start_neural_server.sh" "${GPU_USER}@${GPU_HOST}:~/start_neural_server.sh"
+    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/start_neural_server.sh"
     
-    # Use a here document to create a script that will be executed on the remote server
-    ssh "${GPU_USER}@${GPU_HOST}" << EOF
-    # Generate a unique log file name and record it
-    LOG_FILE="${LOG_FILE}"
-    echo "\${LOG_FILE}" > /tmp/neural_server_current_log
-    
-    cd ~
-    
-    # Activate environment with CUDA support
-    if [ -f ~/neural_cuda_activate.sh ]; then
-        echo "Using neural_cuda_activate.sh script..."
-        source ~/neural_cuda_activate.sh
-    else
-        echo "Warning: neural_cuda_activate.sh not found!"
-        
-        # Try to source conda directly
-        if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-            . "$HOME/miniconda3/etc/profile.d/conda.sh"
-            conda activate neural_cuda
-        else
-            echo "Trying direct environment path..."
-            export PATH="$HOME/miniconda3/envs/neural_cuda/bin:$PATH"
-        fi
-        
-        # Set CUDA environment variables
-        export CUDA_HOME=/usr
-        export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:\$LD_LIBRARY_PATH
-        export CUDA_VISIBLE_DEVICES=0,1,2,3
-        export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-    fi
-    
-    # Verify Python is working
-    if ! command -v python &> /dev/null; then
-        echo "ERROR: Python not found after activation. Check environment setup."
-        exit 1
-    fi
-    
-    # Set proper CUDA environment variables
-    export CUDA_HOME=/usr/local/cuda
-    export LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-    export CUDA_VISIBLE_DEVICES=0,1,2,3
-    export CUDA_DEVICE_ORDER=PCI_BUS_ID
-    echo "===== CUDA ENVIRONMENT SETUP =====" > \${LOG_FILE}
-    echo "CUDA_HOME: $CUDA_HOME" >> \${LOG_FILE}
-    echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH" >> \${LOG_FILE}
-    echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES" >> \${LOG_FILE}
-    
-    # Display Python and environment info
-    echo "===== PYTHON ENVIRONMENT =====" >> \${LOG_FILE}
-    echo "Python path: \$(which python)" >> \${LOG_FILE}
-    echo "Python version: \$(python --version 2>&1)" >> \${LOG_FILE}
-    echo "pip path: \$(which pip 2>/dev/null || echo 'pip not found')" >> \${LOG_FILE}
-    
-    # Create necessary directories
-    mkdir -p ~/whisper-yabai-mac-os-x/gpu_scripts/audio_cache ~/audio_cache
-    
-    # Upload and run the CUDA detection test script
-    echo "===== CUDA DETECTION TEST =====" >> \${LOG_FILE}
-    scp "${SCRIPT_DIR}/utils/cuda_detection_test.py" "${GPU_USER}@${GPU_HOST}:~/cuda_detection_test.py"
-    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/cuda_detection_test.py"
-    ssh "${GPU_USER}@${GPU_HOST}" "~/cuda_detection_test.py" >> \${LOG_FILE} 2>&1
-
-    # Check if required packages are available
-    echo "===== PACKAGE VERIFICATION =====" >> \${LOG_FILE}
-    
-    # Check NumPy
-    if python -c "import numpy; print(f'NumPy version: {numpy.__version__}')" >> \${LOG_FILE} 2>&1; then
-        echo "✓ NumPy is available" >> \${LOG_FILE}
-    else
-        echo "✗ NumPy not available, installing..." >> \${LOG_FILE}
-        pip install numpy==1.22.0 >> \${LOG_FILE} 2>&1
-    fi
-    
-    # Check PyTorch with specific CUDA version
-    if python -c "import torch; print(f'PyTorch: {torch.__version__}, CUDA: {torch.cuda.is_available()}')" >> \${LOG_FILE} 2>&1; then
-        echo "✓ PyTorch is available" >> \${LOG_FILE}
-        
-        # If PyTorch is available but CUDA is not detected, try reinstall with specific version
-        if ! python -c "import torch; assert torch.cuda.is_available(), 'CUDA not available'" >> \${LOG_FILE} 2>&1; then
-            echo "✗ PyTorch installed but CUDA not detected, reinstalling with specific CUDA version..." >> \${LOG_FILE}
-            pip uninstall -y torch torchvision torchaudio >> \${LOG_FILE} 2>&1
-            pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> \${LOG_FILE} 2>&1
-        fi
-    else
-        echo "✗ PyTorch not available, installing..." >> \${LOG_FILE}
-        pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> \${LOG_FILE} 2>&1
-    fi
-    
-    # Upload and run the PyTorch CUDA check script
-    scp "${SCRIPT_DIR}/utils/pytorch_cuda_check.py" "${GPU_USER}@${GPU_HOST}:~/pytorch_cuda_check.py"
-    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/pytorch_cuda_check.py"
-    ssh "${GPU_USER}@${GPU_HOST}" "~/pytorch_cuda_check.py" >> \${LOG_FILE} 2>&1
-    
-    # Check TTS 
-    if python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> \${LOG_FILE} 2>&1; then
-        echo "✓ TTS is available" >> \${LOG_FILE}
-    else
-        echo "✗ TTS not available, installing..." >> \${LOG_FILE}
-        pip install TTS==0.13.0 >> \${LOG_FILE} 2>&1
-    fi
-    
-    # Check Flask
-    if python -c "import flask; print(f'Flask version: {flask.__version__}')" >> \${LOG_FILE} 2>&1; then
-        echo "✓ Flask is available" >> \${LOG_FILE}
-    else
-        echo "✗ Flask not available, installing..." >> \${LOG_FILE}
-        pip install flask >> \${LOG_FILE} 2>&1
-    fi
-    
-    # Make sure model directory exists
-    mkdir -p ${MODEL_DIR}
-    
-    # Start the server
-    echo "===== STARTING NEURAL VOICE SERVER =====" >> \${LOG_FILE}
-    # IMPORTANT: Using --host 0.0.0.0 to ensure server binds to all interfaces, not just localhost
-    echo "Using host 0.0.0.0 to bind to all interfaces for external access" >> \${LOG_FILE}
-    
-    # Run server with explicit python path to ensure we use the right environment
-    PYTHON_PATH=\$(which python)
-    echo "Using Python: \${PYTHON_PATH}" >> \${LOG_FILE}
-    nohup \${PYTHON_PATH} -u ${SERVER_SCRIPT} --port ${PORT} --host 0.0.0.0 --model ${MODEL_DIR} >> \${LOG_FILE} 2>&1 &
-    
-    # Wait a moment to let server start
-    sleep 5
-    
-    # Check if server started successfully
-    if pgrep -f "python.*neural_voice_server.py.*--port ${PORT}" > /dev/null; then
-        echo "Server started successfully with PID \$(pgrep -f "python.*neural_voice_server.py.*--port ${PORT}")"
-        echo "Log file: \${LOG_FILE}"
-    else
-        echo "Failed to start server"
-        cat \${LOG_FILE}
-        exit 1
-    fi
-    
-    # Test server connection
-    echo "Testing server connection..."
-    curl -s --connect-timeout 2 http://localhost:${PORT} || echo "Server not responding yet - check logs"
-EOF
+    # Run the server startup script
+    echo -e "${YELLOW}Running server startup script...${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "~/start_neural_server.sh \"${log_file}\" \"${PORT}\" \"${MODEL_DIR}\" \"${SERVER_SCRIPT}\""
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Neural voice server started successfully${NC}"
@@ -468,165 +339,19 @@ restart_server() {
 setup_cuda_env() {
     echo -e "${GREEN}Setting up dedicated neural CUDA conda environment...${NC}"
     
-    # Create the environment setup script that will run on the remote server
-    ssh "${GPU_USER}@${GPU_HOST}" << 'EOF'
-    # Log file for the setup process
-    LOG_FILE="/tmp/neural_env_setup_$(date +%s).log"
-    CONDA_ENV="neural_cuda"
+    # Upload neural_cuda_activate script
+    echo -e "${GREEN}Uploading activation script...${NC}"
+    scp "${SCRIPT_DIR}/utils/neural_cuda_activate.sh" "${GPU_USER}@${GPU_HOST}:~/neural_cuda_activate.sh"
+    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/neural_cuda_activate.sh"
     
-    # Start logging
-    echo "===== Neural CUDA Environment Setup Log =====" > $LOG_FILE
-    date >> $LOG_FILE
+    # Upload conda environment setup script
+    echo -e "${GREEN}Uploading conda environment setup script...${NC}"
+    scp "${SCRIPT_DIR}/utils/setup_conda_env.sh" "${GPU_USER}@${GPU_HOST}:~/setup_conda_env.sh"
+    ssh "${GPU_USER}@${GPU_HOST}" "chmod +x ~/setup_conda_env.sh"
     
-    # Check if miniconda is installed correctly
-    echo "Checking for Miniconda..." >> $LOG_FILE
-    if [ -d "$HOME/miniconda3" ]; then
-        echo "Miniconda found at $HOME/miniconda3" >> $LOG_FILE
-    else
-        echo "Miniconda not found in expected location. Will use system conda if available." >> $LOG_FILE
-    fi
-    
-    # Try different methods to activate conda
-    if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-        echo "Sourcing conda.sh from miniconda3..." >> $LOG_FILE
-        . "$HOME/miniconda3/etc/profile.d/conda.sh"
-        CONDA_CMD="conda"
-    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-        echo "Sourcing conda.sh from anaconda3..." >> $LOG_FILE
-        . "$HOME/anaconda3/etc/profile.d/conda.sh"
-        CONDA_CMD="conda"
-    elif command -v conda &> /dev/null; then
-        echo "Using system conda command..." >> $LOG_FILE
-        CONDA_CMD="conda"
-    elif [ -f "$HOME/miniconda3/bin/conda" ]; then
-        echo "Using miniconda3/bin/conda directly..." >> $LOG_FILE
-        CONDA_CMD="$HOME/miniconda3/bin/conda"
-    else
-        echo "ERROR: Conda not found in any standard location. Cannot proceed." >> $LOG_FILE
-        echo "ERROR: Conda not found in any standard location. Cannot proceed."
-        exit 1
-    fi
-    
-    echo "Using conda command: $CONDA_CMD" >> $LOG_FILE
-    
-    # Check CUDA availability on the system
-    echo "===== CUDA System Check =====" >> $LOG_FILE
-    ls -la /usr/local/cuda* >> $LOG_FILE 2>&1 || echo "No CUDA found in /usr/local" >> $LOG_FILE
-    ls -la /usr/lib/x86_64-linux-gnu/libcuda* >> $LOG_FILE 2>&1 || echo "No CUDA libs found in standard location" >> $LOG_FILE
-    nvidia-smi >> $LOG_FILE 2>&1 || echo "nvidia-smi failed, may need permissions" >> $LOG_FILE
-    
-    # Check if environment already exists
-    echo "Checking for existing neural_cuda environment..." >> $LOG_FILE
-    if $CONDA_CMD env list | grep -q "neural_cuda"; then
-        echo "Neural CUDA environment already exists" >> $LOG_FILE
-        
-        # Check if the environment already has the required packages
-        echo "Checking for required packages in existing environment..." >> $LOG_FILE
-        if $CONDA_CMD run -n neural_cuda python -c "import sys, numpy, torch, flask; print('Key packages available')" >> $LOG_FILE 2>&1; then
-            echo "✓ Basic packages found in environment" >> $LOG_FILE
-            NEEDS_CORE_PACKAGES=false
-        else
-            echo "✗ Some basic packages missing, will install them" >> $LOG_FILE
-            NEEDS_CORE_PACKAGES=true
-        fi
-        
-        # Check for TTS specifically since it's often missing
-        if $CONDA_CMD run -n neural_cuda python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> $LOG_FILE 2>&1; then
-            echo "✓ TTS package already installed" >> $LOG_FILE
-            NEEDS_TTS=false
-        else
-            echo "✗ TTS package missing, will install it" >> $LOG_FILE
-            NEEDS_TTS=true
-        fi
-    else
-        echo "Creating neural_cuda environment from scratch..." >> $LOG_FILE
-        $CONDA_CMD create -n neural_cuda python=3.9 -y >> $LOG_FILE 2>&1
-        if [ $? -ne 0 ]; then
-            echo "ERROR: Failed to create conda environment" >> $LOG_FILE
-            echo "ERROR: Failed to create conda environment"
-            exit 1
-        fi
-        NEEDS_CORE_PACKAGES=true
-        NEEDS_TTS=true
-    fi
-    
-    # Function to install packages
-    install_packages() {
-        echo "Installing required packages..." >> $LOG_FILE
-        
-        # Make sure conda environment is activated properly
-        if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-            . "$HOME/miniconda3/etc/profile.d/conda.sh"
-        fi
-        
-        # Activate the environment
-        $CONDA_CMD activate neural_cuda
-        
-        if [ $NEEDS_CORE_PACKAGES = true ]; then
-            echo "Installing core packages..." >> $LOG_FILE
-            pip install numpy scipy flask >> $LOG_FILE 2>&1
-            pip install librosa soundfile matplotlib phonemizer >> $LOG_FILE 2>&1
-            
-            # Install PyTorch with CUDA
-            echo "Installing PyTorch with CUDA support..." >> $LOG_FILE
-            # Use CUDA 11.8 for best compatibility
-            pip install torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --index-url https://download.pytorch.org/whl/cu118 >> $LOG_FILE 2>&1
-        else
-            echo "Core packages already installed, skipping" >> $LOG_FILE
-        fi
-        
-        if [ $NEEDS_TTS = true ]; then
-            echo "Installing TTS package..." >> $LOG_FILE
-            pip install TTS==0.13.0 >> $LOG_FILE 2>&1
-        else
-            echo "TTS already installed, skipping" >> $LOG_FILE
-        fi
-    }
-    
-    # Install required packages
-    install_packages
-    
-    # Create or update the activation script
-    echo "Creating activation script..." >> $LOG_FILE
-    cp "$SCRIPT_DIR/utils/neural_cuda_activate.sh" ~/neural_cuda_activate.sh
-    chmod +x ~/neural_cuda_activate.sh
-    
-    # Create audio cache directories
-    echo "Creating cache directories..." >> $LOG_FILE
-    mkdir -p ~/whisper-yabai-mac-os-x/gpu_scripts/audio_cache >> $LOG_FILE 2>&1
-    mkdir -p ~/audio_cache >> $LOG_FILE 2>&1
-    
-    # Test the environment
-    echo "Testing environment setup..." >> $LOG_FILE
-    source ~/neural_cuda_activate.sh >> $LOG_FILE 2>&1
-    
-    # Verify Python and key packages
-    echo "Verifying Python and packages..." >> $LOG_FILE
-    which python >> $LOG_FILE 2>&1
-    python --version >> $LOG_FILE 2>&1
-    
-    # Verify NumPy
-    echo "Verifying NumPy..." >> $LOG_FILE
-    python -c "import numpy; print(f'NumPy version: {numpy.__version__}')" >> $LOG_FILE 2>&1 || echo "NumPy verification failed" >> $LOG_FILE
-    
-    # Verify PyTorch and CUDA
-    echo "Verifying PyTorch and CUDA..." >> $LOG_FILE
-    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda if torch.cuda.is_available() else \"Not available\"}')" >> $LOG_FILE 2>&1 || echo "PyTorch verification failed" >> $LOG_FILE
-    
-    # Verify TTS
-    echo "Verifying TTS..." >> $LOG_FILE
-    python -c "import TTS; print(f'TTS version: {TTS.__version__}')" >> $LOG_FILE 2>&1 || echo "TTS verification failed" >> $LOG_FILE
-    
-    # Copy the log to a more accessible location
-    cp $LOG_FILE ~/neural_env_setup.log
-    
-    # Print success message
-    echo "Neural CUDA environment setup complete!"
-    echo "Log file: ~/neural_env_setup.log"
-    echo ""
-    echo "To activate this environment, run:"
-    echo "source ~/neural_cuda_activate.sh"
-EOF
+    # Run the setup script
+    echo -e "${GREEN}Running environment setup script...${NC}"
+    ssh "${GPU_USER}@${GPU_HOST}" "~/setup_conda_env.sh"
 
     # Display the remote setup log
     echo -e "${YELLOW}Setup process completed. Fetching logs...${NC}"
