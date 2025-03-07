@@ -436,123 +436,52 @@ def _speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float 
             neural_server = os.environ.get("NEURAL_SERVER", "http://192.168.191.55:6000")
             logger.info(f"Using GPU neural voice client for '{text}' with server {neural_server}")
             
-            # Try to use the neural voice client API dynamically
             try:
-                # First, try direct API call without importing the client
-                basic_connection = False
-                try:
-                    import requests
-                    response = requests.get(neural_server, timeout=2)
-                    basic_connection = response.status_code == 200
-                    logger.info(f"Basic server connection: {basic_connection}")
-                except Exception as e:
-                    logger.warning(f"Error in basic server connectivity check: {e}")
+                # Use direct API call to avoid circular imports
+                import requests
+                import tempfile
                 
-                if basic_connection:
-                    # Direct call to synthesize without using the client API
+                # Make direct request to server
+                logger.info(f"Using direct API call to {neural_server}/synthesize")
+                response = requests.post(
+                    f"{neural_server}/synthesize",
+                    json={"text": text},
+                    timeout=10.0
+                )
+                
+                if response.status_code == 200:
+                    # Save audio to temp file
+                    fd, output_file = tempfile.mkstemp(suffix=".wav")
+                    os.close(fd)
+                    with open(output_file, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # Play the audio
+                    play_cmd = [
+                        "afplay",
+                        "-v", str(volume),
+                        output_file
+                    ]
+                    
+                    subprocess.run(play_cmd, check=True)
+                    
+                    # Clean up temporary file
                     try:
-                        import requests
-                        import tempfile
-                        import subprocess
-                        
-                        # Make direct synthesize request
-                        response = requests.post(
-                            f"{neural_server}/synthesize",
-                            json={"text": text},
-                            timeout=10.0
-                        )
-                        
-                        if response.status_code == 200:
-                            # Save audio to temp file
-                            fd, output_file = tempfile.mkstemp(suffix=".wav")
-                            with open(output_file, 'wb') as f:
-                                f.write(response.content)
-                            
-                            # Play the audio
-                            if sys.platform == "darwin":  # macOS
-                                cmd = ["afplay", output_file]
-                            elif sys.platform.startswith("linux"):  # Linux
-                                cmd = ["aplay", output_file]
-                            else:
-                                cmd = None
-                                
-                            if cmd:
-                                subprocess.run(cmd, check=True)
-                                logger.info(f"Successfully played synthesized speech with direct API call")
-                                return True
-                        else:
-                            # If server returns error, neural voice is required
-                            logger.error(f"Server returned error {response.status_code}, neural voice synthesis failed")
-                            return False
-                    except Exception as e:
-                        logger.error(f"Error with direct API call: {e}")
-                
-                # If direct API call failed, try the client API
-                # Only import here to avoid circular imports
-                try:
-                    from src.audio import neural_voice_client
-                    neural_voice_client.configure(server=neural_server)
+                        os.remove(output_file)
+                    except:
+                        pass
                     
-                    # Try the regular client API
-                    connection_status = neural_voice_client.check_server_connection()
-                    logger.info(f"Neural server connection status: {connection_status}")
-                    
-                    if connection_status:
-                        # Use the neural voice client to synthesize and play speech
-                        output_file = neural_voice_client.speak(text, play=True)
-                        
-                        if output_file and os.path.exists(output_file):
-                            logger.info(f"Successfully synthesized speech with neural voice client")
-                            return True
-                except ImportError:
-                    logger.warning("Could not import neural_voice_client module")
-                except Exception as e:
-                    logger.error(f"Error with neural voice client API: {e}")
-                    
-            except Exception as e:
-                logger.error(f"Error connecting to neural voice server: {e}")
-                
-            # If we got here, the client connection failed
-            logger.warning("Neural voice client failed to connect to server")
-            
-            # Try local neural synthesis if TTS is available
-            if HAS_TTS:
-                logger.info(f"Using local neural voice synthesis for '{text}'")
-                
-                # Load neural model if not already in cache
-                neural_model = None
-                if model_path in NEURAL_MODEL_CACHE:
-                    neural_model = NEURAL_MODEL_CACHE[model_path]
+                    logger.info(f"Successfully synthesized speech with direct API call")
+                    return True
                 else:
-                    neural_model = load_neural_model(ACTIVE_VOICE_MODEL)
-                    if neural_model:
-                        logger.info("Neural model loaded successfully")
-                    
-                # If we have a neural model, use it
-                if neural_model:
-                    # Synthesize speech with neural model
-                    output_path = synthesize_with_neural_model(neural_model, text)
-                    
-                    if output_path and os.path.exists(output_path):
-                        # Play the synthesized audio
-                        play_cmd = [
-                            "afplay",
-                            "-v", str(volume),
-                            output_path
-                        ]
-                        
-                        subprocess.run(play_cmd, check=True)
-                        
-                        # Clean up temporary file
-                        try:
-                            os.remove(output_path)
-                        except:
-                            pass
-                            
-                        return True
-            
-            # Neural voice synthesis failed - no fallback available
-            logger.error("Neural voice synthesis failed - no fallback available")
+                    logger.error(f"Server error {response.status_code} in direct API call")
+                    return False
+            except Exception as e:
+                logger.error(f"Error in neural voice synthesis: {e}")
+                
+            # All neural voice server methods failed
+            logger.error("Neural voice server communication failed")
+            logger.error("Cannot proceed without neural voice server - no fallback allowed")
             return False
         
         # Only proceed with parameter-based synthesis if engine_type is not "neural"

@@ -109,3 +109,5 @@
 - Focus on consolidating functionality into existing files rather than creating new ones
 - Always check if functionality can be added to existing scripts first
 - When refactoring, prioritize removing redundant code/files
+- Prefer adding functions to existing scripts rather than creating new files for every task
+- Avoid file sprawl by using the existing code structure

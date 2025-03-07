@@ -267,6 +267,39 @@ def speak(text: str, play: bool = True) -> Optional[str]:
     Returns:
         Path to audio file or None if failed
     """
+    # First try direct API approach if connection fails
+    if connection_status != "connected":
+        try:
+            import requests
+            
+            # Make direct synthesize request
+            logger.info(f"Using direct API call to {server_url}/synthesize")
+            response = requests.post(
+                f"{server_url}/synthesize",
+                json={"text": text},
+                timeout=10.0
+            )
+            
+            if response.status_code == 200:
+                # Create directories if they don't exist
+                os.makedirs(CACHE_DIR, exist_ok=True)
+                
+                # Save audio to file
+                timestamp = int(time.time() * 1000)
+                output_file = os.path.join(CACHE_DIR, f"speech_direct_{timestamp}.wav")
+                with open(output_file, 'wb') as f:
+                    f.write(response.content)
+                
+                # Play if requested
+                if play:
+                    play_audio(output_file)
+                    
+                logger.info(f"Successfully synthesized speech with direct API call")
+                return output_file
+        except Exception as e:
+            logger.error(f"Error with direct API call: {e}")
+    
+    # If direct call failed or connection is already established, try normal synthesis
     output_file = synthesize_speech(text)
     
     if output_file and play:

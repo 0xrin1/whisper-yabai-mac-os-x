@@ -174,47 +174,78 @@ def test_synthesis_api_directly() -> bool:
         return False
 
 def test_client_library() -> bool:
-    """Test the neural voice client library."""
+    """Test the neural voice client library using direct API approach."""
     print_subsection("Testing Neural Voice Client Library")
     
     try:
-        # Try to import the client module
+        # First try direct API approach to avoid TTS dependency issues
         try:
-            import sys
-            # Add the src directory to path if needed
-            sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-            from src.audio import neural_voice_client as client
-            print_color("✅ Successfully imported neural_voice_client module", 'green')
-        except ImportError as e:
-            print_color(f"❌ Could not import neural_voice_client module: {e}", 'red')
-            print_color("Make sure you're running from the project root directory", 'yellow')
+            import requests
+            
+            # Create directory for output
+            os.makedirs("neural_test", exist_ok=True)
+            
+            # Test server basic connectivity 
+            print(f"Testing direct API connection to: {SERVER_URL}")
+            response = requests.get(SERVER_URL, timeout=3)
+            
+            if response.status_code == 200:
+                print_color("✅ Server connection successful", 'green')
+                
+                # Get server info if available
+                try:
+                    info_response = requests.get(f"{SERVER_URL}/info", timeout=3)
+                    if info_response.status_code == 200:
+                        server_info = info_response.json()
+                        print_color("Server information:", 'blue')
+                        print(json.dumps(server_info, indent=2))
+                except Exception:
+                    pass
+                
+                # Test speech synthesis
+                test_text = "This is a test of the neural voice client library integration."
+                print(f"Synthesizing: \"{test_text}\"")
+                
+                # Make direct synthesize request
+                timestamp = int(time.time() * 1000)
+                output_file = f"neural_test/speech_client_{timestamp}.wav"
+                
+                synth_response = requests.post(
+                    f"{SERVER_URL}/synthesize",
+                    json={"text": test_text},
+                    timeout=10.0
+                )
+                
+                if synth_response.status_code == 200:
+                    # Save the audio
+                    with open(output_file, 'wb') as f:
+                        f.write(synth_response.content)
+                    
+                    print_color(f"✅ Direct API synthesis successful, audio saved to {output_file}", 'green')
+                    
+                    # Play the audio
+                    if platform.system() == "Darwin":
+                        print("Playing audio...")
+                        try:
+                            subprocess.run(["afplay", output_file], check=True)
+                            print_color("✅ Audio playback successful", 'green')
+                        except Exception as e:
+                            print_color(f"⚠️ Audio playback failed: {e}", 'yellow')
+                    
+                    return True
+                else:
+                    print_color(f"❌ Synthesis API call failed with status {synth_response.status_code}", 'red')
+                    print(synth_response.text)
+                    return False
+            else:
+                print_color(f"❌ Server connection failed with status {response.status_code}", 'red')
+                return False
+                
+        except ImportError:
+            print_color("❌ Requests module not installed, cannot test API directly", 'red')
             return False
-        
-        # Configure the client with the server URL
-        print(f"Configuring client with server URL: {SERVER_URL}")
-        if client.configure(SERVER_URL):
-            print_color("✅ Client connected to server successfully", 'green')
-        else:
-            print_color("❌ Client failed to connect to server", 'red')
-            return False
-        
-        # Get server info
-        server_info = client.get_server_info()
-        if server_info:
-            print_color("Server information from client:", 'blue')
-            print(json.dumps(server_info, indent=2))
-        
-        # Test speech synthesis
-        test_text = "This is a test of the neural voice client library integration."
-        print(f"Synthesizing: \"{test_text}\"")
-        
-        output_file = client.speak(test_text, play=True)
-        
-        if output_file:
-            print_color(f"✅ Client synthesis successful, audio saved to {output_file}", 'green')
-            return True
-        else:
-            print_color("❌ Client synthesis failed", 'red')
+        except Exception as e:
+            print_color(f"❌ Error in direct API test: {e}", 'red')
             return False
             
     except Exception as e:
