@@ -344,12 +344,63 @@ def run_comprehensive_test() -> Dict[str, bool]:
         # Provide troubleshooting advice
         if not results.get('server_connection', False):
             print_color("\nTroubleshooting server connection:", 'yellow')
-            print("1. Make sure the neural voice server is running on the GPU server")
+            print("1. Make sure the neural voice server is running")
             print("2. Check that the server URL is correct (using: " + SERVER_URL + ")")
-            print("3. Verify network connectivity to the GPU server")
-            print("4. Try restarting the server with: ./scripts/gpu/manage_neural_server.sh restart")
+            print("3. Verify network connectivity to the server")
     
     return results
+
+def synthesize_custom_text(text: str) -> bool:
+    """Synthesize custom text using the neural voice API."""
+    print_subsection("Custom Text Synthesis")
+    
+    try:
+        import requests
+        
+        # Create a temp directory for test output
+        os.makedirs('neural_test', exist_ok=True)
+        
+        # Generate unique filename for this test
+        timestamp = int(time.time() * 1000)
+        output_file = f"neural_test/speech_{timestamp}.wav"
+        
+        print(f"Synthesizing: \"{text}\"")
+        
+        # Send POST request to synthesize endpoint
+        response = requests.post(
+            f"{SERVER_URL}/synthesize",
+            json={"text": text},
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            # Save the audio
+            with open(output_file, 'wb') as f:
+                f.write(response.content)
+                
+            print_color(f"✅ Synthesis successful, audio saved to {output_file}", 'green')
+            
+            # Try to play the audio
+            if platform.system() == "Darwin":
+                print("Playing audio...")
+                try:
+                    subprocess.run(["afplay", output_file], check=True)
+                    print_color("✅ Audio playback successful", 'green')
+                except Exception as e:
+                    print_color(f"⚠️ Audio playback failed: {e}", 'yellow')
+            
+            return True
+        else:
+            print_color(f"❌ Synthesis API call failed with status {response.status_code}", 'red')
+            print(response.text)
+            return False
+    
+    except ImportError:
+        print_color("❌ Requests module not installed", 'red')
+        return False
+    except Exception as e:
+        print_color(f"❌ Error in custom text synthesis: {e}", 'red')
+        return False
 
 def main():
     """Main entry point for the test script."""
@@ -362,6 +413,7 @@ def main():
     parser.add_argument("--client-only", action="store_true", help="Only test client library")
     parser.add_argument("--model-info", action="store_true", help="Only display voice model information")
     parser.add_argument("--text", type=str, help="Specific text to use for synthesis tests")
+    parser.add_argument("--say", type=str, help="Synthesize and play specific text")
     args = parser.parse_args()
     
     # Update server URL from command line or environment
@@ -369,7 +421,20 @@ def main():
         SERVER_URL = args.server
     
     # Determine which tests to run
-    if args.server_only:
+    if args.say:
+        # Skip full tests, only run the custom text synthesis after a minimal server check
+        print(f"Synthesizing custom text: {args.say}")
+        # Simple server check without full tests
+        try:
+            import requests
+            response = requests.get(f'{SERVER_URL}', timeout=3)
+            if response.status_code == 200:
+                synthesize_custom_text(args.say)
+            else:
+                print_color(f"❌ Server connection failed with status {response.status_code}", 'red')
+        except Exception as e:
+            print_color(f"❌ Error checking server: {e}", 'red')
+    elif args.server_only:
         test_server_connection()
     elif args.api_only:
         if test_server_connection():

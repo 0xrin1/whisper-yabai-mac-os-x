@@ -1077,13 +1077,11 @@ def main():
             install_voice_model(DEFAULT_VOICE_MODEL)
             print("\nCustom voice model created and installed automatically.")
     
-    # Provide next steps for neural training
+    # Provide next steps for using your voice samples
     if len(all_samples) >= 10:
         print("\n=== NEXT STEPS ===")
-        print("To create a neural voice model with the RTX 3090 GPU:")
-        print("1. Run the GPU server check script: ./gpu_scripts/check_gpu_server.sh")
-        print("2. Transfer samples and start training: ./gpu_scripts/transfer_to_gpu_server.sh")
-        print("3. After training completes, retrieve your model: ./gpu_scripts/retrieve_from_gpu_server.sh")
+        print("Your voice samples have been collected and analyzed.")
+        print("The system will use these to better recognize your voice patterns.")
     
     print("\nThank you for training the system with your voice!")
 
