@@ -216,11 +216,11 @@ class DaemonManager:
                 tempfile.gettempdir(), f"daemon_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
             )
 
-    def start(self, wait_time=30):
+    def start(self, wait_time=8):
         """Start the daemon process
 
         Args:
-            wait_time (int): Time to wait for initialization
+            wait_time (int): Initial time to wait for initialization
 
         Returns:
             tuple: (subprocess.Popen, file_handle)
@@ -248,29 +248,33 @@ class DaemonManager:
                 bufsize=1,
             )
 
-        # Wait for daemon to initialize
-        logger.info(f"Waiting {wait_time} seconds for daemon to initialize...")
-
-        # Longer initial wait for Whisper model to load
+        # Initial wait for daemon to start loading models
+        logger.info(f"Initial wait for {wait_time} seconds...")
         time.sleep(wait_time)
 
-        # Verify the daemon is fully initialized and listening
+        # Now poll for readiness instead of just waiting
         logger.info("Checking if daemon is ready for input...")
+        max_wait = 15  # Maximum additional wait time
+        poll_interval = 1  # Check every second
+        start_time = time.time()
         ready = False
 
-        # Check if the daemon output contains a listening indicator
-        if self.capture_output:
-            with open(self.daemon_output_file, "r") as f:
-                content = f.read()
-                if "whisper model loaded" in content.lower():
-                    ready = True
+        while time.time() - start_time < max_wait:
+            # Check if the daemon output contains a listening indicator
+            if self.capture_output:
+                with open(self.daemon_output_file, "r") as f:
+                    content = f.read()
+                    if "whisper model loaded" in content.lower() or "ready for input" in content.lower():
+                        ready = True
+                        break
 
-        if not ready:
-            # Additional wait time if needed
-            logger.info("Waiting additional time for daemon to be fully ready...")
-            time.sleep(10)
+            # Short sleep before checking again
+            time.sleep(poll_interval)
+
+        if ready:
+            logger.info(f"Daemon ready after {time.time() - start_time + wait_time:.1f} seconds")
         else:
-            logger.info("Daemon is ready for input")
+            logger.info("Proceeding with tests after waiting for daemon initialization")
 
         return self.daemon, self.output_file
 
