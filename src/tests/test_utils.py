@@ -216,7 +216,7 @@ class DaemonManager:
                 tempfile.gettempdir(), f"daemon_output_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
             )
 
-    def start(self, wait_time=15):
+    def start(self, wait_time=30):
         """Start the daemon process
 
         Args:
@@ -250,7 +250,27 @@ class DaemonManager:
 
         # Wait for daemon to initialize
         logger.info(f"Waiting {wait_time} seconds for daemon to initialize...")
-        time.sleep(wait_time)  # Allow enough time for Whisper model to load
+
+        # Longer initial wait for Whisper model to load
+        time.sleep(wait_time)
+
+        # Verify the daemon is fully initialized and listening
+        logger.info("Checking if daemon is ready for input...")
+        ready = False
+
+        # Check if the daemon output contains a listening indicator
+        if self.capture_output:
+            with open(self.daemon_output_file, "r") as f:
+                content = f.read()
+                if "whisper model loaded" in content.lower():
+                    ready = True
+
+        if not ready:
+            # Additional wait time if needed
+            logger.info("Waiting additional time for daemon to be fully ready...")
+            time.sleep(10)
+        else:
+            logger.info("Daemon is ready for input")
 
         return self.daemon, self.output_file
 
@@ -271,7 +291,11 @@ class DaemonManager:
 
         # Close output file
         if self.output_file:
-            self.output_file.close()
+            try:
+                if not self.output_file.closed:
+                    self.output_file.close()
+            except:
+                pass
 
         self.daemon = None
         self.output_file = None
@@ -302,9 +326,13 @@ class DaemonManager:
         else:
             # Read from stdout pipe
             while time.time() - start_time < timeout:
-                line = self.daemon.stdout.readline()
-                if text in line:
-                    return True
+                try:
+                    line = self.daemon.stdout.readline()
+                    if text in line:
+                        return True
+                except (IOError, AttributeError):
+                    # Handle case where stdout might be closed
+                    break
                 time.sleep(0.1)
 
         logger.warning(f"Text '{text}' not found in daemon output after {timeout} seconds")

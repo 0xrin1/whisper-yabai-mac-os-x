@@ -21,7 +21,7 @@ import subprocess
 from datetime import datetime
 
 # Import common test utilities
-from test_utils import BaseVoiceTest, DaemonManager
+from src.tests.test_utils import BaseVoiceTest, DaemonManager
 
 # Set up logging
 logger = logging.getLogger("type-trigger-test")
@@ -171,13 +171,13 @@ class TypeTriggerTest(BaseVoiceTest):
                 trigger_file = self.synthesize_speech(trigger_phrase)
 
                 # Wait to ensure system is ready
-                time.sleep(1)
+                time.sleep(3)
 
                 # Play at higher volume for better detection
                 self.play_audio_file(trigger_file, volume=2)
 
                 # Give more time for processing
-                time.sleep(8)
+                time.sleep(12)
 
                 # Check if dictation mode was activated
                 dictation_activated = daemon_mgr.check_output(
@@ -351,7 +351,7 @@ class TypeTriggerTest(BaseVoiceTest):
                     self.play_audio_file(trigger_file, volume=2)
 
                     # Wait for dictation mode to activate with longer timeout
-                    time.sleep(1)  # Brief pause to allow system to start processing
+                    time.sleep(3)  # Give system time to start processing
 
                     # Check if dictation mode was activated
                     if daemon_mgr.check_output(
@@ -382,7 +382,7 @@ class TypeTriggerTest(BaseVoiceTest):
                 logger.info(f"Sending test phrase: '{test_phrase}'")
 
                 # Give more time for dictation mode to fully initialize
-                time.sleep(2)
+                time.sleep(5)
 
                 dictation_file = self.synthesize_speech(test_phrase)
                 time.sleep(1)
