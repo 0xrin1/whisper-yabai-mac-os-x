@@ -3,6 +3,10 @@ import sys
 import logging
 from unittest.mock import MagicMock
 
+# Add the src directory to the path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from config.config import config
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,13 +58,16 @@ def mock_speech_synthesis():
 
     def mock_speak(
         text,
-        voice="p230",  # Standardize on p230 voice across all tests
+        voice=None,  # Will use config value
         rate=1.0,
         use_high_quality=True,
         enhance_audio=True,
         block=False,
         **kwargs,
     ):
+        # Default to config value if None
+        if voice is None:
+            voice = config.get("NEURAL_VOICE_ID", "p230")
         # Just log the text, don't actually make API calls
         logger.info(f"MOCK SPEECH (server API): {text}")
         logger.info(

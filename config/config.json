@@ -16,11 +16,7 @@
 
     "USE_LLM": true,
 
-    "VOICE_NAME": "Daniel",
-    "VOICE_RATE": 220,
-    "VOICE_VOLUME": 1.0,
-
-    "USE_NEURAL_VOICE": false,
+    "NEURAL_VOICE_ID": "p230",
 
     "LOG_LEVEL": "INFO",
     "LOG_TO_FILE": true,

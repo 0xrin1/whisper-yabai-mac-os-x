@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Tuple, Any
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.audio import speech_synthesis as tts
 from src.ui.toast_notifications import send_notification
+from src.config.config import config
 
 # Status display constants
 STATUS_LINE = 0
@@ -41,7 +42,7 @@ assistant_state = {
     "active": False,
     "conversational_mode": False,
     "last_interaction_time": 0,
-    "voice": "p230",  # Standardize on p230 voice across all tests
+    "voice": config.get("NEURAL_VOICE_ID", "p230"),  # Use voice from config
 }
 
 # Predefined responses for various scenarios

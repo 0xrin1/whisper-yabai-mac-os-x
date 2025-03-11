@@ -83,13 +83,9 @@ class Config:
                 # LLM settings
                 "USE_LLM": True,
                 "LLM_MODEL_PATH": None,
-                # Voice settings
-                "VOICE_NAME": "Daniel",
-                "VOICE_RATE": 220,
-                "VOICE_VOLUME": 1.0,
                 # Neural voice settings
-                "USE_NEURAL_VOICE": False,
                 "NEURAL_SERVER": None,
+                "NEURAL_VOICE_ID": "p230",
                 # Logging
                 "LOG_LEVEL": "INFO",
                 "LOG_TO_FILE": False,
@@ -113,11 +109,8 @@ class Config:
             "BUFFER_SECONDS": ("BUFFER_SECONDS", int),
             "USE_LLM": ("USE_LLM", lambda v: v.lower() == "true"),
             "LLM_MODEL_PATH": "LLM_MODEL_PATH",
-            "VOICE_NAME": "VOICE_NAME",
-            "VOICE_RATE": ("VOICE_RATE", int),
-            "VOICE_VOLUME": ("VOICE_VOLUME", float),
-            "USE_NEURAL_VOICE": ("USE_NEURAL_VOICE", lambda v: v.lower() == "true"),
             "NEURAL_SERVER": "NEURAL_SERVER",
+            "NEURAL_VOICE_ID": "NEURAL_VOICE_ID",
             "LOG_LEVEL": "LOG_LEVEL",
             "LOG_TO_FILE": ("LOG_TO_FILE", lambda v: v.lower() == "true"),
             "LOG_FILE": "LOG_FILE",
@@ -207,7 +200,12 @@ class Config:
         if filepath is None:
             config_dir = os.path.expanduser("~/.config/whisper_voice_control")
             os.makedirs(config_dir, exist_ok=True)
-            filepath = os.path.join(config_dir, "config/config.json")
+            filepath = os.path.join(config_dir, "config.json")
+
+        # Ensure directory exists
+        directory = os.path.dirname(filepath)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory, exist_ok=True)
 
         try:
             with open(filepath, "w") as f:

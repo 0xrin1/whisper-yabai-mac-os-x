@@ -15,6 +15,7 @@ from unittest.mock import patch, MagicMock
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.utils import assistant
 from src.audio import speech_synthesis as tts
+from src.config.config import config
 
 
 class TestJarvisAssistant(unittest.TestCase):
@@ -30,7 +31,7 @@ class TestJarvisAssistant(unittest.TestCase):
         assistant.assistant_state["active"] = False
         assistant.assistant_state["conversational_mode"] = False
         assistant.assistant_state["last_interaction_time"] = 0
-        assistant.assistant_state["voice"] = "p230"  # Standardize on p230 voice across all tests
+        assistant.assistant_state["voice"] = config.get("NEURAL_VOICE_ID", "p230")  # Use voice from config
 
         # Clear conversation memory
         with assistant.memory_lock:

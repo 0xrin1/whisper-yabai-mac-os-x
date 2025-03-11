@@ -14,6 +14,11 @@ import random
 import logging
 import tempfile
 from typing import Optional, Dict, Any, List, Union
+import sys
+
+# Add parent directory to import path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.config.config import config
 
 # Configure logging
 logging.basicConfig(
@@ -102,7 +107,7 @@ def stop_speaking() -> None:
 
 def _call_speech_api(
     text: str,
-    voice_id: str = "p230",
+    voice_id: str = None,
     speed: float = 1.0,
     use_high_quality: bool = True,
     enhance_audio: bool = True,
@@ -111,7 +116,7 @@ def _call_speech_api(
 
     Args:
         text: Text to synthesize
-        voice_id: Speaker ID for the VITS model
+        voice_id: Speaker ID for the VITS model (defaults to NEURAL_VOICE_ID from config)
         speed: Speech speed factor (0.5 to 2.0)
         use_high_quality: Whether to use highest quality settings
         enhance_audio: Whether to apply additional GPU-based audio enhancement
@@ -119,6 +124,10 @@ def _call_speech_api(
     Returns:
         Path to audio file or None if failed
     """
+    # Get default voice ID from config if not specified
+    if voice_id is None:
+        voice_id = config.get("NEURAL_VOICE_ID", "p230")
+
     if not text:
         return None
 
@@ -263,7 +272,7 @@ def _process_speech_queue() -> None:
 
 def speak(
     text: str,
-    voice: str = "p230",
+    voice: str = None,
     rate: float = 1.0,
     use_high_quality: bool = True,
     enhance_audio: bool = True,
@@ -273,7 +282,7 @@ def speak(
 
     Args:
         text: Text to speak
-        voice: Voice ID for the model (default "p230")
+        voice: Voice ID for the model (defaults to NEURAL_VOICE_ID from config)
         rate: Speaking rate factor (0.5 to 2.0)
         use_high_quality: Whether to use highest quality settings
         enhance_audio: Whether to apply additional GPU-based audio enhancement
@@ -317,7 +326,7 @@ def speak(
 
 def speak_random(
     category: str,
-    voice: str = "p230",
+    voice: str = None,
     rate: float = 1.0,
     use_high_quality: bool = True,
     enhance_audio: bool = True,
@@ -327,7 +336,7 @@ def speak_random(
 
     Args:
         category: Response category (greeting, acknowledgment, etc.)
-        voice: Voice ID for the model (default "p230")
+        voice: Voice ID for the model (defaults to NEURAL_VOICE_ID from config)
         rate: Speaking rate factor (0.5 to 2.0)
         use_high_quality: Whether to use highest quality settings
         enhance_audio: Whether to apply additional GPU-based audio enhancement

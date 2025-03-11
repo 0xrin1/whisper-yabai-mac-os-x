@@ -11,6 +11,11 @@ import sys
 import logging
 import tempfile
 
+# Add src directory to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from audio import speech_synthesis as tts
+from config.config import config
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -19,48 +24,31 @@ logger = logging.getLogger("trigger-test")
 
 
 def synthesize_and_play(text, voice=None):
-    """Synthesize speech and play it at higher volume."""
-    # Create a temp file
-    temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    output_file = temp_file.name
-    temp_file.close()
+    """Synthesize speech using neural TTS and play it."""
+    # Get default voice ID from config if not specified
+    if voice is None:
+        voice = config.get("NEURAL_VOICE_ID", "p230")
 
-    # Use Mac's 'say' command to generate speech
-    aiff_file = output_file.replace(".wav", ".aiff")
+    logger.info(f"Synthesizing '{text}' using neural voice '{voice}'")
 
-    # Build the command with optional voice parameter
-    cmd = ["say", "-o", aiff_file]
-    if voice:
-        cmd.extend(["-v", voice])
-    cmd.append(text)
-
-    # Run the command
-    subprocess.run(cmd, check=True)
-
-    # Convert AIFF to WAV
-    subprocess.run(
-        [
-            "afconvert",
-            "-f",
-            "WAVE",
-            "-d",
-            "LEI16@16000",
-            "-c",
-            "1",
-            aiff_file,
-            output_file,
-        ],
-        check=True,
+    # Generate the audio file using our neural speech synthesis
+    audio_file = tts._call_speech_api(
+        text,
+        voice_id=voice,
+        speed=1.0,
+        use_high_quality=True,
+        enhance_audio=True
     )
 
-    # Clean up AIFF file
-    os.remove(aiff_file)
+    if not audio_file:
+        logger.error("Failed to synthesize speech")
+        return None
 
-    # Play at higher volume
-    subprocess.run(["afplay", "-v", "2", output_file], check=True)
+    # Play the audio file at higher volume
+    subprocess.run(["afplay", "-v", "2", audio_file], check=True)
 
     # Return the file path so it can be cleaned up later
-    return output_file
+    return audio_file
 
 
 def test_trigger_words():
@@ -91,18 +79,18 @@ def test_trigger_words():
         logger.info("Waiting for daemon to initialize...")
         time.sleep(15)  # Extra time to ensure it's fully ready
 
-        # Use the local synthesize_and_play function instead of external API
-        logger.info("Testing with local speech synthesis")
+        # Use our neural TTS API for speech synthesis
+        logger.info("Testing with neural speech synthesis API")
 
         # Test 'hey' trigger
         logger.info("Testing 'hey' trigger word...")
         try:
-            # Use local speech synthesis
-            temp_file = synthesize_and_play("hey", voice="Daniel")
+            # Use neural speech synthesis
+            temp_file = synthesize_and_play("hey")
             # Wait for processing to complete
             time.sleep(5)
             # Clean up
-            if os.path.exists(temp_file):
+            if temp_file and os.path.exists(temp_file):
                 os.remove(temp_file)
         except Exception as e:
             logger.error(f"Error testing 'hey' with speech synthesis: {e}")
@@ -112,12 +100,12 @@ def test_trigger_words():
         for phrase in ["type", "dictate"]:
             try:
                 logger.info(f"Testing '{phrase}' with speech synthesis")
-                # Say it clearly
-                temp_file = synthesize_and_play(phrase, voice="Daniel")
+                # Use neural synthesis
+                temp_file = synthesize_and_play(phrase)
                 # Wait for processing
                 time.sleep(5)
                 # Clean up
-                if os.path.exists(temp_file):
+                if temp_file and os.path.exists(temp_file):
                     os.remove(temp_file)
             except Exception as e:
                 logger.error(f"Error testing '{phrase}' with speech synthesis: {e}")
