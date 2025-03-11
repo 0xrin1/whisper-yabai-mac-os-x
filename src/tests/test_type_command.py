@@ -22,6 +22,10 @@ import json
 import re
 from datetime import datetime
 
+# Add the parent directory to the path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from config.config import config
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -144,51 +148,41 @@ class TypeTriggerTest(unittest.TestCase):
             logger.error(f"Error monitoring dictation log: {e}")
             return []
 
-    def synthesize_speech(self, text, voice="Samantha"):
-        """Generate speech audio file from text.
+    def synthesize_speech(self, text, voice_id=None):
+        """Generate speech audio file from text using neural TTS API.
 
         Args:
             text (str): Text to convert to speech
-            voice (str, optional): Voice to use for synthesis
+            voice_id (str, optional): Voice ID to use for synthesis (defaults to NEURAL_VOICE_ID from config)
 
         Returns:
             str: Path to generated audio file
         """
-        # Create a temp file
-        temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        output_file = temp_file.name
-        temp_file.close()
+        # Import our TTS module
+        from audio import speech_synthesis as tts
 
-        self.temp_files.append(output_file)
+        # Get default voice ID from config if not specified
+        if voice_id is None:
+            voice_id = config.get("NEURAL_VOICE_ID", "p230")
 
-        # Use Mac's 'say' command to generate speech
-        aiff_file = output_file.replace(".wav", ".aiff")
-        self.temp_files.append(aiff_file)
+        logger.info(f"Synthesizing '{text}' using neural voice '{voice_id}'")
 
-        # Build the command with optional voice parameter
-        cmd = ["say", "-o", aiff_file, "-v", voice, text]
-
-        # Run the command
-        subprocess.run(cmd, check=True)
-
-        # Convert AIFF to WAV (16kHz, 16-bit mono - matching Whisper requirements)
-        subprocess.run(
-            [
-                "afconvert",
-                "-f",
-                "WAVE",
-                "-d",
-                "LEI16@16000",
-                "-c",
-                "1",
-                aiff_file,
-                output_file,
-            ],
-            check=True,
+        # Generate the audio file using our neural speech synthesis
+        audio_file = tts._call_speech_api(
+            text,
+            voice_id=voice_id,
+            speed=1.0,
+            use_high_quality=True,
+            enhance_audio=True
         )
 
-        logger.info(f"Generated speech for '{text}' at {output_file}")
-        return output_file
+        if not audio_file:
+            logger.error("Failed to synthesize speech")
+            return None
+
+        self.temp_files.append(audio_file)
+        logger.info(f"Generated speech for '{text}' at {audio_file}")
+        return audio_file
 
     def play_audio_file(self, file_path, volume=2):
         """Play an audio file with specified volume.
