@@ -89,7 +89,7 @@ This document provides a quick reference for available voice commands in your vo
 | "vim insert" | Enter insert mode (i) |
 | "vim normal" | Enter normal mode (Esc) |
 
-## Development 
+## Development
 
 | Command | Action |
 |---------|--------|

@@ -15,93 +15,93 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-        
+
     - name: Install system dependencies
       run: |
         brew install portaudio
-        
+
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
         # Special handling for PyAudio with PortAudio
         pip install --global-option='build_ext' --global-option='-I/usr/local/include' --global-option='-L/usr/local/lib' pyaudio
         # Install remaining requirements
-        if [ -f requirements.txt ]; then 
+        if [ -f requirements.txt ]; then
           grep -v "pyaudio" requirements.txt > requirements_without_pyaudio.txt
           pip install -r requirements_without_pyaudio.txt
         fi
-        
+
     - name: Set up audio environment
       run: |
         echo "Setting up virtual audio environment for CI..."
         # Create empty audio files for tests that need sample files
         mkdir -p test_audio_samples
         dd if=/dev/zero of=test_audio_samples/silence.wav bs=1k count=16
-        
+
         # Set environment variables to use mock audio devices
         echo "AUDIO_DEVICE=mock" >> $GITHUB_ENV
         echo "MOCK_TEST_MODE=true" >> $GITHUB_ENV
         echo "SKIP_AUDIO_RECORDING=true" >> $GITHUB_ENV
         echo "SKIP_AUDIO_PLAYBACK=true" >> $GITHUB_ENV
         echo "USE_MOCK_SPEECH=true" >> $GITHUB_ENV
-        
+
         # Create a mock .env file for testing
         echo "WHISPER_MODEL_SIZE=tiny" > .env
         echo "USE_LLM=false" >> .env
         echo "MOCK_TEST_MODE=true" >> .env
-        
+
     - name: Run syntax checks
       run: |
         echo "Running Python syntax checks..."
         find . -name "*.py" -not -path "./venv/*" -print0 | xargs -0 -n1 python -m py_compile
-        
+
     - name: Run import checks
       run: |
         echo "Checking Python imports..."
         # This checks if imports can be resolved, but doesn't run the script
         find . -name "*.py" -not -path "./venv/*" -print0 | xargs -0 -n1 -I{} python -c "import ast; ast.parse(open('{}').read())"
-        
+
     - name: Run module-specific import tests
       run: |
         echo "Testing speech synthesis module imports..."
         if [ -f "src/speech_synthesis.py" ]; then
           python -c "import sys; sys.path.append('.'); from src import speech_synthesis" || echo "Speech synthesis imports failed"
         fi
-        
+
         echo "Testing neural voice client imports..."
         if [ -f "src/neural_voice_client.py" ]; then
           python -c "import sys; sys.path.append('.'); from src import neural_voice_client" || echo "Neural voice client imports failed"
         fi
-        
+
         echo "Testing audio processor imports..."
         if [ -f "src/audio_processor.py" ]; then
           python -c "import sys; sys.path.append('.'); from src import audio_processor" || echo "Audio processor imports failed"
         fi
-        
+
         echo "Testing audio recorder imports..."
         if [ -f "src/audio_recorder.py" ]; then
           python -c "import sys; sys.path.append('.'); from src import audio_recorder" || echo "Audio recorder imports failed"
         fi
-        
+
     - name: Run code quality checks
       run: |
         echo "Checking for print statements in non-test modules..."
         find ./src -name "*.py" -not -name "test_*" -print0 | xargs -0 grep -l "print(" || echo "No print statements found"
-        
+
         echo "Checking for TODO comments..."
         find ./src -name "*.py" -print0 | xargs -0 grep -l "TODO" || echo "No TODO comments found"
-        
+
         echo "Checking for hardcoded file paths..."
         find ./src -name "*.py" -print0 | xargs -0 grep -l "\/Users\/" || echo "No hardcoded user paths found"
-        
+
         echo "Checking for large files..."
         find . -type f -size +10M -not -path "./venv/*" -not -path "./models/*" | grep -v ".git/" || echo "No large files found"
-        
+
     - name: Create mock test environment
       run: |
         # Patch test files to skip actual audio recording/playback if needed
@@ -109,7 +109,7 @@ jobs:
           echo "Patching test_utils.py for CI environment..."
           # Create a backup
           cp src/test_utils.py src/test_utils.py.bak
-          
+
           # Create a preface file with environment setup
           echo 'import os' > src/test_utils_preface.py
           echo '# CI test environment setup' >> src/test_utils_preface.py
@@ -117,7 +117,7 @@ jobs:
           echo 'os.environ["SKIP_AUDIO_RECORDING"] = "true"' >> src/test_utils_preface.py
           echo 'os.environ["SKIP_AUDIO_PLAYBACK"] = "true"' >> src/test_utils_preface.py
           echo 'os.environ["USE_MOCK_SPEECH"] = "true"' >> src/test_utils_preface.py
-          
+
           # Combine the preface with the original file
           cat src/test_utils_preface.py src/test_utils.py > src/test_utils.py.new
           mv src/test_utils.py.new src/test_utils.py
@@ -136,12 +136,12 @@ jobs:
           echo '    """Setup mock environment for CI testing"""' >> src/test_utils.py
           echo '    return True' >> src/test_utils.py
         fi
-        
+
     - name: Run neural voice tests with mocks
       run: |
         echo "Running neural voice tests with mocks..."
         MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true python test_neural_voice.py || echo "Neural voice tests skipped (requires audio hardware)"
-        
+
     - name: Run unit tests with mocks
       run: |
         echo "Running unit tests with mocks..."

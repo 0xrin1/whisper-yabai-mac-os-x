@@ -10,18 +10,18 @@ Source: `audio/speech_synthesis.py`
 ## Function: `get_random_response(category: str)`
 
 Get a random response from a specific category.
-    
+
     Args:
         category: The category of response to get
-        
+
     Returns:
         A random response string
 
-## Function: `speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE, 
+## Function: `speak(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
           block: bool = False, volume: float = 1.0)`
 
 Speak the provided text using macOS TTS.
-    
+
     Args:
         text: The text to speak
         voice: The voice to use
@@ -32,20 +32,20 @@ Speak the provided text using macOS TTS.
 ## Function: `_speak_with_custom_voice(text: str, rate: int = DEFAULT_RATE, volume: float = 1.0)`
 
 Use custom voice model for speech.
-    
+
     Args:
         text: The text to speak
         rate: The speaking rate
         volume: Volume level (0.0 to 1.0)
-    
+
     Returns:
         Boolean indicating success
 
-## Function: `_speak_now(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE, 
+## Function: `_speak_now(text: str, voice: str = DEFAULT_VOICE, rate: int = DEFAULT_RATE,
                volume: float = 1.0)`
 
 Actually execute the TTS command (internal use).
-    
+
     Args:
         text: The text to speak
         voice: The voice to use
@@ -67,24 +67,24 @@ Stop all speech immediately.
 ## Function: `get_voice_info(voice: str)`
 
 Get information about a specific voice.
-    
+
     Args:
         voice: The voice name
-        
+
     Returns:
         Dictionary with voice characteristics or None if voice doesn't exist
 
 ## Function: `is_speaking()`
 
 Check if the system is currently speaking.
-    
+
     Returns:
         True if speaking, False otherwise
 
 ## Function: `greeting(name: Optional[str] = None)`
 
 Speak a greeting.
-    
+
     Args:
         name: Optional name to personalize the greeting
 
@@ -119,7 +119,6 @@ Reload the active voice model (useful if a new model was just created).
 ## Function: `is_neural_voice_active()`
 
 Check if a neural voice model is active.
-    
+
     Returns:
         Boolean indicating if neural voice is active
-

@@ -24,21 +24,20 @@ Stop listening for keyboard hotkeys.
 ## Function: `_on_press(self, key)`
 
 Handle key press events.
-        
+
         Args:
             key: The key that was pressed
 
 ## Function: `_on_release(self, key)`
 
 Handle key release events.
-        
+
         Args:
             key: The key that was released
-        
+
         Returns:
             bool: False if the listener should stop, True otherwise
 
 ## Function: `_toggle_mute(self)`
 
 Toggle mute state.
-

@@ -56,4 +56,3 @@ Register callback for recording state changes.
 ## Function: `_notify_recording_change(self)`
 
 Notify callbacks of recording state change.
-

@@ -11,4 +11,3 @@ Record audio from microphone.
 ## Function: `main()`
 
 Run the simplified dictation program.
-

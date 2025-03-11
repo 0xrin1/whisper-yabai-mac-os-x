@@ -7,4 +7,3 @@ Source: `utils/direct_typing.py`
 ## Function: `type_text(text)`
 
 Type text using pure AppleScript - no clipboard involved
-

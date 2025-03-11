@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Make the code block relative positioning for the button
         block.style.position = 'relative';
-        
+
         // Add click event to copy code
         copyButton.addEventListener('click', function() {
             const code = block.querySelector('code').textContent;
@@ -55,33 +55,33 @@ document.addEventListener('DOMContentLoaded', function() {
     apiSections.forEach(function(section) {
         section.style.cursor = 'pointer';
         section.classList.add('collapsible');
-        
+
         // Find content to collapse (everything until the next h2)
         const contentElements = [];
         let nextElement = section.nextElementSibling;
-        
+
         while (nextElement && nextElement.tagName !== 'H2') {
             contentElements.push(nextElement);
             nextElement = nextElement.nextElementSibling;
         }
-        
+
         // Create a container for the content
         const contentContainer = document.createElement('div');
         contentContainer.className = 'collapsible-content';
         contentContainer.style.transition = 'max-height 0.3s ease-out';
-        
+
         // Move content into container
         contentElements.forEach(element => {
             contentContainer.appendChild(element.cloneNode(true));
         });
-        
+
         // Replace original elements with the container
         contentElements.forEach(element => {
             element.remove();
         });
-        
+
         section.parentNode.insertBefore(contentContainer, section.nextSibling);
-        
+
         // Add click event to toggle
         section.addEventListener('click', function() {
             this.classList.toggle('active');
@@ -104,11 +104,11 @@ document.addEventListener('DOMContentLoaded', function() {
             anchor.style.textDecoration = 'none';
             anchor.style.opacity = '0.5';
             heading.appendChild(anchor);
-            
+
             heading.addEventListener('mouseenter', function() {
                 anchor.style.opacity = '1';
             });
-            
+
             heading.addEventListener('mouseleave', function() {
                 anchor.style.opacity = '0.5';
             });
@@ -130,11 +130,11 @@ document.addEventListener('DOMContentLoaded', function() {
         themeToggle.style.border = '1px solid #ddd';
         themeToggle.style.cursor = 'pointer';
         themeToggle.style.zIndex = '1000';
-        
+
         themeToggle.addEventListener('click', function() {
             const htmlElement = document.documentElement;
             const currentTheme = htmlElement.getAttribute('data-theme');
-            
+
             if (currentTheme === 'dark' || currentTheme === 'navy') {
                 htmlElement.setAttribute('data-theme', 'light');
                 themeToggle.innerHTML = '🌙';
@@ -143,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 themeToggle.innerHTML = '☀️';
             }
         });
-        
+
         document.body.appendChild(themeToggle);
     }
 });

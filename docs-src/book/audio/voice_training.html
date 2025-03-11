@@ -172,7 +172,7 @@ then uses them to help optimize recognition settings and create custom voice mod
     seconds: Length of recording in seconds
     prompt: Optional text to display before recording
     interactive: Whether to wait for user input before recording
-    
+
 Returns:
     Path to the recorded WAV file
 </code></pre>
@@ -181,7 +181,7 @@ Returns:
 <pre><code>Args:
     name: Name for the voice model
     samples: List of WAV file paths with voice samples (if None, uses all training samples)
-    
+
 Returns:
     Path to the created voice model directory
 </code></pre>
@@ -189,7 +189,7 @@ Returns:
 <p>Install a custom voice model to be used by the system.</p>
 <pre><code>Args:
     name: Name of the voice model to install
-    
+
 Returns:
     Boolean indicating success
 </code></pre>
@@ -197,7 +197,7 @@ Returns:
 <p>Create a backup zip file of all recorded samples.</p>
 <pre><code>Args:
     samples_dir: Directory containing samples to backup
-    
+
 Returns:
     Path to the created zip file
 </code></pre>

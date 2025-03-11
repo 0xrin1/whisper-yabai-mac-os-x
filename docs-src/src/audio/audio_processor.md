@@ -32,17 +32,16 @@ Main processing thread function.
 ## Function: `_process_command(self, transcription)`
 
 Process a command transcription.
-        
+
         Args:
             transcription: Transcribed text to process as a command
-            
+
         Returns:
             bool: True if command was processed successfully
 
 ## Function: `_start_dictation_mode(self)`
 
 Start dictation mode.
-        
+
         Returns:
             bool: True if dictation mode was started successfully
-

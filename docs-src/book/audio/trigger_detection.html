@@ -176,7 +176,7 @@ Detects command and dictation trigger words in audio.</p>
 <p>Process audio buffer to detect trigger words.</p>
 <pre><code>    Args:
         audio_buffer: List of audio frames to process
-        
+
     Returns:
         dict: Detection results with trigger type and transcription
 </code></pre>
@@ -184,7 +184,7 @@ Detects command and dictation trigger words in audio.</p>
 <p>Detect trigger words in transcription.</p>
 <pre><code>    Args:
         transcription: Transcribed text to check for trigger words
-        
+
     Returns:
         dict: Detection results with trigger type and transcription
 </code></pre>
@@ -192,7 +192,7 @@ Detects command and dictation trigger words in audio.</p>
 <p>Handle a detected trigger by starting appropriate mode.</p>
 <pre><code>    Args:
         detection_result: Dict with detection results
-        
+
     Returns:
         bool: True if trigger was handled, False otherwise
 </code></pre>

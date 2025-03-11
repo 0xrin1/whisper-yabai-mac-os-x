@@ -185,7 +185,7 @@ Provides JARVIS-like conversational interface with speech synthesis and recognit
 <p>Process user input and generate appropriate response.</p>
 <pre><code>Args:
     text: The user's transcribed speech
-    
+
 Returns:
     Assistant's response text
 </code></pre>
@@ -194,7 +194,7 @@ Returns:
 <pre><code>Args:
     command_name: The function name to call
     full_text: The user's full input text
-    
+
 Returns:
     The assistant's response
 </code></pre>
@@ -228,7 +228,7 @@ Returns:
 <p>Check if the assistant should timeout due to inactivity.</p>
 <pre><code>Returns:
     True if the assistant should timeout, False otherwise
-    
+
 Note:
     Timeout occurs exactly at TIMEOUT_SECONDS after last interaction.
     This function is designed to be testable with mock time.time() patches.

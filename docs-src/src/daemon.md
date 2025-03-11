@@ -40,4 +40,3 @@ Show startup banner with system information.
 ## Function: `_delayed_start(self)`
 
 Start continuous listening after a delay.
-

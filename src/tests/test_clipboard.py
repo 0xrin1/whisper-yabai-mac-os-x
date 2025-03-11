@@ -26,6 +26,6 @@ time.sleep(3)
 
 # Paste the text (Cmd+V on Mac)
 print("Pasting now...")
-pyautogui.hotkey('command', 'v')
+pyautogui.hotkey("command", "v")
 
 print("Done!")

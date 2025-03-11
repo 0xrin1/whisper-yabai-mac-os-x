@@ -58,7 +58,7 @@ A voice command daemon that uses OpenAI's Whisper model locally to control your 
    ```
    # Create models directory
    mkdir -p models
-   
+
    # Download a GGUF model (e.g., Llama 2 7B Chat quantized)
    # You can download from https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/tree/main
    # Example using curl:
@@ -329,7 +329,7 @@ The project follows a modular directory structure:
 ```
 ├── src/                    # Source code
 │   ├── core/               # Core infrastructure components
-│   ├── audio/              # Audio processing components 
+│   ├── audio/              # Audio processing components
 │   ├── utils/              # Utility modules
 │   ├── ui/                 # User interface components
 │   ├── config/             # Configuration management

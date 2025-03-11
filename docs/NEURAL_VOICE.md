@@ -31,10 +31,10 @@ The speech synthesis module is designed to integrate smoothly with the voice con
    # Basic usage
    from src.audio.speech_synthesis import speak
    speak("Hello, this is a test message")
-   
+
    # Blocking until speech completes
    speak("This is important information", block=True)
-   
+
    # Using predefined responses
    from src.audio.speech_synthesis import speak_random
    speak_random("greeting")  # Selects a random greeting

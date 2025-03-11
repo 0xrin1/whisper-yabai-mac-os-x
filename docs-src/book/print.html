@@ -190,7 +190,7 @@ Handles transcription of audio files using Whisper.</p>
 <p>Process a command transcription.</p>
 <pre><code>    Args:
         transcription: Transcribed text to process as a command
-        
+
     Returns:
         bool: True if command was processed successfully
 </code></pre>
@@ -252,7 +252,7 @@ Enables high-quality neural voice synthesis on lightweight clients</p>
 <p>Play an audio file.</p>
 <pre><code>Args:
     file_path: Path to audio file
-    
+
 Returns:
     Boolean indicating success
 </code></pre>
@@ -289,7 +289,7 @@ p: Optional[pyaudio.PyAudio] = None
     sample_width: Sample width in bytes (default from PyAudio)
     rate: Sample rate (default from config)
     p: PyAudio instance (if None, creates temporary instance)
-    
+
 Returns:
     True if successful, False otherwise
 </code></pre>
@@ -297,7 +297,7 @@ Returns:
 <p>Play a system sound.</p>
 <pre><code>Args:
     sound_name: Name of system sound (without path or extension)
-    
+
 Returns:
     True if successful, False otherwise
 </code></pre>
@@ -311,7 +311,7 @@ Now with support for neural voice models trained with GlowTTS.</p>
 <p>Get a random response from a specific category.</p>
 <pre><code>Args:
     category: The category of response to get
-    
+
 Returns:
     A random response string
 </code></pre>
@@ -356,7 +356,7 @@ Returns:
 <p>Get information about a specific voice.</p>
 <pre><code>Args:
     voice: The voice name
-    
+
 Returns:
     Dictionary with voice characteristics or None if voice doesn't exist
 </code></pre>
@@ -406,7 +406,7 @@ Detects command and dictation trigger words in audio.</p>
 <p>Process audio buffer to detect trigger words.</p>
 <pre><code>    Args:
         audio_buffer: List of audio frames to process
-        
+
     Returns:
         dict: Detection results with trigger type and transcription
 </code></pre>
@@ -414,7 +414,7 @@ Detects command and dictation trigger words in audio.</p>
 <p>Detect trigger words in transcription.</p>
 <pre><code>    Args:
         transcription: Transcribed text to check for trigger words
-        
+
     Returns:
         dict: Detection results with trigger type and transcription
 </code></pre>
@@ -422,7 +422,7 @@ Detects command and dictation trigger words in audio.</p>
 <p>Handle a detected trigger by starting appropriate mode.</p>
 <pre><code>    Args:
         detection_result: Dict with detection results
-        
+
     Returns:
         bool: True if trigger was handled, False otherwise
 </code></pre>
@@ -445,7 +445,7 @@ then uses them to help optimize recognition settings and create custom voice mod
     seconds: Length of recording in seconds
     prompt: Optional text to display before recording
     interactive: Whether to wait for user input before recording
-    
+
 Returns:
     Path to the recorded WAV file
 </code></pre>
@@ -454,7 +454,7 @@ Returns:
 <pre><code>Args:
     name: Name for the voice model
     samples: List of WAV file paths with voice samples (if None, uses all training samples)
-    
+
 Returns:
     Path to the created voice model directory
 </code></pre>
@@ -462,7 +462,7 @@ Returns:
 <p>Install a custom voice model to be used by the system.</p>
 <pre><code>Args:
     name: Name of the voice model to install
-    
+
 Returns:
     Boolean indicating success
 </code></pre>
@@ -470,7 +470,7 @@ Returns:
 <p>Create a backup zip file of all recorded samples.</p>
 <pre><code>Args:
     samples_dir: Directory containing samples to backup
-    
+
 Returns:
     Path to the created zip file
 </code></pre>
@@ -499,7 +499,7 @@ Implements the Singleton pattern to ensure consistent configuration across modul
 <pre><code>    Args:
         key: Configuration key
         default: Default value if key is not found
-        
+
     Returns:
         Configuration value or default
 </code></pre>
@@ -513,7 +513,7 @@ Implements the Singleton pattern to ensure consistent configuration across modul
 <p>Save current configuration to a JSON file.</p>
 <pre><code>    Args:
         filepath: Path to save configuration file (optional)
-        
+
     Returns:
         True if saved successfully, False otherwise
 </code></pre>
@@ -530,7 +530,7 @@ Handles text typing using multiple fallback methods.</p>
 <p>Type text using multiple fallback methods.</p>
 <pre><code>    Args:
         transcription: The text to type
-        
+
     Returns:
         bool: True if text was typed successfully
 </code></pre>
@@ -538,7 +538,7 @@ Handles text typing using multiple fallback methods.</p>
 <p>Type text using AppleScript (most reliable on macOS).</p>
 <pre><code>    Args:
         text: Text to type
-        
+
     Returns:
         bool: True if successful
 </code></pre>
@@ -546,7 +546,7 @@ Handles text typing using multiple fallback methods.</p>
 <p>Type text using clipboard (pbcopy + cmd+v).</p>
 <pre><code>    Args:
         text: Text to type
-        
+
     Returns:
         bool: True if successful
 </code></pre>
@@ -554,7 +554,7 @@ Handles text typing using multiple fallback methods.</p>
 <p>Type text using PyAutoGUI direct typing.</p>
 <pre><code>    Args:
         text: Text to type
-        
+
     Returns:
         bool: True if successful
 </code></pre>
@@ -616,7 +616,7 @@ kwargs: Dict = None
     fallback_action: Optional function to call on error
     args: Positional arguments to pass to the function
     kwargs: Keyword arguments to pass to the function
-    
+
 Returns:
     The result of the function call, or None on error
 </code></pre>
@@ -723,7 +723,7 @@ Returns:
     message: The new notification message
     timeout: Reset auto-dismiss timer to this many seconds (0 = don't auto-dismiss)
     sound: Whether to play a sound with the notification
-    
+
 Returns:
     The notification identifier
 </code></pre>
@@ -770,7 +770,7 @@ Provides JARVIS-like conversational interface with speech synthesis and recognit
 <p>Process user input and generate appropriate response.</p>
 <pre><code>Args:
     text: The user's transcribed speech
-    
+
 Returns:
     Assistant's response text
 </code></pre>
@@ -779,7 +779,7 @@ Returns:
 <pre><code>Args:
     command_name: The function name to call
     full_text: The user's full input text
-    
+
 Returns:
     The assistant's response
 </code></pre>
@@ -813,7 +813,7 @@ Returns:
 <p>Check if the assistant should timeout due to inactivity.</p>
 <pre><code>Returns:
     True if the assistant should timeout, False otherwise
-    
+
 Note:
     Timeout occurs exactly at TIMEOUT_SECONDS after last interaction.
     This function is designed to be testable with mock time.time() patches.
@@ -842,7 +842,7 @@ Executes system commands based on voice input.</p>
 <p>Check if a command exists.</p>
 <pre><code>    Args:
         command: Command name to check
-        
+
     Returns:
         bool: True if command exists, False otherwise
 </code></pre>
@@ -851,7 +851,7 @@ Executes system commands based on voice input.</p>
 <pre><code>    Args:
         command: Command to execute
         args: Arguments for the command
-        
+
     Returns:
         bool: True if command executed successfully
 </code></pre>
@@ -859,7 +859,7 @@ Executes system commands based on voice input.</p>
 <p>Parse and execute a command string.</p>
 <pre><code>    Args:
         text: Command text to parse
-        
+
     Returns:
         bool: True if command executed successfully
 </code></pre>
@@ -867,7 +867,7 @@ Executes system commands based on voice input.</p>
 <p>Execute a shell command.</p>
 <pre><code>    Args:
         command: Shell command to execute
-        
+
     Returns:
         bool: True if command succeeded, False otherwise
 </code></pre>
@@ -875,7 +875,7 @@ Executes system commands based on voice input.</p>
 <p>Open an application.</p>
 <pre><code>    Args:
         args: List of arguments, first being the app name
-        
+
     Returns:
         bool: True if application opened successfully
 </code></pre>
@@ -883,7 +883,7 @@ Executes system commands based on voice input.</p>
 <p>Focus on an application using Yabai.</p>
 <pre><code>    Args:
         args: List of arguments, first being the app name
-        
+
     Returns:
         bool: True if application focused successfully
 </code></pre>
@@ -891,7 +891,7 @@ Executes system commands based on voice input.</p>
 <p>Type text.</p>
 <pre><code>    Args:
         args: List of arguments, joined to form the text to type
-        
+
     Returns:
         bool: True if text typed successfully
 </code></pre>
@@ -899,7 +899,7 @@ Executes system commands based on voice input.</p>
 <p>Move the focused window to a position.</p>
 <pre><code>    Args:
         args: List of arguments, first being the direction
-        
+
     Returns:
         bool: True if window moved successfully
 </code></pre>
@@ -907,7 +907,7 @@ Executes system commands based on voice input.</p>
 <p>Resize the focused window.</p>
 <pre><code>    Args:
         args: List of arguments, first being the direction
-        
+
     Returns:
         bool: True if window resized successfully
 </code></pre>
@@ -915,7 +915,7 @@ Executes system commands based on voice input.</p>
 <p>Move the focused window to a space.</p>
 <pre><code>    Args:
         args: List of arguments, first being the space number
-        
+
     Returns:
         bool: True if window moved successfully
 </code></pre>
@@ -923,7 +923,7 @@ Executes system commands based on voice input.</p>
 <p>Maximize the focused window.</p>
 <pre><code>    Args:
         args: List of arguments (not used)
-        
+
     Returns:
         bool: True if window maximized successfully
 </code></pre>
@@ -931,7 +931,7 @@ Executes system commands based on voice input.</p>
 <p>Close the focused window.</p>
 <pre><code>    Args:
         args: List of arguments (not used)
-        
+
     Returns:
         bool: True if window closed successfully
 </code></pre>
@@ -939,7 +939,7 @@ Executes system commands based on voice input.</p>
 <p>Click the mouse at the current position.</p>
 <pre><code>    Args:
         args: List of arguments (not used)
-        
+
     Returns:
         bool: True if mouse clicked successfully
 </code></pre>
@@ -956,7 +956,7 @@ Extends core dictation with additional functionality.</p>
 <p>Process dictation by typing text at cursor.</p>
 <pre><code>    Args:
         transcription: The text to type
-    
+
     Returns:
         bool: True if dictation was processed successfully
 </code></pre>
@@ -965,7 +965,7 @@ Extends core dictation with additional functionality.</p>
 Handles capitalization, formatting, and other text transformations.</p>
 <pre><code>    Args:
         text: Raw transcription text
-        
+
     Returns:
         Processed text ready for typing
 </code></pre>
@@ -995,7 +995,7 @@ Manages keyboard shortcuts for system control.</p>
 <p>Handle key release events.</p>
 <pre><code>    Args:
         key: The key that was released
-    
+
     Returns:
         bool: False if the listener should stop, True otherwise
 </code></pre>
@@ -1047,7 +1047,7 @@ Uses core dictation functionality with simplified interface.</p>
 <p>Handle key press events.</p>
 <pre><code>Args:
     key: The key that was pressed
-    
+
 Returns:
     False to stop listener, None to continue
 </code></pre>
@@ -1055,7 +1055,7 @@ Returns:
 <p>Handle key release events.</p>
 <pre><code>Args:
     key: The key that was released
-    
+
 Returns:
     False to stop listener, None to continue
 </code></pre>

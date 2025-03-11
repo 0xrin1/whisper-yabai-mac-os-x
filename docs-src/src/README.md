@@ -15,4 +15,3 @@ The documentation is extracted from docstrings in the source code.
 - **Utils**: Utility functions and command processing
 - **UI**: User interface components
 - **Config**: Configuration management
-        

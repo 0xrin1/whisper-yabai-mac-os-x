@@ -12,7 +12,7 @@ Records audio from microphone with configurable parameters.
 ## Function: `play_sound(self, sound_type: str)`
 
 Play a sound to indicate recording status.
-        
+
         Args:
             sound_type: Type of sound to play ('start', 'stop', 'dictation', 'command')
 
@@ -23,4 +23,3 @@ Stop the current recording.
 ## Function: `cleanup(self)`
 
 Clean up PyAudio resources.
-

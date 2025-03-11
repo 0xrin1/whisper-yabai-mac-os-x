@@ -16,4 +16,3 @@ Check if we have accessibility access by testing keyboard monitoring.
 ## Function: `main()`
 
 Main function to perform permission checks.
-

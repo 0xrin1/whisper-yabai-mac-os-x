@@ -1,13 +1,13 @@
+llama-cpp-python
 openai-whisper
-pyobjc-framework-ApplicationServices
-pyobjc-framework-Quartz
+pyaudio
 pyautogui
 pynput
-python-dotenv
-llama-cpp-python
-requests
+pyobjc-framework-ApplicationServices
+pyobjc-framework-Quartz
 pyperclip
+python-dotenv
 # These dependencies are not strictly required but enhance functionality
 # For speech synthesis and assistant features
 pyttsx3
-pyaudio
+requests

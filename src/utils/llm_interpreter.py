@@ -11,34 +11,37 @@ from typing import Dict, Any, Optional, List, Tuple
 from llama_cpp import Llama
 
 # Configure logging
-logger = logging.getLogger('llm-interpreter')
+logger = logging.getLogger("llm-interpreter")
+
 
 class CommandInterpreter:
     """
     Interprets natural language commands using a local LLM.
     Translates speech into structured command actions.
     """
-    
+
     def __init__(self, model_path: Optional[str] = None, n_ctx: int = 4096):
         """Initialize the LLM-based command interpreter."""
-        
+
         # Default model path from environment or use a sensible default
         if model_path is None:
-            model_path = os.getenv('LLM_MODEL_PATH', 'models/qwen2_deepseek_7b_instruct.Q4_K_M.gguf')
-        
+            model_path = os.getenv(
+                "LLM_MODEL_PATH", "models/qwen2_deepseek_7b_instruct.Q4_K_M.gguf"
+            )
+
         self.model_path = model_path
         self.n_ctx = n_ctx
         self.llm = None
         self.available_commands = self._load_available_commands()
         self.model_type = self._determine_model_type()
-        
+
         # Load the model
         self._load_model()
-    
+
     def _determine_model_type(self):
         """Determine the model type based on the filename."""
         model_filename = os.path.basename(self.model_path).lower()
-        
+
         if "qwen" in model_filename:
             return "qwen"
         elif "deepseek" in model_filename:
@@ -48,51 +51,57 @@ class CommandInterpreter:
         else:
             # Default to llama-style models
             return "llama"
-    
+
     def _load_model(self):
         """Load the LLM model."""
         if not os.path.exists(self.model_path):
             logger.error(f"Model file not found: {self.model_path}")
-            logger.error("Please download a GGUF format model and set LLM_MODEL_PATH environment variable.")
+            logger.error(
+                "Please download a GGUF format model and set LLM_MODEL_PATH environment variable."
+            )
             return False
-        
+
         try:
-            logger.info(f"Loading LLM model from {self.model_path} (type: {self.model_type})")
-            
+            logger.info(
+                f"Loading LLM model from {self.model_path} (type: {self.model_type})"
+            )
+
             # Set GPU layers based on available memory
-            gpu_layers = int(os.getenv('LLM_GPU_LAYERS', '0'))
-            
+            gpu_layers = int(os.getenv("LLM_GPU_LAYERS", "0"))
+
             self.llm = Llama(
                 model_path=self.model_path,
                 n_ctx=self.n_ctx,
-                n_threads=int(os.getenv('LLM_THREADS', '4')),
+                n_threads=int(os.getenv("LLM_THREADS", "4")),
                 n_gpu_layers=gpu_layers,
-                verbose=False
+                verbose=False,
             )
-            
-            logger.info(f"LLM model loaded successfully with {self.n_ctx} context window")
-            
+
+            logger.info(
+                f"LLM model loaded successfully with {self.n_ctx} context window"
+            )
+
             # Adjust parameters based on model type
             if self.model_type in ["qwen", "deepseek"]:
                 logger.info(f"Using optimized parameters for {self.model_type} model")
-            
+
             return True
         except Exception as e:
             logger.error(f"Failed to load LLM model: {e}")
             return False
-    
+
     def _load_available_commands(self) -> Dict[str, Any]:
         """Load available commands from commands.json."""
         try:
-            with open('config/commands.json', 'r') as f:
+            with open("config/commands.json", "r") as f:
                 commands_data = json.load(f)
-                
+
             # Extract custom commands if present
-            if 'custom_commands' in commands_data:
-                commands = commands_data['custom_commands']
+            if "custom_commands" in commands_data:
+                commands = commands_data["custom_commands"]
             else:
                 commands = commands_data
-                
+
             # Add built-in command descriptions
             built_in = {
                 "open": "Open an application",
@@ -103,24 +112,24 @@ class CommandInterpreter:
                 "space": "Move window to a space (1-10)",
                 "maximize": "Maximize the current window",
                 "close": "Close the current window",
-                "click": "Click the mouse at current position"
+                "click": "Click the mouse at current position",
             }
-            
+
             # Combine built-in and custom commands
             all_commands = {**built_in, **commands}
             return all_commands
-            
+
         except (FileNotFoundError, json.JSONDecodeError) as e:
             logger.error(f"Error loading commands: {e}")
             return {}
-    
+
     def interpret_command(self, text: str) -> Tuple[str, List[str]]:
         """
         Interpret natural language command and convert to a structured command.
-        
+
         Args:
             text: The natural language text to interpret
-            
+
         Returns:
             Tuple of (command, arguments)
         """
@@ -131,10 +140,12 @@ class CommandInterpreter:
             if not parts:
                 return ("", [])
             return (parts[0], parts[1:])
-        
+
         # Construct prompt with available commands
-        commands_list = "\n".join([f"- {cmd}: {desc}" for cmd, desc in self.available_commands.items()])
-        
+        commands_list = "\n".join(
+            [f"- {cmd}: {desc}" for cmd, desc in self.available_commands.items()]
+        )
+
         # Select the appropriate prompt template based on model type
         if self.model_type == "qwen":
             template = self._get_qwen_prompt_template(commands_list, text)
@@ -143,49 +154,46 @@ class CommandInterpreter:
         else:
             # Default/Llama-style prompt
             template = self._get_llama_prompt_template(commands_list, text)
-        
+
         # Generate response from LLM
         try:
             # Adjust generation parameters based on model type
             if self.model_type in ["qwen", "deepseek"]:
                 # More efficient parameters for newer models
                 response = self.llm(
-                    template, 
+                    template,
                     max_tokens=128,
                     temperature=0.1,  # Lower temperature for more deterministic outputs
                     top_p=0.9,
                     stop=["Input:", "\n\n", "User:"],
-                    echo=False
+                    echo=False,
                 )
             else:
                 # Standard parameters for other models
                 response = self.llm(
-                    template, 
-                    max_tokens=64,
-                    stop=["Input:", "\n\n"],
-                    echo=False
+                    template, max_tokens=64, stop=["Input:", "\n\n"], echo=False
                 )
-            
+
             # Parse the response
-            response_text = response['choices'][0]['text'].strip()
+            response_text = response["choices"][0]["text"].strip()
             logger.debug(f"LLM response: {response_text}")
-            
+
             # Extract command and arguments
             command = ""
             args = []
-            
-            for line in response_text.split('\n'):
+
+            for line in response_text.split("\n"):
                 line = line.strip()
                 if line.startswith("COMMAND:"):
                     command = line[8:].strip().lower()
                 elif line.startswith("ARGS:"):
                     args_str = line[5:].strip()
                     if args_str:
-                        args = [arg.strip() for arg in args_str.split(',')]
-            
+                        args = [arg.strip() for arg in args_str.split(",")]
+
             logger.info(f"Interpreted command: {command}, args: {args}")
             return (command, args)
-            
+
         except Exception as e:
             logger.error(f"Error interpreting command with LLM: {e}")
             # Fall back to simple command extraction
@@ -193,7 +201,7 @@ class CommandInterpreter:
             if not parts:
                 return ("", [])
             return (parts[0], parts[1:])
-    
+
     def _get_qwen_prompt_template(self, commands_list, text):
         """Get prompt template optimized for Qwen models."""
         return f"""<|im_start|>system
@@ -235,7 +243,7 @@ ARGS: [comma-separated arguments]
 
 If this is not a command, respond with:
 COMMAND: none
-ARGS: 
+ARGS:
 
 Be precise and match only to available commands.
 </human>
@@ -244,7 +252,7 @@ Be precise and match only to available commands.
 
     def _get_llama_prompt_template(self, commands_list, text):
         """Get prompt template for Llama-style models."""
-        return f"""You are a voice command interpreter for a Mac OS X system. 
+        return f"""You are a voice command interpreter for a Mac OS X system.
 Convert the following natural language input into a structured command and arguments ONLY if it's clearly a command.
 
 Available commands:
@@ -279,8 +287,11 @@ Output:
         Returns a dictionary with potential actions or information.
         """
         if self.llm is None:
-            return {"status": "error", "message": "LLM not available for dynamic responses"}
-        
+            return {
+                "status": "error",
+                "message": "LLM not available for dynamic responses",
+            }
+
         # Select appropriate prompt based on model type
         if self.model_type == "qwen":
             prompt = self._get_qwen_dynamic_prompt(transcription)
@@ -293,38 +304,35 @@ Output:
             # Adjust generation parameters based on model type
             if self.model_type in ["qwen", "deepseek"]:
                 response = self.llm(
-                    prompt, 
+                    prompt,
                     max_tokens=512,
                     temperature=0.2,
                     top_p=0.9,
                     stop=["```", "User:", "<human>"],
-                    echo=False
+                    echo=False,
                 )
             else:
                 response = self.llm(
-                    prompt, 
-                    max_tokens=300,
-                    stop=["```", "Input:"],
-                    echo=False
+                    prompt, max_tokens=300, stop=["```", "Input:"], echo=False
                 )
-            
-            response_text = response['choices'][0]['text'].strip()
-            
+
+            response_text = response["choices"][0]["text"].strip()
+
             # Try to parse JSON response
             try:
                 # Extract JSON part from response
                 response_text = response_text.strip()
-                
+
                 # Look for any JSON structure in the response
                 if "{" in response_text and "}" in response_text:
                     # Find JSON start and end positions
                     start_pos = response_text.find("{")
                     end_pos = response_text.rfind("}") + 1
                     json_part = response_text[start_pos:end_pos]
-                    
+
                     # Remove any ```json or ``` markers if present
                     json_part = json_part.replace("```json", "").replace("```", "")
-                    
+
                     # Parse the JSON
                     try:
                         result = json.loads(json_part)
@@ -350,13 +358,13 @@ Output:
                     "is_command": False,
                     "command_type": "other",
                     "action": "none",
-                    "explanation": "Could not parse response: " + str(e)
+                    "explanation": "Could not parse response: " + str(e),
                 }
-                
+
         except Exception as e:
             logger.error(f"Error generating dynamic response: {e}")
             return {"status": "error", "message": str(e)}
-    
+
     def _get_qwen_dynamic_prompt(self, transcription):
         """Get dynamic response prompt for Qwen models."""
         return f"""<|im_start|>system
@@ -449,23 +457,26 @@ JSON:
             start = json_str.find("{")
             end = json_str.rfind("}") + 1
             json_str = json_str[start:end]
-        
+
         # Fix missing quotes around keys
         import re
-        json_str = re.sub(r'([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', json_str)
-        
+
+        json_str = re.sub(
+            r"([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:", r'\1"\2":', json_str
+        )
+
         # Fix single quotes to double quotes
         json_str = json_str.replace("'", '"')
-        
+
         # Fix unquoted true/false/null values
-        json_str = re.sub(r':\s*true\b', r':true', json_str)
-        json_str = re.sub(r':\s*false\b', r':false', json_str)
-        json_str = re.sub(r':\s*null\b', r':null', json_str)
-        
+        json_str = re.sub(r":\s*true\b", r":true", json_str)
+        json_str = re.sub(r":\s*false\b", r":false", json_str)
+        json_str = re.sub(r":\s*null\b", r":null", json_str)
+
         # Fix trailing commas
-        json_str = re.sub(r',\s*}', '}', json_str)
-        json_str = re.sub(r',\s*]', ']', json_str)
-        
+        json_str = re.sub(r",\s*}", "}", json_str)
+        json_str = re.sub(r",\s*]", "]", json_str)
+
         return json_str
 
     def _extract_key_values(self, text):
@@ -474,31 +485,50 @@ JSON:
             "is_command": False,
             "command_type": "other",
             "action": "none",
-            "parameters": []
+            "parameters": [],
         }
-        
+
         # Check if it looks like a command
-        command_indicators = ["open", "maximize", "focus", "type", "move", "resize", "close"]
+        command_indicators = [
+            "open",
+            "maximize",
+            "focus",
+            "type",
+            "move",
+            "resize",
+            "close",
+        ]
         if any(indicator in text.lower() for indicator in command_indicators):
             result["is_command"] = True
-            
+
             # Try to determine the action
             for indicator in command_indicators:
                 if indicator in text.lower():
                     result["action"] = indicator
-                    result["command_type"] = "application_control" if indicator == "open" else "system_control"
+                    result["command_type"] = (
+                        "application_control"
+                        if indicator == "open"
+                        else "system_control"
+                    )
                     break
-        
+
         # Look for application names
-        app_indicators = ["safari", "chrome", "firefox", "terminal", "finder", "browser"]
+        app_indicators = [
+            "safari",
+            "chrome",
+            "firefox",
+            "terminal",
+            "finder",
+            "browser",
+        ]
         for app in app_indicators:
             if app in text.lower():
                 result["application"] = app
                 break
-                
+
         # Add explanation
         result["explanation"] = "Extracted from text: " + text[:100]
-        
+
         return result
 
 
@@ -506,38 +536,38 @@ JSON:
 def test_interpreter():
     """Test the command interpreter with sample commands."""
     # Get model path from environment or use default
-    model_path = os.getenv('LLM_MODEL_PATH', None)
-    
+    model_path = os.getenv("LLM_MODEL_PATH", None)
+
     # Print model path info
     if model_path:
         print(f"Using model from environment: {model_path}")
     else:
         print("Using default model")
-        
+
     interpreter = CommandInterpreter(model_path)
-    
+
     # Make sure model loaded
     if interpreter.llm is None:
         print("ERROR: Failed to load LLM model. Please check the model path.")
         return
-        
+
     print(f"Model successfully loaded. Type: {interpreter.model_type}")
     print(f"Context window size: {interpreter.n_ctx}")
-    
+
     test_commands = [
         "Open Safari browser",
         "Maximize my window",
         "Move this window to the left",
         "I want to focus on my terminal",
         "Type hello world",
-        "Can you resize this window to make it smaller?"
+        "Can you resize this window to make it smaller?",
     ]
-    
+
     for cmd in test_commands:
         print(f"\n------------------------------")
         print(f"Testing: '{cmd}'")
         print(f"------------------------------")
-        
+
         # Test command interpretation
         try:
             command, args = interpreter.interpret_command(cmd)
@@ -546,20 +576,20 @@ def test_interpreter():
         except Exception as e:
             print(f"Error during command interpretation: {e}")
             continue
-        
+
         # Test dynamic response separately to isolate any issues
         try:
             print("\nTesting dynamic response...")
             response = interpreter.generate_dynamic_response(cmd)
-            
+
             # Check if response is valid
             if "is_command" in response:
                 print(f"Is command: {response.get('is_command', False)}")
                 print(f"Command type: {response.get('command_type', 'unknown')}")
                 print(f"Action: {response.get('action', 'none')}")
-                
+
                 # Only print parameters if they exist
-                params = response.get('parameters', [])
+                params = response.get("parameters", [])
                 if params:
                     print(f"Parameters: {params}")
             else:
@@ -567,15 +597,15 @@ def test_interpreter():
                 print(f"Response: {response}")
         except Exception as e:
             print(f"Error during dynamic response: {e}")
-            
+
 
 if __name__ == "__main__":
     # Set up logging
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler()]
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler()],
     )
-    
+
     # Run test
     test_interpreter()

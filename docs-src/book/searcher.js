@@ -89,7 +89,7 @@ window.search = window.search || {};
             path: a.pathname.replace(/^([^/])/,'/$1')
         };
     }
-    
+
     // Helper to recreate a url string from its building blocks.
     function renderURL(urlobject) {
         var url = urlobject.protocol + "://" + urlobject.host;
@@ -109,7 +109,7 @@ window.search = window.search || {};
         }
         return url;
     }
-    
+
     // Helper to escape html special chars for displaying the teasers
     var escapeHTML = (function() {
         var MAP = {
@@ -124,7 +124,7 @@ window.search = window.search || {};
             return s.replace(/[&<>'"]/g, repl);
         };
     })();
-    
+
     function formatSearchMetric(count, searchterm) {
         if (count == 1) {
             return count + " search result for '" + searchterm + "':";
@@ -134,7 +134,7 @@ window.search = window.search || {};
             return count + " search results for '" + searchterm + "':";
         }
     }
-    
+
     function formatSearchResult(result, searchterms) {
         var teaser = makeTeaser(escapeHTML(result.doc.body), searchterms);
         teaser_count++;
@@ -152,10 +152,10 @@ window.search = window.search || {};
 
         return '<a href="' + path_to_root + url[0] + '?' + URL_MARK_PARAM + '=' + searchterms + '#' + url[1]
             + '" aria-details="teaser_' + teaser_count + '">' + result.doc.breadcrumbs + '</a>'
-            + '<span class="teaser" id="teaser_' + teaser_count + '" aria-label="Search Result Teaser">' 
+            + '<span class="teaser" id="teaser_' + teaser_count + '" aria-label="Search Result Teaser">'
             + teaser + '</span>';
     }
-    
+
     function makeTeaser(body, searchterms) {
         // The strategy is as follows:
         // First, assign a value to each word in the document:
@@ -271,7 +271,7 @@ window.search = window.search || {};
         // If reloaded, do the search or mark again, depending on the current url parameters
         doSearchOrMarkFromUrl();
     }
-    
+
     function unfocusSearchbar() {
         // hacky, but just focusing a div only works once
         var tmp = document.createElement('input');
@@ -280,7 +280,7 @@ window.search = window.search || {};
         tmp.focus();
         tmp.remove();
     }
-    
+
     // On reload or browser history backwards/forwards events, parse the url and do search or mark
     function doSearchOrMarkFromUrl() {
         // Check current URL for search request
@@ -313,7 +313,7 @@ window.search = window.search || {};
             }
         }
     }
-    
+
     // Eventhandler for keyevents on `document`
     function globalKeyHandler(e) {
         if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || e.target.type === 'textarea' || e.target.type === 'text' || !hasFocus() && /^(?:input|select|textarea)$/i.test(e.target.nodeName)) { return; }
@@ -363,7 +363,7 @@ window.search = window.search || {};
             }
         }
     }
-    
+
     function showSearch(yes) {
         if (yes) {
             search_wrap.classList.remove('hidden');
@@ -396,7 +396,7 @@ window.search = window.search || {};
             showSearch(false);
         }
     }
-    
+
     // Eventhandler for keyevents while the searchbar is focused
     function searchbarKeyUpHandler() {
         var searchterm = searchbar.value.trim();
@@ -414,7 +414,7 @@ window.search = window.search || {};
         // Remove marks
         marker.unmark();
     }
-    
+
     // Update current url with ?URL_SEARCH_PARAM= parameter, remove ?URL_MARK_PARAM and #heading-anchor .
     // `action` can be one of "push", "replace", "push_if_new_search_else_replace"
     // and replaces or pushes a new browser history item.
@@ -439,7 +439,7 @@ window.search = window.search || {};
             history.replaceState({}, document.title, renderURL(url));
         }
     }
-    
+
     function doSearch(searchterm) {
 
         // Don't search the same twice
@@ -470,7 +470,7 @@ window.search = window.search || {};
 
     fetch(path_to_root + 'searchindex.json')
         .then(response => response.json())
-        .then(json => init(json))        
+        .then(json => init(json))
         .catch(error => { // Try to load searchindex.js if fetch failed
             var script = document.createElement('script');
             script.src = path_to_root + 'searchindex.js';

@@ -21,7 +21,7 @@ if [ -z "$CHANGED_PYTHON_FILES" ]; then
 else
   echo -e "${YELLOW}Checking Python files:${NC}"
   echo "$CHANGED_PYTHON_FILES"
-  
+
   # Check for syntax errors
   echo -e "${YELLOW}Checking Python syntax...${NC}"
   for file in $CHANGED_PYTHON_FILES; do
@@ -30,7 +30,7 @@ else
     fi
   done
   echo -e "${GREEN}✓ No syntax errors found${NC}"
-  
+
   # Check for import errors in modified files
   echo -e "${YELLOW}Checking Python imports...${NC}"
   for file in $CHANGED_PYTHON_FILES; do
@@ -45,7 +45,7 @@ else
     fi
   done
   echo -e "${GREEN}✓ All imports valid${NC}"
-  
+
   # Run a simple check on speech_synthesis.py if it's modified
   MODIFIED_SPEECH=$(echo "$CHANGED_PYTHON_FILES" | grep -E "speech_synthesis.py|neural_voice_client.py" || true)
   if [ -n "$MODIFIED_SPEECH" ]; then
@@ -54,7 +54,7 @@ else
     python -c "import sys; sys.path.append('.'); from src.audio import speech_synthesis" 2>/dev/null
     echo -e "${GREEN}✓ Speech synthesis imports succeeded${NC}"
   fi
-  
+
   # Check audio processing imports if modified
   MODIFIED_AUDIO=$(echo "$CHANGED_PYTHON_FILES" | grep -E "audio_processor.py|audio_recorder.py" || true)
   if [ -n "$MODIFIED_AUDIO" ]; then
@@ -63,7 +63,7 @@ else
       && echo -e "${GREEN}✓ Audio modules loaded successfully${NC}" \
       || { echo -e "${RED}✗ Audio module imports failed${NC}"; exit 1; }
   fi
-  
+
   # Check for problematic patterns
   echo -e "${YELLOW}Checking for problematic patterns...${NC}"
   for file in $CHANGED_PYTHON_FILES; do
@@ -77,14 +77,14 @@ else
           echo -e "${YELLOW}Consider using logging instead of print() for production code.${NC}"
         fi
       fi
-      
+
       # Check for TODOs
       TODOS=$(grep -n "# TODO" "$file" || true)
       if [ -n "$TODOS" ]; then
         echo -e "${YELLOW}Warning: TODOs found in $file:${NC}"
         echo "$TODOS"
       fi
-      
+
       # Check for hardcoded file paths
       HARDCODED_PATHS=$(grep -E "'/Users/|\"C:\\\\|'/tmp/|'/var/|'/etc/" "$file" || true)
       if [ -n "$HARDCODED_PATHS" ]; then

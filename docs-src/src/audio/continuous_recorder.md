@@ -12,7 +12,7 @@ Records continuously in the background with a rolling buffer.
 ## Function: `__init__(self, buffer_seconds=5)`
 
 Initialize continuous recorder.
-        
+
         Args:
             buffer_seconds: Number of seconds to keep in the rolling buffer
 
@@ -31,4 +31,3 @@ Main recording thread function.
 ## Function: `_process_buffer(self)`
 
 Process the audio buffer to detect trigger words.
-

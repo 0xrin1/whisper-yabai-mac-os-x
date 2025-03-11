@@ -9,7 +9,8 @@ import traceback
 from typing import Optional, Callable, Any, List, Dict
 
 # Create a logger for this module
-logger = logging.getLogger('error-handler')
+logger = logging.getLogger("error-handler")
+
 
 def handle_error(
     error: Exception,
@@ -17,11 +18,11 @@ def handle_error(
     context: str = "",
     notification_text: Optional[str] = None,
     should_raise: bool = False,
-    fallback_action: Optional[Callable[[], Any]] = None
+    fallback_action: Optional[Callable[[], Any]] = None,
 ) -> None:
     """
     Standardized error handling across the application.
-    
+
     Args:
         error: The exception that was raised
         logger: The module-specific logger to use
@@ -34,15 +35,16 @@ def handle_error(
     error_prefix = f"[{context}] " if context else ""
     logger.error(f"{error_prefix}Error: {error}")
     logger.error(traceback.format_exc())
-    
+
     # Show notification if requested
     if notification_text:
         try:
             from src.ui.toast_notifications import notify_error
+
             notify_error(notification_text)
         except Exception as e:
             logger.error(f"Failed to show error notification: {e}")
-    
+
     # Execute fallback action if provided
     if fallback_action:
         try:
@@ -50,10 +52,11 @@ def handle_error(
             fallback_action()
         except Exception as fallback_err:
             logger.error(f"Fallback action failed: {fallback_err}")
-    
+
     # Re-raise if requested
     if should_raise:
         raise error
+
 
 def safe_execute(
     func: Callable,
@@ -64,11 +67,11 @@ def safe_execute(
     should_raise: bool = False,
     fallback_action: Optional[Callable[[], Any]] = None,
     args: List = None,
-    kwargs: Dict = None
+    kwargs: Dict = None,
 ) -> Any:
     """
     Execute a function with standardized error handling.
-    
+
     Args:
         func: The function to execute
         logger: The module-specific logger to use
@@ -79,7 +82,7 @@ def safe_execute(
         fallback_action: Optional function to call on error
         args: Positional arguments to pass to the function
         kwargs: Keyword arguments to pass to the function
-        
+
     Returns:
         The result of the function call, or None on error
     """
@@ -87,17 +90,17 @@ def safe_execute(
         args = []
     if kwargs is None:
         kwargs = {}
-        
+
     try:
         return func(*args, **kwargs)
     except Exception as e:
         notification_text = error_message if notification else None
         handle_error(
-            e, 
-            logger, 
+            e,
+            logger,
             context=context,
             notification_text=notification_text,
             should_raise=should_raise,
-            fallback_action=fallback_action
+            fallback_action=fallback_action,
         )
         return None

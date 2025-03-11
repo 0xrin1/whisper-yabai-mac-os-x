@@ -129,16 +129,16 @@ a[href^="https://github.com"] {
     .sidebar, .menu-bar, #theme-toggle, .mobile-nav-chapters {
         display: none;
     }
-    
+
     .page {
         margin: 0;
         max-width: 100%;
     }
-    
+
     h1, h2, h3 {
         page-break-after: avoid;
     }
-    
+
     pre, code {
         page-break-inside: avoid;
     }

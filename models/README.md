@@ -12,7 +12,7 @@ For the best command interpretation performance, we now recommend using the Qwen
    ```
    curl -L "https://huggingface.co/TheBloke/Qwen2-7B-Instruct-GGUF/resolve/main/qwen2-7b-instruct.Q4_K_M.gguf" -o qwen2_deepseek_7b_instruct.Q4_K_M.gguf
    ```
-   
+
    Place the downloaded file in this directory. The correct path should be:
    ```
    models/qwen2_deepseek_7b_instruct.Q4_K_M.gguf
@@ -56,7 +56,7 @@ This will offload some of the model computation to the GPU for faster inference.
 
 ## Whisper ASR Models
 
-Whisper models will be downloaded automatically when you first run the application. 
+Whisper models will be downloaded automatically when you first run the application.
 
 By default, the system uses the "tiny" model. If you want to use a different size model, you can set the `WHISPER_MODEL_SIZE` environment variable to one of:
 - `tiny` (default)

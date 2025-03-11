@@ -15,7 +15,7 @@ Source: `core/error_handler.py`
 )`
 
 Standardized error handling across the application.
-    
+
     Args:
         error: The exception that was raised
         logger: The module-specific logger to use
@@ -37,7 +37,7 @@ Standardized error handling across the application.
 )`
 
 Execute a function with standardized error handling.
-    
+
     Args:
         func: The function to execute
         logger: The module-specific logger to use
@@ -48,7 +48,6 @@ Execute a function with standardized error handling.
         fallback_action: Optional function to call on error
         args: Positional arguments to pass to the function
         kwargs: Keyword arguments to pass to the function
-        
+
     Returns:
         The result of the function call, or None on error
-

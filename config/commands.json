@@ -19,7 +19,7 @@
     "docker": "open -a 'Docker Desktop'",
     "postman": "open -a 'Postman'",
     "figma": "open -a 'Figma'",
-    
+
     "// Communication Apps": "Section for communication tools",
     "telegram": "open -a 'Telegram'",
     "whatsapp": "open -a 'WhatsApp'",
@@ -29,7 +29,7 @@
     "messages": "open -a 'Messages'",
     "chat": "open -a 'Messages'",
     "discord": "open -a 'Discord'",
-    
+
     "// Productivity": "Section for productivity apps",
     "notes": "open -a 'Notes'",
     "mail": "open -a 'Mail'",
@@ -38,14 +38,14 @@
     "reminders": "open -a 'Reminders'",
     "music": "open -a 'Music'",
     "spotify": "open -a 'Spotify'",
-    
+
     "// Web Resources": "Section for web resources",
     "github": "open https://github.com",
     "gitlab": "open https://gitlab.com",
     "stack overflow": "open https://stackoverflow.com",
     "google": "open https://google.com",
     "youtube": "open https://youtube.com",
-    
+
     "// Common Hotkeys": "Section for common keyboard shortcuts",
     "save": "pyautogui.hotkey('command', 's')",
     "save as": "pyautogui.hotkey('command', 'shift', 's')",
@@ -78,7 +78,7 @@
     "escape": "pyautogui.press('escape')",
     "enter": "pyautogui.press('enter')",
     "return": "pyautogui.press('return')",
-    
+
     "// Navigation": "Section for system navigation",
     "home": "pyautogui.hotkey('fn', 'left')",
     "end": "pyautogui.hotkey('fn', 'right')",
@@ -87,7 +87,7 @@
     "mission control": "pyautogui.hotkey('control', 'up')",
     "app windows": "pyautogui.hotkey('control', 'down')",
     "show desktop": "pyautogui.hotkey('fn', 'f11')",
-    
+
     "// Window Management (Yabai)": "Section for yabai window management",
     "split vertical": "yabai -m window --split vertical",
     "split horizontal": "yabai -m window --split horizontal",
@@ -126,7 +126,7 @@
     "unstack": "yabai -m window --stack recent",
     "next stack": "yabai -m window --focus stack.next || yabai -m window --focus stack.first",
     "previous stack": "yabai -m window --focus stack.prev || yabai -m window --focus stack.last",
-    
+
     "// Development": "Section for development shortcuts",
     "build": "pyautogui.hotkey('command', 'b')",
     "run": "pyautogui.hotkey('command', 'r')",
@@ -143,7 +143,7 @@
     "step into": "pyautogui.hotkey('f7')",
     "step out": "pyautogui.hotkey('shift', 'f8')",
     "resume": "pyautogui.hotkey('f9')",
-    
+
     "// Vim Commands": "Section for vim-specific commands",
     "vim save": "pyautogui.press('escape') && pyautogui.typewrite(':w') && pyautogui.press('enter')",
     "vim quit": "pyautogui.press('escape') && pyautogui.typewrite(':q') && pyautogui.press('enter')",
@@ -154,7 +154,7 @@
     "vim visual": "pyautogui.press('v')",
     "vim line": "pyautogui.press('shift+v')",
     "vim block": "pyautogui.hotkey('control', 'v')",
-    
+
     "// System Controls": "Section for system controls",
     "screenshot": "pyautogui.hotkey('command', 'shift', '4')",
     "screenshot window": "pyautogui.hotkey('command', 'shift', '4') && pyautogui.hotkey('space')",

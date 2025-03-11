@@ -12,7 +12,7 @@ Manages temporary audio files with automatic cleanup.
 ## Function: `__init__(self, suffix: str = '.wav', delete: bool = True)`
 
 Create a temporary audio file.
-        
+
         Args:
             suffix: File suffix (default: .wav)
             delete: Whether to delete file on cleanup (default: True)
@@ -31,7 +31,7 @@ Prevent the file from being deleted on cleanup.
 )`
 
 Save audio frames to a WAV file.
-    
+
     Args:
         frames: List of audio frames
         filename: Output filename
@@ -39,17 +39,16 @@ Save audio frames to a WAV file.
         sample_width: Sample width in bytes (default from PyAudio)
         rate: Sample rate (default from config)
         p: PyAudio instance (if None, creates temporary instance)
-        
+
     Returns:
         True if successful, False otherwise
 
 ## Function: `play_system_sound(sound_name: str = "Pop")`
 
 Play a system sound.
-    
+
     Args:
         sound_name: Name of system sound (without path or extension)
-        
+
     Returns:
         True if successful, False otherwise
-

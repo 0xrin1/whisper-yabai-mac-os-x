@@ -13,42 +13,55 @@ import tempfile
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger('trigger-test')
+logger = logging.getLogger("trigger-test")
+
 
 def synthesize_and_play(text, voice=None):
     """Synthesize speech and play it at higher volume."""
     # Create a temp file
-    temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
+    temp_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     output_file = temp_file.name
     temp_file.close()
-    
+
     # Use Mac's 'say' command to generate speech
-    aiff_file = output_file.replace('.wav', '.aiff')
-    
+    aiff_file = output_file.replace(".wav", ".aiff")
+
     # Build the command with optional voice parameter
     cmd = ["say", "-o", aiff_file]
     if voice:
         cmd.extend(["-v", voice])
     cmd.append(text)
-    
+
     # Run the command
     subprocess.run(cmd, check=True)
-    
+
     # Convert AIFF to WAV
-    subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", 
-                   aiff_file, output_file], check=True)
-    
+    subprocess.run(
+        [
+            "afconvert",
+            "-f",
+            "WAVE",
+            "-d",
+            "LEI16@16000",
+            "-c",
+            "1",
+            aiff_file,
+            output_file,
+        ],
+        check=True,
+    )
+
     # Clean up AIFF file
     os.remove(aiff_file)
-    
+
     # Play at higher volume
     subprocess.run(["afplay", "-v", "2", output_file], check=True)
-    
+
     # Return the file path so it can be cleaned up later
     return output_file
+
 
 def test_trigger_words():
     """Test both trigger words with multiple voices."""
@@ -60,9 +73,9 @@ def test_trigger_words():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
-            bufsize=1
+            bufsize=1,
         )
-        
+
         # Function to check if a string is in the daemon output
         def check_output(search_text, timeout=10):
             """Check daemon output for a string with timeout."""
@@ -73,14 +86,14 @@ def test_trigger_words():
                     return True
                 time.sleep(0.1)
             return False
-        
+
         # Wait for daemon to initialize
         logger.info("Waiting for daemon to initialize...")
         time.sleep(15)  # Extra time to ensure it's fully ready
-        
+
         # Use the local synthesize_and_play function instead of external API
         logger.info("Testing with local speech synthesis")
-        
+
         # Test 'hey' trigger
         logger.info("Testing 'hey' trigger word...")
         try:
@@ -93,7 +106,7 @@ def test_trigger_words():
                 os.remove(temp_file)
         except Exception as e:
             logger.error(f"Error testing 'hey' with speech synthesis: {e}")
-        
+
         # Test dictation triggers
         logger.info("Testing dictation trigger words...")
         for phrase in ["type", "dictate"]:
@@ -108,7 +121,7 @@ def test_trigger_words():
                     os.remove(temp_file)
             except Exception as e:
                 logger.error(f"Error testing '{phrase}' with speech synthesis: {e}")
-    
+
     finally:
         # Stop the daemon
         if daemon:
@@ -119,6 +132,7 @@ def test_trigger_words():
             except subprocess.TimeoutExpired:
                 daemon.kill()
                 logger.warning("Had to forcefully kill daemon")
+
 
 if __name__ == "__main__":
     test_trigger_words()
