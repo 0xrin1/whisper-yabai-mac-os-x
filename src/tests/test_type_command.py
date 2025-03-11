@@ -22,10 +22,6 @@ import json
 import re
 from datetime import datetime
 
-# Add the parent directory to the path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config.config import config
-
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -159,7 +155,9 @@ class TypeTriggerTest(unittest.TestCase):
             str: Path to generated audio file
         """
         # Import our TTS module
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         from audio import speech_synthesis as tts
+        from config.config import config
 
         # Get default voice ID from config if not specified
         if voice_id is None:
