@@ -78,34 +78,36 @@ def test_trigger_words():
         logger.info("Waiting for daemon to initialize...")
         time.sleep(15)  # Extra time to ensure it's fully ready
         
-        # Use only our custom neural voice
-        logger.info("Testing with custom trained neural voice")
-        
-        # Import our speech synthesis module
-        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        import speech_synthesis as tts
+        # Use the local synthesize_and_play function instead of external API
+        logger.info("Testing with local speech synthesis")
         
         # Test 'hey' trigger
         logger.info("Testing 'hey' trigger word...")
         try:
-            # Use our custom neural voice
-            tts.speak("hey", block=True)
+            # Use local speech synthesis
+            temp_file = synthesize_and_play("hey", voice="Daniel")
             # Wait for processing to complete
             time.sleep(5)
+            # Clean up
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
         except Exception as e:
-            logger.error(f"Error testing 'hey' with neural voice: {e}")
+            logger.error(f"Error testing 'hey' with speech synthesis: {e}")
         
         # Test dictation triggers
         logger.info("Testing dictation trigger words...")
         for phrase in ["type", "dictate"]:
             try:
-                logger.info(f"Testing '{phrase}' with neural voice")
+                logger.info(f"Testing '{phrase}' with speech synthesis")
                 # Say it clearly
-                tts.speak(f"{phrase}", block=True)
+                temp_file = synthesize_and_play(phrase, voice="Daniel")
                 # Wait for processing
                 time.sleep(5)
+                # Clean up
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
             except Exception as e:
-                logger.error(f"Error testing '{phrase}' with neural voice: {e}")
+                logger.error(f"Error testing '{phrase}' with speech synthesis: {e}")
     
     finally:
         # Stop the daemon
