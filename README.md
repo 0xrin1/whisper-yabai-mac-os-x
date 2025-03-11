@@ -329,7 +329,7 @@ The project follows a modular directory structure:
 │   ├── utils/              # Utility modules
 │   ├── ui/                 # User interface components
 │   ├── config/             # Configuration management
-│   └── tests/              # Test modules
+│   └── tests/              # Test modules and test utilities
 ├── config/                 # Configuration files
 ├── docs/                   # Documentation
 ├── docs-src/               # Source files for generated documentation
@@ -378,7 +378,7 @@ When contributing to this project:
 - Use resource managers to handle system resources
 - Implement proper type annotations and docstrings
 - Follow the logging conventions
-- Write tests for new functionality in the tests directory
+- Write tests for new functionality in the tests directory using the helper utilities in test_utils.py
 - Update documentation for new features
 
 ### Documentation System
@@ -503,6 +503,29 @@ The documentation website includes:
   - Use Docker with GPU support (see docker-compose.yml)
   - Adjust model size based on your hardware capabilities
   - For distributed setup, ensure network latency is low
+
+## Testing
+
+The project includes a robust testing framework for ensuring functionality works correctly:
+
+```bash
+# Run all tests
+python -m pytest src/tests/
+
+# Run specific test file
+python -m pytest src/tests/test_audio_processor.py
+
+# Run with more detailed output
+python -m pytest -v src/tests/
+```
+
+For more detailed information about the testing framework, see [TESTING.md](docs/TESTING.md), which covers:
+
+- Comprehensive testing of the Speech Recognition API
+- Testing audio processing with the API-only approach
+- Testing the trigger detection for "jarvis" and dictation modes
+- Strategies for mocking async API calls
+- Running and extending the test suite
 
 ## License
 

@@ -202,6 +202,9 @@ class MockSpeechRecognitionClient:
         """Initialize with a mock that always succeeds."""
         self.api_url = api_url or "http://localhost:8080"
         self.connected = True
+        self.ws_connected = False
+        self.websocket = None
+        self.transcription_callbacks = []
 
     async def check_connection(self):
         """Mock connection check that always succeeds by default."""
@@ -215,7 +218,7 @@ class MockSpeechRecognitionClient:
             "loaded_models": ["large-v3"]
         }
 
-    async def transcribe(self, audio_file, model_size="large-v3", language="en"):
+    async def transcribe(self, audio_file, model_size="large-v3", language="en", prompt=None):
         """Mock transcription that returns pre-defined text."""
         return {
             "text": "this is a mock transcription",
@@ -223,7 +226,7 @@ class MockSpeechRecognitionClient:
             "processing_time": 0.1
         }
 
-    async def transcribe_audio_data(self, audio_data, model_size="large-v3", language="en"):
+    async def transcribe_audio_data(self, audio_data, model_size="large-v3", language="en", prompt=None):
         """Mock transcription for raw audio data."""
         return {
             "text": "this is a mock transcription from audio data",
@@ -231,9 +234,47 @@ class MockSpeechRecognitionClient:
             "processing_time": 0.1
         }
 
+    async def upload_and_transcribe(self, audio_file, model_size="large-v3", language="en", prompt=None):
+        """Mock file upload and transcription."""
+        return {
+            "text": "this is a mock transcription from uploaded file",
+            "confidence": 0.95,
+            "processing_time": 0.1
+        }
+
+    async def connect_websocket(self, model_size=None, language=None, prompt=None):
+        """Mock websocket connection."""
+        self.ws_connected = True
+        logger.info("Mock WebSocket connected")
+
     async def disconnect_websocket(self):
         """Mock websocket disconnection."""
-        pass
+        self.ws_connected = False
+        logger.info("Mock WebSocket disconnected")
+
+    async def send_audio_for_transcription(self, audio_data):
+        """Mock sending audio data via websocket."""
+        # Call all registered callbacks with a mock result
+        for callback in self.transcription_callbacks:
+            try:
+                callback({
+                    "text": "this is a mock transcription from websocket",
+                    "confidence": 0.95,
+                    "processing_time": 0.1,
+                    "is_final": True
+                })
+            except Exception as e:
+                logger.error(f"Error in transcription callback: {e}")
+
+    def register_transcription_callback(self, callback):
+        """Register a callback for transcription events."""
+        if callback not in self.transcription_callbacks:
+            self.transcription_callbacks.append(callback)
+
+    def unregister_transcription_callback(self, callback):
+        """Unregister a callback for transcription events."""
+        if callback in self.transcription_callbacks:
+            self.transcription_callbacks.remove(callback)
 
 def mock_speech_recognition_client():
     """Return a patch for the SpeechRecognitionClient."""
@@ -258,6 +299,23 @@ def mock_asyncio_new_event_loop():
         if not hasattr(coro, '__await__'):
             return coro
 
+        # For mock coroutines, try to resolve them
+        try:
+            # For our mock async methods (they're not real coroutines)
+            if hasattr(coro, '__self__') and isinstance(coro.__self__, MockSpeechRecognitionClient):
+                # This is a method call on our mock client - extract the method name
+                method_name = coro.__name__
+                # Check if it's one of our async methods
+                if method_name in ['check_connection', 'list_models', 'transcribe',
+                                  'transcribe_audio_data', 'upload_and_transcribe',
+                                  'connect_websocket', 'disconnect_websocket',
+                                  'send_audio_for_transcription']:
+                    # Return the hard-coded result for this method
+                    result = coro.__self__.__getattribute__(method_name)(*coro.__args__, **coro.__kwdefaults__ or {})
+                    return result
+        except (AttributeError, TypeError):
+            pass
+
         # We need to return a sensible default for all coroutines used in testing
         return True
 
@@ -265,6 +323,44 @@ def mock_asyncio_new_event_loop():
 
     # Create a patch that returns our pre-configured mock loop
     return patch("asyncio.new_event_loop", return_value=loop)
+
+# Async test utilities
+class AsyncMock(MagicMock):
+    """A MagicMock that works with async functions."""
+
+    async def __call__(self, *args, **kwargs):
+        return super().__call__(*args, **kwargs)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        pass
+
+def async_return(value):
+    """Create a mock async function that returns the specified value."""
+    async def mock_func(*args, **kwargs):
+        return value
+    return mock_func
+
+def async_exception(exc):
+    """Create a mock async function that raises the specified exception."""
+    async def mock_func(*args, **kwargs):
+        raise exc
+    return mock_func
+
+class AsyncTestCase:
+    """Base class for tests that need to run async code without pytest-asyncio."""
+
+    def run_async(self, coro):
+        """Run an async coroutine in a test."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
 
 # Daemon management utilities
 class DaemonManager:
