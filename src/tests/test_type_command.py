@@ -9,54 +9,38 @@ Dedicated test for the 'type' trigger word functionality including the complete 
 
 import os
 import time
-import subprocess
 import threading
 import tempfile
 import logging
-import wave
 import pyaudio
-import numpy as np
 import sys
 import unittest
 import json
 import re
+import subprocess
 from datetime import datetime
 
+# Import common test utilities
+from test_utils import BaseVoiceTest, DaemonManager
+
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
 logger = logging.getLogger("type-trigger-test")
 
 
-class TypeTriggerTest(unittest.TestCase):
+class TypeTriggerTest(BaseVoiceTest):
     """Test suite specifically for the 'type' trigger word functionality."""
 
     @classmethod
     def setUpClass(cls):
         """Set up the test environment."""
+        # Call parent setup first
+        super().setUpClass()
+
         cls.test_results = {
             "trigger_detections": [],
             "dictation_transcriptions": [],
             "applescript_executions": [],
         }
-
-        cls.temp_files = []
-
-        # Create a directory to store test logs
-        logs_base_dir = os.path.join(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            ),
-            "logs",
-            "test_logs",
-        )
-        os.makedirs(logs_base_dir, exist_ok=True)
-
-        cls.log_dir = os.path.join(
-            logs_base_dir, f"test_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        )
-        os.makedirs(cls.log_dir, exist_ok=True)
 
         # Create test phrase file for verification
         cls.test_phrases_file = os.path.join(cls.log_dir, "test_phrases.txt")
@@ -64,9 +48,6 @@ class TypeTriggerTest(unittest.TestCase):
             f.write("This is a test phrase\n")
             f.write("Hello world how are you today\n")
             f.write("Testing the dictation functionality\n")
-
-        # Create a file for capturing daemon output
-        cls.daemon_output_file = os.path.join(cls.log_dir, "daemon_output.log")
 
         # Initialize speech synthesizer for tests
         cls.p = pyaudio.PyAudio()
@@ -81,16 +62,11 @@ class TypeTriggerTest(unittest.TestCase):
 
         logger.info(f"Test results saved to {results_file}")
 
-        # Clean up temp files
-        for temp_file in cls.temp_files:
-            try:
-                if os.path.exists(temp_file):
-                    os.remove(temp_file)
-            except:
-                pass
-
         # Clean up audio resources
         cls.p.terminate()
+
+        # Call parent teardown
+        super().tearDownClass()
 
     def monitor_dictation_log(self, timeout=30):
         """Monitor the dictation log file for new entries.
@@ -144,132 +120,30 @@ class TypeTriggerTest(unittest.TestCase):
             logger.error(f"Error monitoring dictation log: {e}")
             return []
 
-    def synthesize_speech(self, text, voice_id=None):
-        """Generate speech audio file from text using neural TTS API.
+    # Using inherited method from BaseVoiceTest
+    # Commented out duplicated implementation
 
-        Args:
-            text (str): Text to convert to speech
-            voice_id (str, optional): Voice ID to use for synthesis (defaults to NEURAL_VOICE_ID from config)
+    # Using inherited method from BaseVoiceTest
+    # Commented out duplicated implementation
 
-        Returns:
-            str: Path to generated audio file
-        """
-        # Import our TTS module
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from audio import speech_synthesis as tts
-        from config.config import config
+    # Using DaemonManager class from test_utils instead of these methods:
+    # - start_daemon
+    # - stop_daemon
+    # - check_daemon_output
 
-        # Get default voice ID from config if not specified
-        if voice_id is None:
-            voice_id = config.get("NEURAL_VOICE_ID", "p230")
-
-        logger.info(f"Synthesizing '{text}' using neural voice '{voice_id}'")
-
-        # Generate the audio file using our neural speech synthesis
-        audio_file = tts._call_speech_api(
-            text,
-            voice_id=voice_id,
-            speed=1.0,
-            use_high_quality=True,
-            enhance_audio=True
-        )
-
-        if not audio_file:
-            logger.error("Failed to synthesize speech")
-            return None
-
-        self.temp_files.append(audio_file)
-        logger.info(f"Generated speech for '{text}' at {audio_file}")
-        return audio_file
-
-    def play_audio_file(self, file_path, volume=2):
-        """Play an audio file with specified volume.
-
-        Args:
-            file_path (str): Path to the audio file
-            volume (int, optional): Volume level (1-2)
-        """
-        logger.info(f"Playing audio file: {file_path} at volume {volume}")
-
-        # Use afplay for more reliable playback
-        subprocess.run(["afplay", "-v", str(volume), file_path], check=True)
-
-    def start_daemon(self):
-        """Start the daemon process with output capture.
+    def create_daemon_manager(self):
+        """Create a DaemonManager instance for this test.
 
         Returns:
-            subprocess.Popen: The daemon process
+            DaemonManager: Configured daemon manager
         """
-        logger.info("Starting daemon in background...")
-
-        # Open file for capturing output
-        output_file = open(self.daemon_output_file, "w")
-
-        # Start the daemon process
-        daemon = subprocess.Popen(
-            ["python", "src/daemon.py"],
-            stdout=output_file,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-        )
-
-        # Wait for daemon to initialize
-        logger.info("Waiting for daemon to initialize...")
-        time.sleep(15)  # Allow enough time for Whisper model to load
-
-        return daemon, output_file
-
-    def stop_daemon(self, daemon, output_file):
-        """Stop the daemon process.
-
-        Args:
-            daemon (subprocess.Popen): The daemon process
-            output_file (file): The output file handle
-        """
-        logger.info("Stopping daemon...")
-
-        # Terminate the daemon
-        daemon.terminate()
-        try:
-            daemon.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            daemon.kill()
-            logger.warning("Had to forcefully kill daemon")
-
-        # Close output file
-        output_file.close()
-
-    def check_daemon_output(self, text, timeout=10):
-        """Check if text appears in daemon output file.
-
-        Args:
-            text (str): Text to search for
-            timeout (int, optional): Maximum time to wait
-
-        Returns:
-            bool: True if text found, False otherwise
-        """
-        start_time = time.time()
-
-        while time.time() - start_time < timeout:
-            with open(self.daemon_output_file, "r") as f:
-                content = f.read()
-
-            if text in content:
-                logger.info(f"Found '{text}' in daemon output")
-                return True
-
-            time.sleep(0.5)
-
-        logger.warning(
-            f"Text '{text}' not found in daemon output after {timeout} seconds"
-        )
-        return False
+        return DaemonManager(log_dir=self.log_dir, capture_output=True)
 
     def test_type_trigger_complete_flow(self):
         """Test the complete flow from type trigger to dictation execution."""
-        # Start daemon
-        daemon, output_file = self.start_daemon()
+        # Use DaemonManager to handle daemon lifecycle
+        daemon_mgr = self.create_daemon_manager()
+        daemon_mgr.start()
 
         try:
             # Enhanced test for the 'type' trigger word with multiple approaches
@@ -306,7 +180,7 @@ class TypeTriggerTest(unittest.TestCase):
                 time.sleep(8)
 
                 # Check if dictation mode was activated
-                dictation_activated = self.check_daemon_output(
+                dictation_activated = daemon_mgr.check_output(
                     "DICTATION TRIGGER DETECTED"
                 )
 
@@ -329,7 +203,7 @@ class TypeTriggerTest(unittest.TestCase):
                     time.sleep(10)
 
                     # Check if the AppleScript execution was triggered
-                    applescript_detected = self.check_daemon_output(
+                    applescript_detected = daemon_mgr.check_output(
                         "Using AppleScript keystroke method"
                     )
 
@@ -377,7 +251,7 @@ class TypeTriggerTest(unittest.TestCase):
                     logger.warning(f"Dictation not triggered with '{trigger_phrase}'")
 
                 # Check if we can see what was transcribed
-                with open(self.daemon_output_file, "r") as f:
+                with open(daemon_mgr.daemon_output_file, "r") as f:
                     content = f.read()
 
                 # Look for transcription in output
@@ -400,7 +274,7 @@ class TypeTriggerTest(unittest.TestCase):
             # If no trigger worked, try direct detection through daemon output
             if not triggered:
                 # Check if any transcription contains fragments of trigger words
-                with open(self.daemon_output_file, "r") as f:
+                with open(daemon_mgr.daemon_output_file, "r") as f:
                     content = f.read()
 
                 # Extract all transcriptions
@@ -444,12 +318,13 @@ class TypeTriggerTest(unittest.TestCase):
 
         finally:
             # Stop daemon
-            self.stop_daemon(daemon, output_file)
+            daemon_mgr.stop()
 
     def test_multiple_sequences(self):
         """Test multiple sequences of type trigger and dictation."""
-        # Start daemon
-        daemon, output_file = self.start_daemon()
+        # Use DaemonManager to handle daemon lifecycle
+        daemon_mgr = self.create_daemon_manager()
+        daemon_mgr.start()
 
         try:
             # Test sequence with multiple dictation sessions
@@ -479,7 +354,7 @@ class TypeTriggerTest(unittest.TestCase):
                     time.sleep(1)  # Brief pause to allow system to start processing
 
                     # Check if dictation mode was activated
-                    if self.check_daemon_output(
+                    if daemon_mgr.check_output(
                         "DICTATION TRIGGER DETECTED", timeout=10
                     ):
                         logger.info(
@@ -517,7 +392,7 @@ class TypeTriggerTest(unittest.TestCase):
                 time.sleep(10)
 
                 # Check if the AppleScript execution was triggered
-                if self.check_daemon_output("Running AppleScript", timeout=10):
+                if daemon_mgr.check_output("Running AppleScript", timeout=10):
                     logger.info(f"AppleScript execution detected in sequence {i+1}")
                     successful_sequences += 1
                 else:
@@ -550,12 +425,13 @@ class TypeTriggerTest(unittest.TestCase):
 
         finally:
             # Stop daemon
-            self.stop_daemon(daemon, output_file)
+            daemon_mgr.stop()
 
     def test_rapid_mode_switching(self):
         """Test rapid switching between command and dictation modes."""
-        # Start daemon
-        daemon, output_file = self.start_daemon()
+        # Use DaemonManager to handle daemon lifecycle
+        daemon_mgr = self.create_daemon_manager()
+        daemon_mgr.start()
 
         try:
             # Sequence: Command -> Dictation -> Command
@@ -571,7 +447,7 @@ class TypeTriggerTest(unittest.TestCase):
             time.sleep(10)
 
             # Verify command was processed, but don't fail test if not detected
-            cmd_detected = self.check_daemon_output(
+            cmd_detected = daemon_mgr.check_output(
                 "COMMAND TRIGGER DETECTED", timeout=15
             )
             if cmd_detected:
@@ -590,7 +466,7 @@ class TypeTriggerTest(unittest.TestCase):
             time.sleep(8)
 
             # Verify dictation mode was activated
-            dict_detected = self.check_daemon_output(
+            dict_detected = daemon_mgr.check_output(
                 "DICTATION TRIGGER DETECTED", timeout=15
             )
             if dict_detected:
@@ -617,7 +493,7 @@ class TypeTriggerTest(unittest.TestCase):
                 time.sleep(10)
 
                 # Verify AppleScript execution (but don't fail test if not detected)
-                script_executed = self.check_daemon_output("AppleScript", timeout=15)
+                script_executed = daemon_mgr.check_output("AppleScript", timeout=15)
                 if script_executed:
                     logger.info("AppleScript execution detected for dictation")
                 else:
@@ -637,7 +513,7 @@ class TypeTriggerTest(unittest.TestCase):
             time.sleep(10)
 
             # Verify command was processed (but don't fail test if not detected)
-            cmd2_detected = self.check_daemon_output("maximize", timeout=15)
+            cmd2_detected = daemon_mgr.check_output("maximize", timeout=15)
             if cmd2_detected:
                 logger.info("Second command detected after dictation mode")
             else:
@@ -655,12 +531,13 @@ class TypeTriggerTest(unittest.TestCase):
 
         finally:
             # Stop daemon
-            self.stop_daemon(daemon, output_file)
+            daemon_mgr.stop()
 
     def test_applescript_execution_verification(self):
         """Test that the AppleScript for typing is correctly executed."""
-        # Start daemon
-        daemon, output_file = self.start_daemon()
+        # Use DaemonManager to handle daemon lifecycle
+        daemon_mgr = self.create_daemon_manager()
+        daemon_mgr.start()
 
         try:
             # Skip file creation and TextEdit part as it's unreliable in testing
@@ -675,7 +552,7 @@ class TypeTriggerTest(unittest.TestCase):
             time.sleep(5)
 
             # Verify dictation mode was activated
-            dictation_detected = self.check_daemon_output("DICTATION TRIGGER DETECTED")
+            dictation_detected = daemon_mgr.check_output("DICTATION TRIGGER DETECTED")
             self.assertTrue(dictation_detected, "Dictation trigger not detected")
 
             # Send a unique test phrase that's easy to verify
@@ -690,19 +567,19 @@ class TypeTriggerTest(unittest.TestCase):
             time.sleep(15)
 
             # Verify temp file was created for AppleScript
-            temp_file_created = self.check_daemon_output(
+            temp_file_created = daemon_mgr.check_output(
                 "Saved text to /tmp/dictation_text.txt"
             )
             self.assertTrue(temp_file_created, "Temp file for AppleScript not created")
 
             # Verify AppleScript was run
-            applescript_run = self.check_daemon_output("Running AppleScript")
+            applescript_run = daemon_mgr.check_output("Running AppleScript")
             self.assertTrue(applescript_run, "AppleScript not run")
 
             # Verify successful completion or at least the attempt to execute AppleScript
-            success = self.check_daemon_output(
+            success = daemon_mgr.check_output(
                 "AppleScript succeeded"
-            ) or self.check_daemon_output("AppleScript")
+            ) or daemon_mgr.check_output("AppleScript")
             self.assertTrue(success, "AppleScript execution was not attempted")
 
             # Record results
@@ -715,7 +592,7 @@ class TypeTriggerTest(unittest.TestCase):
 
         finally:
             # Stop daemon
-            self.stop_daemon(daemon, output_file)
+            daemon_mgr.stop()
 
 
 if __name__ == "__main__":
