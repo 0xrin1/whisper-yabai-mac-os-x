@@ -50,8 +50,7 @@ dictation_log.txt
 
 # Environment variables
 config/.env
-# But allow the root .env which just points to config directory
-!.env
+.env
 
 # Temporary files
 *.tmp

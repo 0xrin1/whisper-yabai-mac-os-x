@@ -18,6 +18,9 @@ from src.utils.llm_interpreter import CommandInterpreter
 # Import for command processing
 from src.utils.command_processor import commands
 
+# Import for notifications
+from src.ui.toast_notifications import notify_processing, notify_error, send_notification
+
 logger = logging.getLogger("audio-processor")
 
 
