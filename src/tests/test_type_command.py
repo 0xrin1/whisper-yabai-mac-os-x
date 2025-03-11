@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """
-Dedicated test for the 'type' trigger word functionality including the complete flow:
-1. Detect the 'type' trigger word
-2. Activate dictation mode
-3. Transcribe speech
-4. Verify the AppleScript execution
+Dedicated test for the dictation functionality including the complete flow:
+1. Default dictation mode or explicit 'type' trigger detection
+2. Transcribe speech
+3. Verify the AppleScript execution
+
+Note: This test has been updated to reflect the new architecture where:
+- Dictation is the default mode
+- 'jarvis' is the command trigger
+- Explicit dictation triggers like 'type' are optional
 """
 
 import os
@@ -28,7 +32,7 @@ logger = logging.getLogger("type-trigger-test")
 
 
 class TypeTriggerTest(BaseVoiceTest):
-    """Test suite specifically for the 'type' trigger word functionality."""
+    """Test suite for the dictation functionality (with or without explicit triggers)."""
 
     @classmethod
     def setUpClass(cls):
@@ -439,8 +443,8 @@ class TypeTriggerTest(BaseVoiceTest):
             # without always failing the test in automated environments
 
             # 1. Trigger command mode
-            logger.info("Triggering command mode with 'hey'")
-            cmd_file = self.synthesize_speech("hey open safari")
+            logger.info("Triggering command mode with 'jarvis'")
+            cmd_file = self.synthesize_speech("jarvis open safari")
             self.play_audio_file(cmd_file, volume=2)
 
             # Wait for command to process
@@ -448,7 +452,7 @@ class TypeTriggerTest(BaseVoiceTest):
 
             # Verify command was processed, but don't fail test if not detected
             cmd_detected = daemon_mgr.check_output(
-                "COMMAND TRIGGER DETECTED", timeout=15
+                "Command/JARVIS trigger detected", timeout=15
             )
             if cmd_detected:
                 logger.info("Command trigger detected")
@@ -505,8 +509,8 @@ class TypeTriggerTest(BaseVoiceTest):
             time.sleep(10)
 
             # 3. Trigger command mode again
-            logger.info("Triggering command mode again with 'hey'")
-            cmd_file2 = self.synthesize_speech("hey maximize window")
+            logger.info("Triggering command mode again with 'jarvis'")
+            cmd_file2 = self.synthesize_speech("jarvis maximize window")
             self.play_audio_file(cmd_file2, volume=2)
 
             # Wait for command to process
@@ -543,17 +547,16 @@ class TypeTriggerTest(BaseVoiceTest):
             # Skip file creation and TextEdit part as it's unreliable in testing
             # Instead just check that the dictation mechanism works up to AppleScript execution
 
-            # Trigger dictation mode with a more reliable trigger phrase
-            logger.info("Triggering dictation mode with 'type'")
-            trigger_file = self.synthesize_speech("type")
-            self.play_audio_file(trigger_file)
+            # With the new architecture, we don't need a trigger for dictation mode
+            # as it's the default, but we'll verify speech is detected
+            logger.info("Speaking directly to use default dictation mode (no trigger needed)")
 
-            # Wait for dictation mode to activate
+            # Wait for system to initialize
             time.sleep(5)
 
-            # Verify dictation mode was activated
-            dictation_detected = daemon_mgr.check_output("DICTATION TRIGGER DETECTED")
-            self.assertTrue(dictation_detected, "Dictation trigger not detected")
+            # We'll check that speech is detected and transcribed
+            speech_detected = daemon_mgr.check_output("audio energy level")
+            self.assertTrue(speech_detected, "Speech activity not detected")
 
             # Send a unique test phrase that's easy to verify
             unique_phrase = f"Unique test phrase {int(time.time())}"

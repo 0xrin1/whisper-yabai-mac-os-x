@@ -2,6 +2,13 @@
 
 This document provides a quick reference for available voice commands in your voice control system.
 
+## Mode Activation
+
+| Mode | Activation Method |
+|------|------------------|
+| Dictation Mode | Default - just speak naturally and words will be typed at cursor |
+| Command Mode | Say "jarvis" to activate command mode, then speak your command |
+
 ## Custom Voice Model
 
 | Command | Description |

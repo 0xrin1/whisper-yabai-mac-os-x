@@ -48,8 +48,8 @@ class VoiceControlDaemon:
 
         # Override global state
         state.model_size = os.getenv("WHISPER_MODEL_SIZE", "tiny")
-        state.command_trigger = "hey"
-        state.dictation_trigger = "type"
+        state.command_trigger = "jarvis"
+        state.dictation_trigger = "type"  # Kept for backward compatibility, but not required anymore
 
         # Store CLI arguments
         self.force_onboarding = force_onboarding
@@ -177,21 +177,16 @@ class VoiceControlDaemon:
         """Show startup banner with system information."""
         logger.info("=== Voice Control Ready ===")
         logger.info("ALWAYS LISTENING with ROLLING BUFFER")
-        logger.info("THREE TRIGGER WORDS:")
+        logger.info("DEFAULT MODE: DICTATION")
         logger.info(
-            f"1. COMMAND TRIGGER: Say '{state.command_trigger}' to activate command mode"
-        )
-        logger.info(
-            f"2. DICTATION TRIGGER: Say '{state.dictation_trigger}' to activate dictation mode"
-        )
-        logger.info(
-            f"3. ASSISTANT TRIGGER: Say 'hey Jarvis' to activate conversational assistant"
+            f"COMMAND TRIGGER: Say '{state.command_trigger}' to activate command mode"
         )
         logger.info(f"MUTE TOGGLE: Press Ctrl+Shift+M to mute/unmute voice control")
         logger.info("")
         logger.info("HOW IT WORKS:")
         logger.info("- System continuously listens with a 5-second rolling buffer")
-        logger.info("- When you speak, we analyze the buffer to detect trigger words")
+        logger.info("- When you speak, it automatically transcribes to text (dictation mode)")
+        logger.info("- Say 'jarvis' to enter command mode instead of dictation")
         logger.info("- No need to wait for a recording to start - just speak naturally")
         logger.info("")
         logger.info(
@@ -204,15 +199,10 @@ class VoiceControlDaemon:
         logger.info("")
         logger.info("DICTATION MODE: System types what you say at the cursor position")
         logger.info(
-            f"   Simply say '{state.dictation_trigger}' to start dictation immediately"
+            "   DEFAULT MODE - just speak naturally and your words will be typed"
         )
-        logger.info("   Everything you say after will be typed at the cursor position")
+        logger.info("   Everything you say will be typed at the cursor position")
         logger.info("   To exit dictation mode, stop speaking for 4 seconds")
-        logger.info("")
-        logger.info("JARVIS ASSISTANT MODE: Talk to a conversational assistant")
-        logger.info("   Say 'hey Jarvis' to activate the conversational assistant")
-        logger.info("   Ask questions like 'what time is it' or 'tell me a joke'")
-        logger.info("   Say 'go to sleep' to exit assistant mode")
         logger.info("")
         logger.info("Press Ctrl+C or ESC to exit")
 
@@ -242,7 +232,7 @@ class VoiceControlDaemon:
                 try:
                     send_notification(
                         "Voice Control Ready",
-                        f"Say '{state.command_trigger}' for commands | Say '{state.dictation_trigger}' for dictation",
+                        f"Just speak for dictation | Say '{state.command_trigger}' for commands",
                         "whisper-trigger-listening",
                         10,
                         False,
@@ -259,7 +249,7 @@ class VoiceControlDaemon:
             # Send a notification that we're ready
             send_notification(
                 "Voice Control Ready with Rolling Buffer",
-                f"Just speak: '{state.command_trigger}' for commands | '{state.dictation_trigger}' for dictation | Mute: Ctrl+Shift+M",
+                f"Just speak for dictation | Say '{state.command_trigger}' for commands | Mute: Ctrl+Shift+M",
                 "whisper-voice-ready",
                 10,
                 True,
@@ -297,20 +287,17 @@ class VoiceControlDaemon:
             )
             time.sleep(0.5)
 
-            # Explain the trigger words
+            # Explain the modes
             tts.speak(
-                f"You can say '{state.command_trigger}' to activate command mode for system control.",
+                "By default, I'll type whatever you say as dictation.",
                 block=True,
             )
             time.sleep(0.5)
 
             tts.speak(
-                f"Say '{state.dictation_trigger}' to start typing what you say.",
+                f"If you need to give me a command instead, just say '{state.command_trigger}' first.",
                 block=True,
             )
-            time.sleep(0.5)
-
-            tts.speak("Or say 'hey Jarvis' to have a conversation with me.", block=True)
             time.sleep(0.5)
 
             # Tips for best experience

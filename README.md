@@ -8,7 +8,8 @@ A voice command daemon that uses OpenAI's Whisper model locally to control your 
 ## Features
 
 - Voice control for your Mac using a local Whisper model
-- Dictation mode for converting speech directly to text at cursor position
+- Dictation mode by default - speak naturally to type text at cursor position
+- Command mode via "jarvis" trigger word
 - Text-to-speech API integration for voice feedback
 - Audio feedback with sounds for recording start/stop and completion
 - Yabai window manager integration for advanced window management
@@ -238,7 +239,7 @@ Edit `config.json` to customize settings:
 ```json
 {
   "MODEL_SIZE": "large-v3",
-  "COMMAND_TRIGGER": "hey",
+  "COMMAND_TRIGGER": "jarvis",
   "DICTATION_TRIGGER": "type",
   "RECORDING_TIMEOUT": 7.0,
   "USE_LLM": true,
@@ -252,7 +253,7 @@ Edit the `.env` file to set environment variables:
 
 ```
 WHISPER_MODEL_SIZE=tiny
-COMMAND_TRIGGER=hey
+COMMAND_TRIGGER=jarvis
 DICTATION_TRIGGER=type
 RECORDING_TIMEOUT=7.0
 USE_LLM=true
@@ -262,9 +263,8 @@ LOG_LEVEL=INFO
 #### Key Configuration Options
 
 - `MODEL_SIZE` - The size of the Whisper model to use (tiny, base, small, medium, large)
-- `COMMAND_TRIGGER` - The trigger word for command mode (default: "hey")
-- `DICTATION_TRIGGER` - The trigger word for dictation mode (default: "type")
-- `ASSISTANT_TRIGGER` - The trigger phrase for assistant mode (default: "hey jarvis")
+- `COMMAND_TRIGGER` - The trigger word for command mode (default: "jarvis")
+- `DICTATION_TRIGGER` - The trigger word for explicit dictation mode (default: "type", but not required as dictation is now the default mode)
 - `RECORDING_TIMEOUT` - How long to record after trigger detection (in seconds)
 - `DICTATION_TIMEOUT` - How long to record for dictation (in seconds)
 - `USE_LLM` - Enable or disable LLM-based command interpretation (true/false)

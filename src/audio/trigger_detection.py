@@ -34,16 +34,19 @@ class TriggerDetector:
         self.recorder = AudioRecorder()
 
         # Trigger word variations for more robust detection
+        # Command mode is now triggered by Jarvis
         self.command_variations = [
-            state.command_trigger.lower(),
-            "hay",
-            "he",
-            "hey",
-            "hi",
-            "okay",
-            "ok",
+            "jarvis",
+            "hey jarvis",
+            "hi jarvis",
+            "hello jarvis",
+            "ok jarvis",
+            "hey jarvis",
+            "jarvis please",
         ]
 
+        # Keep dictation variations for explicit dictation trigger
+        # (though dictation is now the default mode)
         self.dictation_variations = [
             state.dictation_trigger.lower(),
             "typing",
@@ -80,13 +83,8 @@ class TriggerDetector:
             "tai",
         ]
 
-        self.jarvis_variations = [
-            "jarvis",
-            "hey jarvis",
-            "hi jarvis",
-            "hello jarvis",
-            "ok jarvis",
-        ]
+        # Jarvis variations are now the same as command variations
+        self.jarvis_variations = self.command_variations
 
     def ensure_model(self):
         """Ensure Whisper model is loaded."""
@@ -194,22 +192,17 @@ class TriggerDetector:
             dict: Detection results with trigger type and transcription
         """
         result = {
-            "detected": False,
+            "detected": True,  # Default to detected as we'll use dictation by default
             "transcription": transcription,
-            "trigger_type": None,
+            "trigger_type": "dictation",  # Default to dictation mode
         }
 
-        # Check for command trigger
+        # Check for command/JARVIS trigger (same list now)
         contains_command_trigger = any(
             variation in transcription.lower() for variation in self.command_variations
         )
 
-        # Check for JARVIS assistant trigger
-        contains_jarvis_trigger = any(
-            variation in transcription.lower() for variation in self.jarvis_variations
-        )
-
-        # More robust detection for dictation - looking for exact word matches or the word embedded in a phrase
+        # Check for explicit dictation trigger (still supported but now optional)
         contains_dictation_trigger = False
         for variation in self.dictation_variations:
             # Full exact match
@@ -238,23 +231,18 @@ class TriggerDetector:
                 contains_dictation_trigger = True
                 break
 
-        # Process JARVIS assistant trigger first (highest priority)
-        if contains_jarvis_trigger:
-            logger.info(f"JARVIS assistant trigger detected: '{transcription}'")
-            result["detected"] = True
-            result["trigger_type"] = "jarvis"
-
-        # Process dictation trigger next (medium priority)
-        elif contains_dictation_trigger:
-            logger.info(f"Dictation trigger detected: '{transcription}'")
-            result["detected"] = True
-            result["trigger_type"] = "dictation"
-
-        # Otherwise check for command trigger (lowest priority)
-        elif contains_command_trigger:
-            logger.info(f"Command trigger detected: '{transcription}'")
-            result["detected"] = True
+        # Process command/JARVIS trigger (has priority over the default dictation mode)
+        if contains_command_trigger:
+            logger.info(f"Command/JARVIS trigger detected: '{transcription}'")
             result["trigger_type"] = "command"
+        # Process explicit dictation trigger (not strictly necessary since it's the default)
+        elif contains_dictation_trigger:
+            logger.info(f"Explicit dictation trigger detected: '{transcription}'")
+            result["trigger_type"] = "dictation"
+        # Otherwise use dictation as the default
+        else:
+            logger.info(f"No specific trigger detected, defaulting to dictation mode: '{transcription}'")
+            result["trigger_type"] = "dictation"
 
         return result
 
@@ -273,48 +261,9 @@ class TriggerDetector:
         trigger_type = detection_result["trigger_type"]
         transcription = detection_result["transcription"]
 
-        # Import here to avoid circular imports
-        if trigger_type == "jarvis":
+        # Now "command" and "jarvis" are the same - both activated by saying "jarvis"
+        if trigger_type == "command":
             # Play a notification sound
-            self.recorder.play_sound("command")
-
-            # Forward to the assistant module
-            try:
-                from src.utils import assistant
-
-                assistant.process_voice_command(transcription)
-                return True
-            except Exception as e:
-                logger.error(f"Error processing JARVIS command: {e}")
-                import traceback
-
-                logger.error(traceback.format_exc())
-                return False
-
-        elif trigger_type == "dictation":
-            # Play a different sound for dictation mode
-            self.recorder.play_sound("dictation")
-
-            # Add a notification to clearly show we're entering dictation mode
-            try:
-                from src.ui.toast_notifications import send_notification
-
-                send_notification(
-                    "Dictation Mode Activated",
-                    "Everything you say will be typed as text",
-                    "whisper-dictation-direct",
-                    3,
-                    True,
-                )
-            except Exception as e:
-                logger.error(f"Failed to show dictation notification: {e}")
-
-            # Start dictation mode
-            self._start_recording_thread("dictation", force=True)
-            return True
-
-        elif trigger_type == "command":
-            # Play a subtle notification sound for command detection
             self.recorder.play_sound("command")
 
             # Add a notification to show we're listening for a command
@@ -335,7 +284,28 @@ class TriggerDetector:
             self._start_recording_thread("command", force=True)
             return True
 
-        return False
+        # Everything else defaults to dictation mode (including explicit dictation triggers)
+        else:
+            # Play the dictation sound
+            self.recorder.play_sound("dictation")
+
+            # Add a notification to clearly show we're entering dictation mode
+            try:
+                from src.ui.toast_notifications import send_notification
+
+                send_notification(
+                    "Dictation Mode Activated",
+                    "Everything you say will be typed as text",
+                    "whisper-dictation-direct",
+                    3,
+                    True,
+                )
+            except Exception as e:
+                logger.error(f"Failed to show dictation notification: {e}")
+
+            # Start dictation mode
+            self._start_recording_thread("dictation", force=True)
+            return True
 
     def _start_recording_thread(self, mode, force=False):
         """Start a recording thread with specified mode.
