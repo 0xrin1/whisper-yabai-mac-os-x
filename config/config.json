@@ -1,5 +1,5 @@
 {
-    "MODEL_SIZE": "tiny",
+    "MODEL_SIZE": "medium",
     "COMMAND_TRIGGER": "hey",
     "DICTATION_TRIGGER": "type",
     "ASSISTANT_TRIGGER": "hey jarvis",

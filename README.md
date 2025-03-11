@@ -237,7 +237,7 @@ Edit `config.json` to customize settings:
 
 ```json
 {
-  "MODEL_SIZE": "tiny",
+  "MODEL_SIZE": "medium",
   "COMMAND_TRIGGER": "hey",
   "DICTATION_TRIGGER": "type",
   "RECORDING_TIMEOUT": 7.0,
@@ -423,9 +423,10 @@ The documentation website includes:
 - If you encounter permission issues with microphone access, make sure to grant Terminal (or your IDE) microphone permissions in System Preferences > Security & Privacy > Privacy > Microphone.
 - If commands related to Yabai aren't working, make sure Yabai is properly installed and running.
 - Check the logs for detailed error messages.
-- If you're getting repetitive "little bit of a little bit of" transcriptions, try:
+- For speech recognition issues, try:
   - Speaking more clearly and directly into the microphone
-  - Using the smaller 'tiny' Whisper model by setting `WHISPER_MODEL_SIZE=tiny` in your .env file
+  - The system now uses the 'medium' Whisper model by default for better accuracy
+  - If you need faster performance with less accuracy, you can switch to smaller models (base or tiny)
   - Checking for background noise that might be confusing the model
   - If possible, use a better microphone or move to a quieter environment
 - The voice commands are designed to be natural language, so experiment with different phrasings if a command isn't recognized.

@@ -58,9 +58,9 @@ This will offload some of the model computation to the GPU for faster inference.
 
 Whisper models will be downloaded automatically when you first run the application.
 
-By default, the system uses the "tiny" model. If you want to use a different size model, you can set the `WHISPER_MODEL_SIZE` environment variable to one of:
-- `tiny` (default)
-- `base`
-- `small`
-- `medium`
-- `large`
+By default, the system uses the "medium" model. If you want to use a different size model, you can set the `WHISPER_MODEL_SIZE` environment variable or update the MODEL_SIZE in config.json to one of:
+- `tiny` (fastest, least accurate)
+- `base` (faster, less accurate)
+- `small` (balance of speed and accuracy)
+- `medium` (default, good accuracy)
+- `large` (most accurate, slowest)
