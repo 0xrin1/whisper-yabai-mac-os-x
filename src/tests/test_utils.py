@@ -54,7 +54,7 @@ def mock_speech_synthesis():
 
     def mock_speak(
         text,
-        voice="p230",
+        voice="p230",  # Standardize on p230 voice across all tests
         rate=1.0,
         use_high_quality=True,
         enhance_audio=True,

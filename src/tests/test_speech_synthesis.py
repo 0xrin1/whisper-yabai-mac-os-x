@@ -84,7 +84,7 @@ class TestSpeechSynthesis(unittest.TestCase):
         # Call function with custom parameters
         result = speech_synthesis._call_speech_api(
             "Test text",
-            voice_id="p240",
+            voice_id="p230",  # Standardize on p230 voice
             speed=1.5,
             use_high_quality=False,
             enhance_audio=False,
@@ -97,7 +97,7 @@ class TestSpeechSynthesis(unittest.TestCase):
         # Check request payload
         payload = call_args[1]["json"]
         self.assertEqual(payload["text"], "Test text")
-        self.assertEqual(payload["voice_id"], "p240")
+        self.assertEqual(payload["voice_id"], "p230")  # Standardize on p230 voice
         self.assertEqual(payload["speed"], 1.5)
         self.assertFalse(payload["use_high_quality"])
         self.assertFalse(payload["enhance_audio"])
@@ -135,7 +135,7 @@ class TestSpeechSynthesis(unittest.TestCase):
                 # Call function with custom parameters
                 result = speech_synthesis.speak(
                     "Test text",
-                    voice="p240",
+                    voice="p230",  # Standardize on p230 voice
                     rate=1.5,
                     use_high_quality=False,
                     enhance_audio=False,
@@ -148,7 +148,7 @@ class TestSpeechSynthesis(unittest.TestCase):
                 self.assertEqual(len(mock_queue), 1)
                 request = mock_queue[0]
                 self.assertEqual(request["text"], "Test text")
-                self.assertEqual(request["voice_id"], "p240")
+                self.assertEqual(request["voice_id"], "p230")  # Standardize on p230 voice
                 self.assertEqual(request["speed"], 1.5)
                 self.assertFalse(request["use_high_quality"])
                 self.assertFalse(request["enhance_audio"])

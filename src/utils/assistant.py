@@ -41,7 +41,7 @@ assistant_state = {
     "active": False,
     "conversational_mode": False,
     "last_interaction_time": 0,
-    "voice": "daniel",  # Default to Daniel (British male voice)
+    "voice": "p230",  # Standardize on p230 voice across all tests
 }
 
 # Predefined responses for various scenarios

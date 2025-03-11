@@ -30,7 +30,7 @@ class TestJarvisAssistant(unittest.TestCase):
         assistant.assistant_state["active"] = False
         assistant.assistant_state["conversational_mode"] = False
         assistant.assistant_state["last_interaction_time"] = 0
-        assistant.assistant_state["voice"] = "daniel"
+        assistant.assistant_state["voice"] = "p230"  # Standardize on p230 voice across all tests
 
         # Clear conversation memory
         with assistant.memory_lock:
