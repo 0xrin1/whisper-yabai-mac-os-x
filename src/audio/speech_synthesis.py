@@ -20,8 +20,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 logger = logging.getLogger('speech-synthesis')
 
 # API configuration
-DEFAULT_API_URL = os.environ.get("SPEECH_API_URL", "https://api.example.com/synthesize")
-API_KEY = os.environ.get("SPEECH_API_KEY", "")
+SERVER_URL = os.environ.get("SERVER_URL", "http://localhost:6000")
+TTS_ENDPOINT = f"{SERVER_URL}/tts"
 
 # Track if speech is currently in progress
 _speaking_lock = threading.Lock()
@@ -95,11 +95,16 @@ def stop_speaking() -> None:
         _speech_queue.clear()
         _queue_running = False
 
-def _call_speech_api(text: str) -> Optional[str]:
+def _call_speech_api(text: str, voice_id: str = "p230", speed: float = 1.0,
+                 use_high_quality: bool = True, enhance_audio: bool = True) -> Optional[str]:
     """Call external API to synthesize speech.
     
     Args:
         text: Text to synthesize
+        voice_id: Speaker ID for the VITS model
+        speed: Speech speed factor (0.5 to 2.0)
+        use_high_quality: Whether to use highest quality settings
+        enhance_audio: Whether to apply additional GPU-based audio enhancement
         
     Returns:
         Path to audio file or None if failed
@@ -112,21 +117,22 @@ def _call_speech_api(text: str) -> Optional[str]:
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
             temp_path = temp_file.name
             
-        # Call the API
+        # Call the API using POST method with JSON body
         headers = {
-            "Authorization": f"Bearer {API_KEY}",
             "Content-Type": "application/json"
         }
         payload = {
             "text": text,
-            "format": "wav",
-            "voice": "default"
+            "voice_id": voice_id,
+            "speed": speed,
+            "use_high_quality": use_high_quality,
+            "enhance_audio": enhance_audio
         }
         
         logger.debug(f"Calling speech API with text: '{text}'")
         
         response = requests.post(
-            DEFAULT_API_URL,
+            TTS_ENDPOINT,
             headers=headers,
             json=payload,
             timeout=10
@@ -191,7 +197,7 @@ def _process_speech_queue() -> None:
     logger.debug("Starting speech queue processing thread")
     
     while True:
-        text_to_speak = None
+        speech_request = None
         
         # Get the next item from the queue
         with _queue_lock:
@@ -199,18 +205,36 @@ def _process_speech_queue() -> None:
                 _queue_running = False
                 break
                 
-            text_to_speak = _speech_queue.pop(0)
+            speech_request = _speech_queue.pop(0)
             
-        if text_to_speak:
+        if speech_request:
             # Mark as speaking
             with _speaking_lock:
                 _currently_speaking = True
                 
             # Generate and play speech
             try:
-                audio_file = _call_speech_api(text_to_speak)
+                # Handle both string and dict formats for backward compatibility
+                if isinstance(speech_request, str):
+                    audio_file = _call_speech_api(speech_request)
+                else:
+                    text = speech_request.get("text", "")
+                    voice_id = speech_request.get("voice_id", "p230")
+                    speed = speech_request.get("speed", 1.0)
+                    use_high_quality = speech_request.get("use_high_quality", True)
+                    enhance_audio = speech_request.get("enhance_audio", True)
+                    
+                    audio_file = _call_speech_api(
+                        text, 
+                        voice_id=voice_id,
+                        speed=speed,
+                        use_high_quality=use_high_quality,
+                        enhance_audio=enhance_audio
+                    )
+                
                 if audio_file:
                     _play_audio(audio_file)
+                    
             except Exception as e:
                 logger.error(f"Error in speech synthesis: {e}")
                 
@@ -220,13 +244,17 @@ def _process_speech_queue() -> None:
                 
     logger.debug("Speech queue processing thread finished")
 
-def speak(text: str, voice: str = None, rate: float = None, block: bool = False) -> bool:
+def speak(text: str, voice: str = "p230", rate: float = 1.0, 
+           use_high_quality: bool = True, enhance_audio: bool = True, 
+           block: bool = False) -> bool:
     """Synthesize speech using the external API.
     
     Args:
         text: Text to speak
-        voice: Voice ID (ignored, using API default)
-        rate: Speaking rate (ignored, using API default)
+        voice: Voice ID for the model (default "p230")
+        rate: Speaking rate factor (0.5 to 2.0)
+        use_high_quality: Whether to use highest quality settings
+        enhance_audio: Whether to apply additional GPU-based audio enhancement
         block: Whether to block until speech is complete
         
     Returns:
@@ -237,9 +265,18 @@ def speak(text: str, voice: str = None, rate: float = None, block: bool = False)
         
     logger.debug(f"Adding to speech queue: '{text}'")
     
+    # Store speech parameters with the text
+    speech_request = {
+        "text": text,
+        "voice_id": voice,
+        "speed": rate,
+        "use_high_quality": use_high_quality,
+        "enhance_audio": enhance_audio
+    }
+    
     # Add to queue
     with _queue_lock:
-        _speech_queue.append(text)
+        _speech_queue.append(speech_request)
         
         # Start queue processing thread if not already running
         global _queue_running, _queue_thread
@@ -255,11 +292,17 @@ def speak(text: str, voice: str = None, rate: float = None, block: bool = False)
             
     return True
 
-def speak_random(category: str, block: bool = False) -> bool:
+def speak_random(category: str, voice: str = "p230", rate: float = 1.0,
+                use_high_quality: bool = True, enhance_audio: bool = True,
+                block: bool = False) -> bool:
     """Speak a random response from a category.
     
     Args:
         category: Response category (greeting, acknowledgment, etc.)
+        voice: Voice ID for the model (default "p230")
+        rate: Speaking rate factor (0.5 to 2.0)
+        use_high_quality: Whether to use highest quality settings
+        enhance_audio: Whether to apply additional GPU-based audio enhancement
         block: Whether to block until speech is complete
         
     Returns:
@@ -272,10 +315,14 @@ def speak_random(category: str, block: bool = False) -> bool:
     responses = CASUAL_RESPONSES[category]
     selected = random.choice(responses)
     
-    return speak(selected, block=block)
+    return speak(
+        selected,
+        voice=voice,
+        rate=rate,
+        use_high_quality=use_high_quality,
+        enhance_audio=enhance_audio,
+        block=block
+    )
 
 # Initialize module
-if not API_KEY:
-    logger.warning("No API key provided for speech synthesis")
-    
-logger.info(f"Speech synthesis module initialized with API URL: {DEFAULT_API_URL}")
+logger.info(f"Speech synthesis module initialized with TTS endpoint: {TTS_ENDPOINT}")

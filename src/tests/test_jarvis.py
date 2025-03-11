@@ -36,7 +36,7 @@ class TestJarvisAssistant(unittest.TestCase):
             assistant.conversation_memory.clear()
         
         # Create mock for tts.speak to avoid actual speech
-        self.speak_patch = patch('src.speech_synthesis.speak')
+        self.speak_patch = patch('src.audio.speech_synthesis.speak')
         self.mock_speak = self.speak_patch.start()
         
         # Create mock for subprocess.run to avoid actual sounds
@@ -268,7 +268,7 @@ class TestJarvisTimings(unittest.TestCase):
             assistant.conversation_memory.clear()
             
         # Create mocks for functions that might cause timing issues
-        self.speak_patch = patch('src.speech_synthesis.speak')
+        self.speak_patch = patch('src.audio.speech_synthesis.speak')
         self.mock_speak = self.speak_patch.start()
         
         # Make speak return immediately instead of blocking
@@ -436,7 +436,7 @@ class TestJarvisIntegration(unittest.TestCase):
     def test_complete_conversation_flow(self):
         """Test a full conversation flow with JARVIS, simulating real interactions."""
         # Create a mock for speech output so we don't actually speak during tests
-        with patch('src.speech_synthesis.speak') as mock_speak:
+        with patch('src.audio.speech_synthesis.speak') as mock_speak:
             # 1. Initial activation with wake word
             assistant.process_voice_command("Hey Jarvis")
             self.assertTrue(assistant.assistant_state["active"])
@@ -474,7 +474,7 @@ class TestJarvisIntegration(unittest.TestCase):
     
     def test_wake_sleep_cycle(self):
         """Test repeated wake/sleep cycles to ensure state consistency."""
-        with patch('src.speech_synthesis.speak'):
+        with patch('src.audio.speech_synthesis.speak'):
             # Multiple wake-sleep cycles
             for i in range(3):
                 # Wake up
@@ -504,7 +504,7 @@ class TestJarvisIntegration(unittest.TestCase):
     
     def test_transcription_processing(self):
         """Test handling of various transcription formats and edge cases."""
-        with patch('src.speech_synthesis.speak'):
+        with patch('src.audio.speech_synthesis.speak'):
             # Activate the assistant
             assistant.activate_assistant()
             

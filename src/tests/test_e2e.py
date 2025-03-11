@@ -15,6 +15,7 @@ import numpy as np
 import sys
 import unittest
 import logging
+import requests
 
 # Set up logging
 logging.basicConfig(
@@ -33,9 +34,9 @@ class DaemonProcess:
         
     def start(self):
         """Start the daemon process with logging."""
-        # Start the process - use the refactored daemon
+        # Start the process - use the main daemon module
         self.process = subprocess.Popen(
-            ["python", "-m", "src.daemon_refactored", "--test"],
+            ["python", "-m", "src.daemon"],  # Use default args that daemon understands
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
@@ -101,7 +102,7 @@ class DaemonProcess:
         return False
 
 class SpeechSynthesizer:
-    """Class to generate speech for testing."""
+    """Class to generate speech for testing using the external API."""
     
     def __init__(self):
         self.chunk = 1024
@@ -110,13 +111,18 @@ class SpeechSynthesizer:
         self.format = pyaudio.paInt16
         self.p = pyaudio.PyAudio()
         
+        # API configuration - use the same config as speech_synthesis.py
+        self.server_url = os.environ.get("SERVER_URL", "http://localhost:6000")
+        self.tts_endpoint = f"{self.server_url}/tts"
+        logger.info(f"Using TTS endpoint: {self.tts_endpoint}")
+        
     def synthesize_speech(self, text, output_file=None, voice=None):
-        """Synthesize speech using macOS say command.
+        """Synthesize speech using the external TTS API.
         
         Args:
             text (str): Text to synthesize
             output_file (str, optional): Output WAV file path. If None, a temp file is created.
-            voice (str, optional): Voice to use for synthesis. Default is system voice.
+            voice (str, optional): Voice ID for the model. Default is p230.
             
         Returns:
             str: Path to the created WAV file
@@ -126,25 +132,45 @@ class SpeechSynthesizer:
             temp_file = tempfile.NamedTemporaryFile(suffix='.wav', delete=False)
             output_file = temp_file.name
             temp_file.close()
+        
+        # Map macOS voice names to our API voice IDs if needed
+        if voice in ["Alex", "Samantha", "Fred"]:
+            voice = "p230"  # Default to p230 for any macOS voice names
+        
+        # Use API defaults for voice if none specified
+        voice_id = voice or "p230"
+        
+        logger.info(f"Synthesizing speech for '{text}' with voice {voice_id}")
+        
+        # Build request payload
+        payload = {
+            "text": text,
+            "voice_id": voice_id,
+            "speed": 1.0,
+            "use_high_quality": True,
+            "enhance_audio": True
+        }
+        
+        headers = {"Content-Type": "application/json"}
+        
+        # Call the API
+        response = requests.post(
+            self.tts_endpoint,
+            headers=headers,
+            json=payload,
+            timeout=30  # Increase timeout for larger requests
+        )
+        
+        # Check if the request was successful
+        if response.status_code != 200:
+            error_msg = f"TTS API call failed with status {response.status_code}: {response.text}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
             
-        # Use Mac's 'say' command to generate speech
-        aiff_file = output_file.replace('.wav', '.aiff')
-        
-        # Build the command with optional voice parameter
-        cmd = ["say", "-o", aiff_file]
-        if voice:
-            cmd.extend(["-v", voice])
-        cmd.append(text)
-        
-        # Run the command
-        subprocess.run(cmd, check=True)
-        
-        # Convert AIFF to WAV (16kHz, 16-bit mono - matching Whisper requirements)
-        subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", aiff_file, output_file], check=True)
-        
-        # Clean up AIFF file
-        os.remove(aiff_file)
-        
+        # Save the audio to the output file
+        with open(output_file, "wb") as f:
+            f.write(response.content)
+            
         logger.info(f"Generated speech for '{text}' at {output_file}")
         return output_file
         
@@ -240,10 +266,10 @@ class VoiceControlTests(unittest.TestCase):
         
         # Start daemon - use a shorter path to avoid potential permission issues
         print("Starting daemon in background...")
-        # Use the refactored daemon instead
+        # Use the main daemon module
         cls.daemon = DaemonProcess()
         cls.daemon.process = subprocess.Popen(
-            ["python", "-m", "src.daemon_refactored", "--test"],
+            ["python", "-m", "src.daemon"],  # Use default args that daemon understands
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
@@ -275,16 +301,7 @@ class VoiceControlTests(unittest.TestCase):
         print(f"Python version: {sys.version}")
         print(f"PyAudio version: {pyaudio.get_portaudio_version()}")
         print(f"OS: {os.uname().sysname} {os.uname().release}")
-        
-        # List available voices for speech synthesis
-        try:
-            voices = subprocess.check_output(["say", "-v", "?"], universal_newlines=True)
-            print("\nAvailable voices for speech synthesis:")
-            for line in voices.splitlines()[:5]:  # Show first 5 voices
-                print(f"  {line}")
-            print("  ...")
-        except:
-            print("Could not list available voices")
+        print(f"TTS API endpoint: {cls.synth.tts_endpoint}")
         
     @classmethod
     def tearDownClass(cls):
@@ -320,7 +337,7 @@ class VoiceControlTests(unittest.TestCase):
             logger.info(f"Testing dictation trigger with '{phrase}'")
             
             # Generate and play the trigger word - try different voices too
-            voices = ["Alex", "Samantha", "Fred"]  # Different voices to try
+            voices = ["p230", "p231", "p232"]  # Different voice IDs to try
             
             for voice in voices:
                 try:

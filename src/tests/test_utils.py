@@ -43,9 +43,14 @@ def get_mock_audio_data():
     return bytes([0] * 16000)
 
 def mock_speech_synthesis():
-    """Get a mock speech synthesis function"""
-    def mock_speak(text, **kwargs):
-        logger.info(f"MOCK SPEECH: {text}")
+    """Get a mock speech synthesis function that matches our new server-based API"""
+    def mock_speak(text, voice="p230", rate=1.0, 
+                   use_high_quality=True, enhance_audio=True, 
+                   block=False, **kwargs):
+        # Just log the text, don't actually make API calls
+        logger.info(f"MOCK SPEECH (server API): {text}")
+        logger.info(f"MOCK SPEECH PARAMS: voice={voice}, rate={rate}, "
+                   f"use_high_quality={use_high_quality}, enhance_audio={enhance_audio}")
         return True
     
     return mock_speak
