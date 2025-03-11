@@ -1,0 +1,34 @@
+FROM python:3.10-slim
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements file
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code
+COPY src/ src/
+COPY config/ config/
+COPY scripts/ scripts/
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV DEFAULT_MODEL_SIZE=large-v3
+ENV SPEECH_API_HOST=0.0.0.0
+ENV SPEECH_API_PORT=8080
+
+# Expose port
+EXPOSE 8080
+
+# Run the API server
+CMD ["python", "src/api/speech_recognition_api.py", "--host", "0.0.0.0", "--port", "8080", "--model", "large-v3"]

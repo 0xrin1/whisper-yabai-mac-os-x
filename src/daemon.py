@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Voice command daemon using Whisper and Yabai for Mac OS X control.
+Voice command daemon using Speech Recognition API and Yabai for Mac OS X control.
 Unified version combining features of original and refactored implementations.
 """
 
@@ -9,7 +9,6 @@ import time
 import threading
 import signal
 import logging
-import whisper
 import argparse
 from dotenv import load_dotenv
 
@@ -28,17 +27,27 @@ import src.audio.speech_synthesis as tts
 import src.utils.assistant as assistant
 from src.ui.toast_notifications import send_notification
 
+# Import cloud code components
+try:
+    from src.api.api_server import APIServer
+    from src.utils.cloud_code import CloudCodeHandler
+    api_available = True
+except ImportError:
+    api_available = False
+    logging.getLogger("voice-control").warning("API server components not available. Cloud code features will be disabled.")
+
 logger = logging.getLogger("voice-control")
 
 
 class VoiceControlDaemon:
     """Main daemon class for voice control system."""
 
-    def __init__(self, force_onboarding=False):
+    def __init__(self, force_onboarding=False, api_enabled=True):
         """Initialize the daemon.
 
         Args:
             force_onboarding (bool, optional): Force the onboarding conversation even if not first run.
+            api_enabled (bool, optional): Enable the API server for cloud code integration.
         """
         # Configure logging
         self._setup_logging()
@@ -53,11 +62,16 @@ class VoiceControlDaemon:
 
         # Store CLI arguments
         self.force_onboarding = force_onboarding
+        self.api_enabled = api_enabled and api_available
 
         # Initialize components
         self.recorder = AudioRecorder()
         self.continuous_recorder = ContinuousRecorder()
         self.running = False
+
+        # API and cloud code components
+        self.api_server = None
+        self.cloud_code_handler = None
 
     def _setup_logging(self):
         """Set up logging configuration."""
@@ -108,6 +122,15 @@ class VoiceControlDaemon:
         self.continuous_recorder.stop()
         hotkeys.stop()
 
+        # Stop API and cloud code components if they exist
+        if self.api_server:
+            logger.info("Stopping API server...")
+            self.api_server.stop()
+
+        if self.cloud_code_handler:
+            logger.info("Stopping Cloud Code handler...")
+            self.cloud_code_handler.stop()
+
         # Clean up resources
         self.recorder.cleanup()
 
@@ -146,16 +169,36 @@ class VoiceControlDaemon:
                 logger.error(f"Error testing speech synthesis: {e}")
                 # Continue without speech if it fails
 
-            # Check if whisper model can be loaded
-            logger.info(f"Testing Whisper model load: {state.model_size}")
-            try:
-                test_model = whisper.load_model(state.model_size)
-                logger.info("Whisper model loaded successfully")
-                # Update state with model
-                state.whisper_model = test_model
-            except Exception as e:
-                logger.error(f"Error loading Whisper model: {e}")
-                raise
+            # Check if Speech API is available - only in non-testing mode
+            if os.getenv("TESTING", "false").lower() != "true":
+                logger.info("Testing Speech Recognition API connection...")
+                try:
+                    # Import here to avoid circular imports
+                    from src.api.speech_recognition_client import SpeechRecognitionClient
+                    import asyncio
+
+                    speech_api_url = os.getenv("SPEECH_API_URL", "http://localhost:8080")
+                    client = SpeechRecognitionClient(api_url=speech_api_url)
+                    loop = asyncio.new_event_loop()
+
+                    if not loop.run_until_complete(client.check_connection()):
+                        error_msg = f"Speech Recognition API not available at {speech_api_url}"
+                        logger.error(error_msg)
+                        raise RuntimeError(error_msg)
+
+                    logger.info("Speech Recognition API connection successful")
+
+                    # Get available models
+                    models = loop.run_until_complete(client.list_models())
+                    logger.info(f"Available models on API: {models}")
+
+                    # Clean up
+                    loop.close()
+                except Exception as e:
+                    logger.error(f"Error connecting to Speech Recognition API: {e}")
+                    raise
+            else:
+                logger.info("TESTING mode: Skipping Speech Recognition API check")
 
             # Start audio processor
             logger.info("Starting audio processor...")
@@ -165,6 +208,10 @@ class VoiceControlDaemon:
             logger.info("Starting hotkey listener...")
             hotkeys.start()
 
+            # Always initialize Cloud Code components for "jarvis" commands
+            # (API server is only started if specifically enabled)
+            self._initialize_cloud_components()
+
         except Exception as e:
             logger.error(f"Error initializing components: {e}")
             import traceback
@@ -173,31 +220,85 @@ class VoiceControlDaemon:
             self.stop()
             os._exit(1)
 
+    def _initialize_cloud_components(self):
+        """Initialize API server and Cloud Code handler."""
+        try:
+            # Initialize Cloud Code handler (always initialize for voice commands)
+            logger.info("Initializing Cloud Code handler...")
+            from src.config.config import config
+            self.cloud_code_handler = CloudCodeHandler(state)
+            self.cloud_code_handler.start()
+            logger.info("Cloud Code handler initialized successfully")
+
+            # Initialize API server (only if API is explicitly enabled)
+            if self.api_enabled:
+                logger.info("Initializing API server...")
+                self.api_server = APIServer(state, config)
+
+                # Get API port and host from environment or default
+                api_port = int(os.getenv("API_PORT", "8000"))
+                api_host = os.getenv("API_HOST", "127.0.0.1")
+
+                # Start the API server
+                self.api_server.start(host=api_host, port=api_port)
+                logger.info(f"API server started on {api_host}:{api_port}")
+
+                # Notify user
+                send_notification(
+                    "Cloud Code API Ready",
+                    f"API server running at http://{api_host}:{api_port}",
+                    "whisper-cloud-api",
+                    5,
+                    True,
+                )
+
+                # Announce via speech synthesis
+                tts.speak("Cloud Code API is now ready for integration", block=False)
+            else:
+                logger.info("API server not enabled, but Cloud Code handler is ready for 'jarvis' commands")
+
+        except Exception as e:
+            logger.error(f"Error initializing cloud components: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            # Continue without cloud components if they fail to initialize
+
     def _show_startup_banner(self):
         """Show startup banner with system information."""
         logger.info("=== Voice Control Ready ===")
         logger.info("ALWAYS LISTENING with ROLLING BUFFER")
         logger.info("DEFAULT MODE: DICTATION")
         logger.info(
-            f"COMMAND TRIGGER: Say '{state.command_trigger}' to activate command mode"
+            f"CLOUD CODE TRIGGER: Say '{state.command_trigger}' to talk to Claude Code"
         )
         logger.info(f"MUTE TOGGLE: Press Ctrl+Shift+M to mute/unmute voice control")
         logger.info("")
         logger.info("HOW IT WORKS:")
         logger.info("- System continuously listens with a 5-second rolling buffer")
         logger.info("- When you speak, it automatically transcribes to text (dictation mode)")
-        logger.info("- Say 'jarvis' to enter command mode instead of dictation")
+        logger.info("- Say 'jarvis' followed by your question to talk to Claude Code")
         logger.info("- No need to wait for a recording to start - just speak naturally")
         logger.info("")
         logger.info(
-            "COMMAND MODE: System listens for commands to control your computer"
+            "CLOUD CODE MODE: Talk to Claude Code AI assistant"
         )
         logger.info(
-            f"   Say '{state.command_trigger}' to activate, then speak your command when you hear the tone"
+            f"   Say '{state.command_trigger}' followed by your question"
         )
-        logger.info("   Examples: 'open Safari', 'maximize window', 'focus chrome'")
+        logger.info("   Examples: 'jarvis what's the weather today', 'jarvis tell me a joke'")
         logger.info("")
         logger.info("DICTATION MODE: System types what you say at the cursor position")
+
+        # Show cloud code status if enabled
+        if self.api_enabled:
+            api_port = int(os.getenv("API_PORT", "8000"))
+            api_host = os.getenv("API_HOST", "127.0.0.1")
+            logger.info("")
+            logger.info("CLOUD CODE API:")
+            logger.info(f"- API server enabled on http://{api_host}:{api_port}")
+            logger.info("- Speech transcriptions available via WebSocket")
+            logger.info("- Cloud Code integration ready for use")
+            logger.info(f"- Access API documentation at http://{api_host}:{api_port}/docs")
         logger.info(
             "   DEFAULT MODE - just speak naturally and your words will be typed"
         )
@@ -216,14 +317,9 @@ class VoiceControlDaemon:
             )
             time.sleep(5)
 
-            # Make sure model is loaded before starting
-            if state.whisper_model is None:
-                logger.info("Waiting for Whisper model to finish loading...")
-                # Wait up to 15 more seconds for model to load
-                for _ in range(15):
-                    if state.whisper_model is not None:
-                        break
-                    time.sleep(1)
+            # Short delay to ensure all subsystems are ready
+            logger.info("Finalizing initialization...")
+            time.sleep(2)
 
             logger.info("Now starting continuous listening mode...")
 
@@ -295,7 +391,7 @@ class VoiceControlDaemon:
             time.sleep(0.5)
 
             tts.speak(
-                f"If you need to give me a command instead, just say '{state.command_trigger}' first.",
+                f"If you want to talk to Claude Code, just say '{state.command_trigger}' followed by your question.",
                 block=True,
             )
             time.sleep(0.5)
@@ -354,8 +450,22 @@ if __name__ == "__main__":
     parser.add_argument(
         "--onboard", action="store_true", help="Force the onboarding conversation"
     )
+    parser.add_argument(
+        "--api", action="store_true", help="Enable the Cloud Code API server"
+    )
+    parser.add_argument(
+        "--api-port", type=int, default=8000, help="Port for the API server"
+    )
+    parser.add_argument(
+        "--api-host", type=str, default="127.0.0.1", help="Host for the API server"
+    )
     args = parser.parse_args()
 
+    # Set environment variables for API if provided
+    if args.api:
+        os.environ["API_PORT"] = str(args.api_port)
+        os.environ["API_HOST"] = args.api_host
+
     # Create and start the daemon
-    daemon = VoiceControlDaemon(force_onboarding=args.onboard)
+    daemon = VoiceControlDaemon(force_onboarding=args.onboard, api_enabled=args.api)
     daemon.start()

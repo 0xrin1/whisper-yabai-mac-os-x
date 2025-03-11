@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Control Cloud Code Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .settings {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 8px;
+        }
+        .row {
+            display: flex;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        label {
+            width: 100px;
+            font-weight: bold;
+        }
+        input, button {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 8px 16px;
+            margin-left: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .transcription-container {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-top: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        .entry {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .dictation {
+            background: #e1f5fe;
+            border-left: 4px solid #03a9f4;
+        }
+        .command {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+        }
+        .timestamp {
+            font-size: 0.8em;
+            color: #666;
+        }
+        .mode {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+        .confidence {
+            font-size: 0.8em;
+            color: #555;
+        }
+        .text {
+            margin-top: 5px;
+        }
+        .status {
+            padding: 10px;
+            margin-top: 10px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status.error {
+            background: #ffebee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Voice Control Cloud Code Demo</h1>
+
+        <div class="settings">
+            <h2>Connection Settings</h2>
+            <div class="row">
+                <label for="host">Host:</label>
+                <input type="text" id="host" value="127.0.0.1">
+            </div>
+            <div class="row">
+                <label for="port">Port:</label>
+                <input type="number" id="port" value="8000">
+            </div>
+            <div class="row">
+                <button id="connectBtn">Connect to WebSocket</button>
+                <button id="disconnectBtn" disabled>Disconnect</button>
+            </div>
+        </div>
+
+        <div class="speech-control">
+            <h2>Speech Control</h2>
+            <div class="row">
+                <label for="speechText">Text:</label>
+                <input type="text" id="speechText" value="Hello, I'm listening to you through the Cloud Code API!">
+                <button id="speakBtn">Speak</button>
+            </div>
+        </div>
+
+        <div class="cloud-code">
+            <h2>Cloud Code</h2>
+            <div class="row">
+                <label for="promptText">Prompt:</label>
+                <input type="text" id="promptText" value="Tell me a short joke">
+                <button id="sendPromptBtn">Send</button>
+            </div>
+        </div>
+
+        <h2>Live Transcription</h2>
+        <div class="status" id="connectionStatus">Not connected</div>
+        <div class="transcription-container" id="transcriptionContainer"></div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const hostInput = document.getElementById('host');
+        const portInput = document.getElementById('port');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const speechText = document.getElementById('speechText');
+        const speakBtn = document.getElementById('speakBtn');
+        const promptText = document.getElementById('promptText');
+        const sendPromptBtn = document.getElementById('sendPromptBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const transcriptionContainer = document.getElementById('transcriptionContainer');
+
+        // WebSocket connection
+        let socket = null;
+
+        // Connect to WebSocket
+        connectBtn.addEventListener('click', () => {
+            const host = hostInput.value;
+            const port = portInput.value;
+
+            // Create WebSocket connection
+            try {
+                socket = new WebSocket(`ws://${host}:${port}/ws/transcription`);
+
+                // Connection opened
+                socket.addEventListener('open', (event) => {
+                    connectionStatus.textContent = 'Connected to WebSocket';
+                    connectionStatus.className = 'status';
+                    connectBtn.disabled = true;
+                    disconnectBtn.disabled = false;
+                    speakBtn.disabled = false;
+                    sendPromptBtn.disabled = false;
+                });
+
+                // Listen for messages
+                socket.addEventListener('message', (event) => {
+                    const data = JSON.parse(event.data);
+                    addTranscriptionEntry(data);
+                });
+
+                // Connection closed
+                socket.addEventListener('close', (event) => {
+                    connectionStatus.textContent = 'Disconnected from WebSocket';
+                    connectionStatus.className = 'status';
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    speakBtn.disabled = true;
+                    sendPromptBtn.disabled = true;
+                });
+
+                // Connection error
+                socket.addEventListener('error', (event) => {
+                    connectionStatus.textContent = 'Error: Failed to connect to WebSocket';
+                    connectionStatus.className = 'status error';
+                    console.error('WebSocket error:', event);
+                });
+            } catch (error) {
+                connectionStatus.textContent = `Error: ${error.message}`;
+                connectionStatus.className = 'status error';
+            }
+        });
+
+        // Disconnect from WebSocket
+        disconnectBtn.addEventListener('click', () => {
+            if (socket) {
+                socket.close();
+                socket = null;
+            }
+        });
+
+        // Speak text
+        speakBtn.addEventListener('click', () => {
+            const host = hostInput.value;
+            const port = portInput.value;
+            const text = speechText.value;
+
+            if (!text) return;
+
+            // Call the speak API
+            fetch(`http://${host}:${port}/speak?text=${encodeURIComponent(text)}`, {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Speech synthesis request sent:', data);
+            })
+            .catch(error => {
+                console.error('Error sending speech synthesis request:', error);
+                connectionStatus.textContent = `Error: ${error.message}`;
+                connectionStatus.className = 'status error';
+            });
+        });
+
+        // Send prompt to Cloud Code
+        sendPromptBtn.addEventListener('click', () => {
+            const host = hostInput.value;
+            const port = portInput.value;
+            const prompt = promptText.value;
+
+            if (!prompt) return;
+
+            // Call the cloud-code API
+            fetch(`http://${host}:${port}/cloud-code`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    prompt: prompt,
+                    session_id: `web-demo-${Date.now()}`
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Cloud Code response:', data);
+                // Add the response to the transcription container
+                addCloudCodeResponse(data);
+            })
+            .catch(error => {
+                console.error('Error sending Cloud Code request:', error);
+                connectionStatus.textContent = `Error: ${error.message}`;
+                connectionStatus.className = 'status error';
+            });
+        });
+
+        // Add transcription entry to the container
+        function addTranscriptionEntry(data) {
+            const entry = document.createElement('div');
+            entry.className = `entry ${data.is_command ? 'command' : 'dictation'}`;
+
+            // Format timestamp
+            const timestamp = new Date(data.timestamp * 1000).toLocaleTimeString();
+
+            // Create content
+            entry.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <div><span class="mode">${data.is_command ? 'COMMAND' : 'DICTATION'}</span> <span class="confidence">(${(data.confidence * 100).toFixed(1)}%)</span></div>
+                <div class="text">${data.text}</div>
+            `;
+
+            // Add to container and scroll to bottom
+            transcriptionContainer.appendChild(entry);
+            transcriptionContainer.scrollTop = transcriptionContainer.scrollHeight;
+        }
+
+        // Add Cloud Code response to the container
+        function addCloudCodeResponse(data) {
+            const entry = document.createElement('div');
+            entry.className = 'entry';
+            entry.style.background = '#e8f5e9';
+            entry.style.borderLeft = '4px solid #4CAF50';
+
+            // Format timestamp
+            const timestamp = new Date().toLocaleTimeString();
+
+            // Create content
+            entry.innerHTML = `
+                <div class="timestamp">${timestamp}</div>
+                <div><span class="mode">CLOUD CODE RESPONSE</span> <span class="confidence">(${data.conversation_id})</span></div>
+                <div class="text">${data.response}</div>
+            `;
+
+            // Add to container and scroll to bottom
+            transcriptionContainer.appendChild(entry);
+            transcriptionContainer.scrollTop = transcriptionContainer.scrollHeight;
+        }
+
+        // Disable buttons initially
+        speakBtn.disabled = true;
+        sendPromptBtn.disabled = true;
+    </script>
+</body>
+</html>

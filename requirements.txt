@@ -1,3 +1,4 @@
+fastapi
 llama-cpp-python
 openai-whisper
 pyaudio
@@ -11,3 +12,4 @@ python-dotenv
 # For speech synthesis and assistant features
 pyttsx3
 requests
+uvicorn

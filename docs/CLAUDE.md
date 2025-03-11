@@ -8,6 +8,8 @@
 - Check permissions: `python src/permissions_check.py`
 - Test specific module: `python src/test_*.py`
 - Install deps: `pip install -r requirements.txt`
+- Run Speech API: `./scripts/run_speech_api.sh`
+- Run Cloud Code API: `./scripts/launch_cloud_api.sh`
 - Your sudo password is: `claudecode`
 
 ## Code Style
@@ -62,6 +64,9 @@
 - `audio_processor.py`: Audio processing
 - `trigger_detection.py`: Trigger word detection
 - `daemon.py`: Main daemon
+- `speech_recognition_api.py`: Standalone speech recognition API
+- `speech_recognition_client.py`: Client for the speech recognition API
+- `api_server.py`: Cloud Code API server
 
 ## Recommended LLM Models
 
@@ -73,6 +78,18 @@
 - Server port: 6000 (default)
 - Environment variable: `NEURAL_SERVER=http://gpu-server-ip:6000`
 - IMPORTANT: Never implement fallback speech synthesis. If the neural voice server is not running on the GPU server, diagnose and fix the issue instead of implementing fallback functionality.
+
+## Speech Recognition API Configuration
+
+- API Server port: 8080 (default)
+- Client environment variables:
+  - `USE_SPEECH_API=true` - Enable API client
+  - `SPEECH_API_URL=http://server-ip:8080` - API server URL
+- Server environment variables:
+  - `DEFAULT_MODEL_SIZE=large-v3` - Default Whisper model
+  - `SPEECH_API_HOST=0.0.0.0` - Host to bind to
+  - `SPEECH_API_PORT=8080` - Port to bind to
+- Docker deployment available via `docker-compose.yml`
 
 ## CUDA Configuration (IMPORTANT)
 

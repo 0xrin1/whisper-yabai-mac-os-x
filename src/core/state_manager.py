@@ -22,8 +22,7 @@ class StateManager:
         self.audio_queue = queue.Queue()
 
         # Audio processing state
-        self.whisper_model = None
-        self.model_size = "large-v3"  # Default, will be overridden from env
+        self.model_size = "large-v3"  # Default, will be overridden from env, used by API
 
         # Modality state
         self.muted = False
@@ -58,6 +57,7 @@ class StateManager:
         # Callbacks
         self._on_mute_callbacks = []
         self._on_recording_change_callbacks = []
+        self._on_transcription_callbacks = []
 
     def start_recording(self):
         """Set recording state to True and record start time."""
@@ -133,6 +133,40 @@ class StateManager:
                 callback(self.recording)
             except Exception as e:
                 logger.error(f"Error in recording callback: {e}")
+
+    def register_transcription_callback(self, callback):
+        """Register callback for transcription events.
+
+        Args:
+            callback: Function to call with (text, is_command, confidence) parameters
+        """
+        if callback not in self._on_transcription_callbacks:
+            self._on_transcription_callbacks.append(callback)
+            logger.debug(f"Registered transcription callback: {callback}")
+
+    def unregister_transcription_callback(self, callback):
+        """Unregister callback for transcription events.
+
+        Args:
+            callback: Previously registered callback function
+        """
+        if callback in self._on_transcription_callbacks:
+            self._on_transcription_callbacks.remove(callback)
+            logger.debug(f"Unregistered transcription callback: {callback}")
+
+    def notify_transcription(self, text, is_command=False, confidence=0.0):
+        """Notify callbacks of new transcription.
+
+        Args:
+            text: The transcribed text
+            is_command: Whether the transcription is a command
+            confidence: The confidence level of the transcription
+        """
+        for callback in self._on_transcription_callbacks:
+            try:
+                callback(text, is_command, confidence)
+            except Exception as e:
+                logger.error(f"Error in transcription callback: {e}")
 
 
 # Create a singleton instance

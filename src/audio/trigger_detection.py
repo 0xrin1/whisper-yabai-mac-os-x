@@ -11,12 +11,12 @@ import subprocess
 import tempfile
 import wave
 import logging
-import whisper
-import torch
 import numpy as np
+import asyncio
 
 from src.core.state_manager import state
 from src.audio.audio_recorder import AudioRecorder
+from src.api.speech_recognition_client import SpeechRecognitionClient
 
 logger = logging.getLogger("trigger-detection")
 
@@ -24,14 +24,14 @@ logger = logging.getLogger("trigger-detection")
 class TriggerDetector:
     """Detects trigger words in audio to activate command or dictation modes."""
 
-    def __init__(self, whisper_model=None):
-        """Initialize the trigger detector.
-
-        Args:
-            whisper_model: Pre-loaded Whisper model to use (will load if not provided)
-        """
-        self.whisper_model = whisper_model
+    def __init__(self):
+        """Initialize the trigger detector."""
         self.recorder = AudioRecorder()
+
+        # Initialize speech recognition client
+        self.speech_api_url = os.getenv("SPEECH_API_URL", "http://localhost:8080")
+        self.speech_client = SpeechRecognitionClient(api_url=self.speech_api_url)
+        self.loop = asyncio.new_event_loop()
 
         # Trigger word variations for more robust detection
         # Command mode is now triggered by Jarvis
@@ -86,18 +86,17 @@ class TriggerDetector:
         # Jarvis variations are now the same as command variations
         self.jarvis_variations = self.command_variations
 
-    def ensure_model(self):
-        """Ensure Whisper model is loaded."""
-        if self.whisper_model is None:
-            try:
-                logger.info(f"Loading Whisper model: {state.model_size}")
-                self.whisper_model = whisper.load_model(state.model_size)
-                logger.info("Whisper model loaded successfully")
-                # Update global state
-                state.whisper_model = self.whisper_model
-            except Exception as e:
-                logger.error(f"Failed to load Whisper model: {e}")
-                raise
+    def check_api_connection(self):
+        """Check API connection and verify it's available."""
+        try:
+            if not self.loop.run_until_complete(self.speech_client.check_connection()):
+                error_msg = f"Speech Recognition API not available at {self.speech_api_url}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
+            logger.info("Successfully connected to Speech Recognition API")
+        except Exception as e:
+            logger.error(f"Failed to connect to Speech API: {e}")
+            raise
 
     def process_audio_buffer(self, audio_buffer):
         """Process audio buffer to detect trigger words.
@@ -112,8 +111,12 @@ class TriggerDetector:
             logger.debug("Buffer too small to process")
             return {"detected": False}
 
-        # Ensure model is loaded
-        self.ensure_model()
+        # Check API connection
+        try:
+            self.check_api_connection()
+        except Exception as e:
+            logger.error(f"Speech API unavailable: {e}")
+            return {"detected": False}
 
         logger.debug(f"Processing audio buffer with {len(audio_buffer)} frames")
 
@@ -135,35 +138,28 @@ class TriggerDetector:
 
             logger.debug(f"Audio buffer saved to {temp_filename}")
 
-            # Use Whisper to transcribe the buffer with context clearing
+            # Use Speech API to transcribe the buffer
             try:
-                # Create fresh transcription options to prevent context accumulation
-                result = self.whisper_model.transcribe(
-                    temp_filename,
-                    language="en",
-                    fp16=False,
-                    initial_prompt=None,  # Explicitly clear prompt context
-                )
-                # Force memory cleanup to prevent context accumulation
-                torch.cuda.empty_cache() if hasattr(
-                    torch, "cuda"
-                ) and torch is not None else None
-                transcription = result["text"].strip().lower()
-            except Exception as e:
-                logger.error(f"Error during buffer transcription: {e}")
-                # Try to reload the model if transcription failed
-                try:
-                    logger.debug("Attempting to reload Whisper model due to error")
-                    self.whisper_model = whisper.load_model(state.model_size)
-                    state.whisper_model = self.whisper_model
-                    # Retry transcription with fresh model
-                    result = self.whisper_model.transcribe(
-                        temp_filename, language="en", fp16=False
+                # Read the audio file
+                with open(temp_filename, "rb") as f:
+                    audio_data = f.read()
+
+                # Call the API
+                result = self.loop.run_until_complete(
+                    self.speech_client.transcribe_audio_data(
+                        audio_data,
+                        model_size=state.model_size,
+                        language="en"
                     )
-                    transcription = result["text"].strip().lower()
-                except Exception as reload_err:
-                    logger.error(f"Failed to reload model: {reload_err}")
-                    return {"detected": False}
+                )
+
+                if "error" in result:
+                    raise Exception(f"API error: {result['error']}")
+
+                transcription = result.get("text", "").strip().lower()
+            except Exception as e:
+                logger.error(f"Error during API transcription: {e}")
+                return {"detected": False}
 
             logger.debug(f"Buffer transcription: '{transcription}'")
 
@@ -197,51 +193,29 @@ class TriggerDetector:
             "trigger_type": "dictation",  # Default to dictation mode
         }
 
-        # Check for command/JARVIS trigger (same list now)
-        contains_command_trigger = any(
+        # Check for Jarvis trigger - this will now activate Cloud Code
+        contains_jarvis_trigger = any(
             variation in transcription.lower() for variation in self.command_variations
         )
 
-        # Check for explicit dictation trigger (still supported but now optional)
-        contains_dictation_trigger = False
-        for variation in self.dictation_variations:
-            # Full exact match
-            if variation == transcription.lower().strip():
-                logger.debug(f"EXACT MATCH found for '{variation}'")
-                contains_dictation_trigger = True
-                break
-
-            # Word boundary match - the trigger word surrounded by spaces or at start/end
-            if (
-                f" {variation} " in f" {transcription.lower()} "
-                or transcription.lower().startswith(f"{variation} ")
-                or transcription.lower().endswith(f" {variation}")
-            ):
-                logger.debug(
-                    f"WORD BOUNDARY MATCH found for '{variation}' in '{transcription}'"
-                )
-                contains_dictation_trigger = True
-                break
-
-            # Check for substring match
-            if variation in transcription.lower():
-                logger.debug(
-                    f"SUBSTRING MATCH found for '{variation}' in '{transcription}'"
-                )
-                contains_dictation_trigger = True
-                break
-
-        # Process command/JARVIS trigger (has priority over the default dictation mode)
-        if contains_command_trigger:
-            logger.info(f"Command/JARVIS trigger detected: '{transcription}'")
-            result["trigger_type"] = "command"
-        # Process explicit dictation trigger (not strictly necessary since it's the default)
-        elif contains_dictation_trigger:
-            logger.info(f"Explicit dictation trigger detected: '{transcription}'")
-            result["trigger_type"] = "dictation"
+        # Process Jarvis trigger to activate Cloud Code
+        if contains_jarvis_trigger:
+            logger.info(f"Jarvis trigger detected for Cloud Code: '{transcription}'")
+            # Extract the query part (remove jarvis trigger)
+            for trigger in self.command_variations:
+                if trigger in transcription.lower():
+                    # Get everything after the trigger word
+                    trigger_pos = transcription.lower().find(trigger) + len(trigger)
+                    query = transcription[trigger_pos:].strip()
+                    # If there's a query, use it, otherwise use the whole text
+                    if query:
+                        result["transcription"] = query
+                    # Set to cloud_code type
+                    result["trigger_type"] = "cloud_code"
+                    break
         # Otherwise use dictation as the default
         else:
-            logger.info(f"No specific trigger detected, defaulting to dictation mode: '{transcription}'")
+            logger.info(f"No Jarvis trigger detected, defaulting to dictation mode: '{transcription}'")
             result["trigger_type"] = "dictation"
 
         return result
@@ -261,30 +235,68 @@ class TriggerDetector:
         trigger_type = detection_result["trigger_type"]
         transcription = detection_result["transcription"]
 
-        # Now "command" and "jarvis" are the same - both activated by saying "jarvis"
-        if trigger_type == "command":
+        # Handle Cloud Code request (triggered by "jarvis")
+        if trigger_type == "cloud_code":
             # Play a notification sound
             self.recorder.play_sound("command")
 
-            # Add a notification to show we're listening for a command
+            # Add a notification to show we're processing with Cloud Code
             try:
                 from src.ui.toast_notifications import send_notification
 
                 send_notification(
-                    "Command Mode Activated",
-                    "Listening for your command...",
-                    "whisper-command-direct",
+                    "Cloud Code Activated",
+                    f"Processing: {transcription[:30]}{'...' if len(transcription) > 30 else ''}",
+                    "whisper-cloud-code",
                     3,
                     False,
                 )
             except Exception as e:
-                logger.error(f"Failed to show command notification: {e}")
+                logger.error(f"Failed to show Cloud Code notification: {e}")
 
-            # Start command mode
-            self._start_recording_thread("command", force=True)
+            # Send the query to Cloud Code
+            try:
+                # Import here to avoid circular imports
+                from src.utils.cloud_code import CloudCodeHandler
+                from src.core.state_manager import state
+
+                # Create a temporary instance if we don't have one
+                handler = CloudCodeHandler(state)
+
+                # Generate a unique session ID
+                session_id = f"voice_{int(time.time())}"
+
+                # Submit the request
+                request_id = handler.submit_request(transcription, session_id)
+
+                logger.info(f"Submitted Cloud Code request: {request_id} with query: '{transcription}'")
+
+                # Process the request synchronously for immediate response
+                try:
+                    response = handler._process_request({
+                        "id": request_id,
+                        "prompt": transcription,
+                        "session_id": session_id,
+                        "submitted_at": time.time(),
+                    })
+
+                    # Speak the response
+                    from src.audio.speech_synthesis import speak
+                    speak(response)
+
+                    logger.info(f"Cloud Code response: {response[:100]}{'...' if len(response) > 100 else ''}")
+                except Exception as e:
+                    logger.error(f"Error processing Cloud Code response: {e}")
+
+                    # Notify of the error
+                    from src.ui.toast_notifications import notify_error
+                    notify_error("Failed to process request")
+            except Exception as e:
+                logger.error(f"Failed to submit Cloud Code request: {e}")
+
             return True
 
-        # Everything else defaults to dictation mode (including explicit dictation triggers)
+        # Default to dictation mode
         else:
             # Play the dictation sound
             self.recorder.play_sound("dictation")

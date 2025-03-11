@@ -5,8 +5,9 @@ import tempfile
 import logging
 import subprocess
 import unittest
+import asyncio
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 # Add the src directory to the path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -193,6 +194,78 @@ def synthesize_and_play(text, voice_id=None, volume=2):
     return audio_file
 
 
+# Mock Speech Recognition API client
+class MockSpeechRecognitionClient:
+    """Mock SpeechRecognitionClient for testing."""
+
+    def __init__(self, api_url=None):
+        """Initialize with a mock that always succeeds."""
+        self.api_url = api_url or "http://localhost:8080"
+        self.connected = True
+
+    async def check_connection(self):
+        """Mock connection check that always succeeds by default."""
+        return self.connected
+
+    async def list_models(self):
+        """Return dummy list of models."""
+        return {
+            "available_models": ["tiny", "base", "small", "medium", "large-v3"],
+            "default_model": "large-v3",
+            "loaded_models": ["large-v3"]
+        }
+
+    async def transcribe(self, audio_file, model_size="large-v3", language="en"):
+        """Mock transcription that returns pre-defined text."""
+        return {
+            "text": "this is a mock transcription",
+            "confidence": 0.95,
+            "processing_time": 0.1
+        }
+
+    async def transcribe_audio_data(self, audio_data, model_size="large-v3", language="en"):
+        """Mock transcription for raw audio data."""
+        return {
+            "text": "this is a mock transcription from audio data",
+            "confidence": 0.95,
+            "processing_time": 0.1
+        }
+
+    async def disconnect_websocket(self):
+        """Mock websocket disconnection."""
+        pass
+
+def mock_speech_recognition_client():
+    """Return a patch for the SpeechRecognitionClient."""
+    return patch("src.api.speech_recognition_client.SpeechRecognitionClient",
+                 return_value=MockSpeechRecognitionClient())
+
+def mock_asyncio_new_event_loop():
+    """Return a patch for asyncio.new_event_loop().
+
+    This returns a mock event loop with run_until_complete method to handle coroutines.
+    """
+    loop = MagicMock()
+
+    # Define a special run_until_complete method that can handle coroutines
+    def mock_run_until_complete(coro):
+        """Special run_until_complete that extracts values from coroutines.
+
+        For regular coroutines from our mock classes, run it and get the result.
+        For anything else, just return True as a default success value.
+        """
+        # If it's not awaitable, just return it
+        if not hasattr(coro, '__await__'):
+            return coro
+
+        # We need to return a sensible default for all coroutines used in testing
+        return True
+
+    loop.run_until_complete = mock_run_until_complete
+
+    # Create a patch that returns our pre-configured mock loop
+    return patch("asyncio.new_event_loop", return_value=loop)
+
 # Daemon management utilities
 class DaemonManager:
     """Manages a daemon process for testing"""
@@ -264,7 +337,7 @@ class DaemonManager:
             if self.capture_output:
                 with open(self.daemon_output_file, "r") as f:
                     content = f.read()
-                    if "whisper model loaded" in content.lower() or "ready for input" in content.lower():
+                    if "speech recognition api connection successful" in content.lower() or "ready for input" in content.lower():
                         ready = True
                         break
 

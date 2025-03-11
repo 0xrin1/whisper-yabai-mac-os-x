@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  speech-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.speech_api
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./models:/app/models
+    environment:
+      - DEFAULT_MODEL_SIZE=large-v3
+      - SPEECH_API_HOST=0.0.0.0
+      - SPEECH_API_PORT=8080
+    restart: unless-stopped
+    command: python src/api/speech_recognition_api.py --host 0.0.0.0 --port 8080 --model large-v3
+    # For GPU support, uncomment the following lines and install nvidia-container-toolkit
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]

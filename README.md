@@ -21,6 +21,10 @@ A voice command daemon that uses OpenAI's Whisper model locally to control your 
 - Support for non-standard keyboard layouts during dictation
 - Modular, refactored architecture for easier maintenance
 - Support for multiple LLM architectures (Qwen, DeepSeek, LLaMA)
+- Cloud Code API for integrating speech recognition with external applications
+- WebSocket interface for real-time transcriptions
+- Standalone Speech Recognition API for distributed processing
+- Ability to run speech recognition on a separate machine for better resource allocation
 
 ## Prerequisites
 
@@ -138,92 +142,43 @@ The system uses an external API for speech synthesis:
 
 For detailed API configuration instructions, see `docs/NEURAL_VOICE_SETUP.md`
 
-## Voice Commands
+## Voice Interactions
 
-The daemon responds to the following voice commands:
+The voice control system now has two main modes:
 
-### Basic Commands
-- `open [application]` - Opens an application (e.g., "open Safari")
-- `focus [application]` - Focuses on an application window using Yabai
-- `type [text]` - Types the specified text
-- `move [direction]` - Moves the focused window (left, right, top, bottom)
-- `resize [direction]` - Resizes the focused window (left, right, top, bottom)
-- `space [number]` - Moves the focused window to the specified space
-- `maximize` - Maximizes the focused window
-- `close` - Closes the focused window
-- `click` - Clicks the mouse at the current position
+### Dictation Mode (Default)
+- Just speak naturally and your words will be typed at the cursor position
+- No trigger word needed - dictation is the default behavior
+- Useful for writing emails, messages, documents, etc.
 
-### Application Commands
-- `browser` - Opens Safari
-- `chrome` - Opens Google Chrome
-- `terminal` - Opens Terminal
-- `iterm` - Opens iTerm
-- `code` - Opens Visual Studio Code
-- `intellij` - Opens IntelliJ IDEA
-- `pycharm` - Opens PyCharm
-- `android studio` - Opens Android Studio
-- `xcode` - Opens Xcode
-- `docker` - Opens Docker Desktop
-- `postman` - Opens Postman
-- `figma` - Opens Figma
-- `github` - Opens GitHub in the browser
-- `gitlab` - Opens GitLab in the browser
-- `slack` - Opens Slack
-- `teams` - Opens Microsoft Teams
-- `zoom` - Opens Zoom
-- And more...
+### Cloud Code Mode
+- Say "jarvis" followed by your question or request
+- Interact directly with Claude Code AI assistant
+- Get answers to questions, coding help, creative content, etc.
+- Example: "Jarvis, what's the weather today?"
+- Example: "Jarvis, help me debug this Python code"
 
-### Keyboard Shortcuts
-- `save` - Command+S (Save)
-- `undo` - Command+Z (Undo)
-- `redo` - Command+Shift+Z (Redo)
-- `copy` - Command+C (Copy)
-- `paste` - Command+V (Paste)
-- `cut` - Command+X (Cut)
-- `select all` - Command+A (Select All)
-- `find` - Command+F (Find)
-- `new file` - Command+N (New File)
-- `new tab` - Command+T (New Tab)
-- `close tab` - Command+W (Close Tab)
-- `reload` - Command+R (Reload)
+### Hotkeys
+- `Ctrl+Shift+Space` - Activate dictation mode
+- `Ctrl+Shift+D` - Alternative hotkey for dictation mode
+- `Ctrl+Shift+M` - Toggle microphone mute
+- `ESC` - Stop the daemon
 
-### Developer Commands
-- `build` - Command+B (Build)
-- `run` - Command+R (Run)
-- `debug` - Command+D (Debug)
-- `stop` - Command+. (Stop)
-- `test` - Command+U (Run Tests)
-- `refactor` - Control+T (Refactor)
-- `next error` - F8 (Next Error)
-- `previous error` - Shift+F8 (Previous Error)
-- `comment` - Command+/ (Comment/Uncomment)
-
-### Window Management
-- `split vertical` - Split window vertically using Yabai
-- `split horizontal` - Split window horizontally using Yabai
-- `flip` - Mirror the current space along the y-axis
-- `balance` - Balance window sizes in the current space
-- `float` - Toggle floating mode for the current window
-- `rotate` - Rotate the current space by 90 degrees
-
-Additional custom commands can be defined in `commands.json`
+For more details about the Cloud Code integration and dictation features, see `docs/COMMANDS_CHEATSHEET.md` and `docs/CLOUD_CODE_API.md`.
 
 ## Customization
 
-### Adding Custom Commands
+### Cloud Code Integration
 
-You can add custom commands by editing the `commands.json` file. For example:
+The system now uses Cloud Code integration to process all "jarvis" commands. This provides a more natural way to interact with the assistant:
 
-```json
-{
-  "custom_commands": {
-    "browser": "open -a 'Safari'",
-    "terminal": "open -a 'Terminal'",
-    "code": "open -a 'Visual Studio Code'"
-  }
-}
+```
+"Jarvis, what's the capital of France?"
+"Jarvis, can you help me with my Python code?"
+"Jarvis, write a short story about a robot"
 ```
 
+The response will be spoken aloud using the configured voice synthesis.
 ### Changing Settings
 
 The application now uses a centralized configuration system with multiple configuration sources:
@@ -289,6 +244,47 @@ To run the daemon as a background service that starts automatically:
    ```
    launchctl load ~/Library/LaunchAgents/com.example.whispervoicecontrol.plist
    ```
+
+## Cloud Code API
+
+The system includes a built-in API server that allows external applications to interact with the speech recognition system, providing a way to create cloud-based assistants that leverage the local speech processing capabilities.
+
+### Starting the API Server
+
+To start the daemon with the API server enabled:
+
+```
+python src/daemon.py --api --api-port 8000 --api-host 127.0.0.1
+```
+
+### API Endpoints
+
+- `GET /status`: Get the current status of the voice control system
+- `POST /speak`: Synthesize speech from text
+- `POST /cloud-code`: Process a cloud code request
+- `WebSocket /ws/transcription`: Real-time transcription stream
+
+### Using the API Client
+
+A test client is included to demonstrate API usage:
+
+```
+# Test API status
+python src/api/client.py --status
+
+# Connect to real-time transcription WebSocket
+python src/api/client.py --ws
+
+# Test speech synthesis
+python src/api/client.py --speak "Hello, world"
+
+# Test cloud code integration
+python src/api/client.py --prompt "What's the weather like today?"
+```
+
+### Integration Example
+
+To integrate with your own application, connect to the WebSocket endpoint to receive transcriptions in real-time, and use the cloud-code endpoint to send responses back to the user via speech synthesis.
 
 ## Natural Language Commands with LLM
 
@@ -397,6 +393,13 @@ The project includes a comprehensive documentation system:
   - `scripts/docs/create_documentation.sh`: End-to-end documentation generation
   - `scripts/docs/build_docs.sh`: Builds and serves documentation with Docker
 
+Additional documentation:
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md): Detailed system architecture and diagrams
+- [COMMANDS_CHEATSHEET.md](docs/COMMANDS_CHEATSHEET.md): Quick reference for voice commands
+- [NEURAL_VOICE_SETUP.md](docs/NEURAL_VOICE_SETUP.md): Guide for setting up text-to-speech
+- [CLOUD_CODE_API.md](docs/CLOUD_CODE_API.md): Cloud Code API documentation
+- [SPEECH_API.md](docs/SPEECH_API.md): Speech Recognition API documentation
+
 To generate the documentation:
 
 ```bash
@@ -477,6 +480,29 @@ The documentation website includes:
   - Try a different model architecture (Qwen, DeepSeek, LLaMA)
   - Adjust model parameters in the `.env` file
   - Check models/README.md for recommended models and configurations
+
+### Speech Recognition API Troubleshooting
+
+- If the Speech Recognition API server fails to start:
+  - Check if the port is already in use (`lsof -i :8080`)
+  - Verify you have sufficient memory for the model
+  - Ensure all dependencies are installed (`pip install -r requirements.txt`)
+  - Check logs for specific errors (`./scripts/run_speech_api.sh`)
+- If the client can't connect to the API:
+  - Verify the API server is running (`curl http://localhost:8080/`)
+  - Check network connectivity if running on a separate machine
+  - Ensure the `SPEECH_API_URL` environment variable has the correct URL
+  - Look for firewall or network issues if running distributed
+- If transcription quality is poor:
+  - Try using a larger model (`--model large-v3`)
+  - Check audio quality and recording settings
+  - Verify microphone is working properly
+  - Increase the `MIN_CONFIDENCE` threshold
+- For better performance:
+  - Run the API on a machine with a GPU
+  - Use Docker with GPU support (see docker-compose.yml)
+  - Adjust model size based on your hardware capabilities
+  - For distributed setup, ensure network latency is low
 
 ## License
 

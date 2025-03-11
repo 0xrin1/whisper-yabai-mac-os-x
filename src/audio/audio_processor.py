@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """
 Audio processing module for voice control system.
-Handles transcription of audio files using Whisper.
+Handles transcription of audio files using the Speech Recognition API.
 """
 
 import os
 import time
 import logging
 import threading
-import whisper
-import torch
+import asyncio
 
 from src.core.state_manager import state
 from src.core.core_dictation import core_dictation
@@ -21,6 +20,9 @@ from src.utils.command_processor import commands
 # Import for notifications
 from src.ui.toast_notifications import notify_processing, notify_error, send_notification
 
+# Import the speech recognition client
+from src.api.speech_recognition_client import SpeechRecognitionClient
+
 logger = logging.getLogger("audio-processor")
 
 
@@ -31,7 +33,6 @@ class AudioProcessor:
         """Initialize the audio processor."""
         self.running = False
         self.thread = None
-        self.whisper_model = None
 
         # Load LLM interpreter if available
         model_path = os.getenv("LLM_MODEL_PATH")
@@ -40,6 +41,18 @@ class AudioProcessor:
 
         # Set minimum confidence threshold for command processing
         self.min_confidence = float(os.getenv("MIN_CONFIDENCE", "0.5"))
+
+        # Initialize speech recognition client
+        self.speech_api_url = os.getenv("SPEECH_API_URL", "http://localhost:8080")
+
+        logger.info(f"Using Speech Recognition API at {self.speech_api_url}")
+        self.speech_client = SpeechRecognitionClient(api_url=self.speech_api_url)
+        # Create event loop for asyncio
+        self.loop = asyncio.new_event_loop()
+        # Check if API is available
+        if not self.loop.run_until_complete(self.speech_client.check_connection()):
+            logger.error(f"Speech Recognition API not available at {self.speech_api_url}")
+            raise RuntimeError(f"Speech Recognition API not available at {self.speech_api_url}. Cannot continue.")
 
     def start(self):
         """Start processing audio in a background thread."""
@@ -69,34 +82,45 @@ class AudioProcessor:
         if self.thread:
             self.thread.join(2.0)  # Wait up to 2 seconds for thread to end
 
-    def load_model(self):
-        """Load the Whisper model."""
-        if self.whisper_model is not None:
-            return
+        # Clean up API client
+        if hasattr(self, 'speech_client'):
+            # Close any websocket connections
+            try:
+                self.loop.run_until_complete(self.speech_client.disconnect_websocket())
+            except Exception as e:
+                logger.error(f"Error disconnecting from speech API websocket: {e}")
 
-        try:
-            logger.info(f"Loading Whisper model: {state.model_size}")
-            start_time = time.time()
-            self.whisper_model = whisper.load_model(state.model_size)
-            load_time = time.time() - start_time
-            logger.info(f"Whisper model loaded in {load_time:.2f} seconds")
+            # Close the loop
+            try:
+                self.loop.close()
+            except Exception as e:
+                logger.error(f"Error closing asyncio loop: {e}")
 
-            # Update global state
-            state.whisper_model = self.whisper_model
-        except Exception as e:
-            logger.error(f"Failed to load Whisper model: {e}")
-            raise
+            logger.info("Speech Recognition API client cleaned up")
+
+    def check_api_connection(self):
+        """Check API connection and get available models."""
+        if not self.loop.run_until_complete(self.speech_client.check_connection()):
+            error_msg = f"Speech Recognition API not available at {self.speech_api_url}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        logger.info("Successfully connected to Speech Recognition API")
+        # Get available models from the API
+        models = self.loop.run_until_complete(self.speech_client.list_models())
+        logger.info(f"Available models on API server: {models}")
 
     def _processing_thread(self):
         """Main processing thread function."""
         logger.debug("Audio processing thread starting...")
 
-        # Load the Whisper model
+        # Check API connection and get models
         try:
-            self.load_model()
+            self.check_api_connection()
         except Exception as e:
-            logger.error(f"Failed to load Whisper model: {e}")
+            logger.error(f"Failed to connect to Speech API: {e}")
             self.running = False
+            notify_error("Failed to connect to Speech API. Cannot continue.")
             return
 
         if self.use_llm:
@@ -175,52 +199,43 @@ class AudioProcessor:
                         logger.debug(f"Failed to delete temp file: {unlink_err}")
                     continue
 
-                # Normal transcription for command/dictation modes with context clearing
+                # Always use the Speech Recognition API
                 try:
-                    # Create fresh transcription context each time
-                    result = self.whisper_model.transcribe(
-                        audio_file,
-                        initial_prompt=None,  # Explicitly clear prompt context
-                    )
-                    # Force memory cleanup to prevent context accumulation
-                    torch.cuda.empty_cache() if hasattr(
-                        torch, "cuda"
-                    ) and torch is not None else None
+                    # Read the audio file
+                    with open(audio_file, "rb") as f:
+                        audio_data = f.read()
 
-                    transcription = result["text"].strip()
+                    # Call the API
+                    result = self.loop.run_until_complete(
+                        self.speech_client.transcribe_audio_data(
+                            audio_data,
+                            model_size=state.model_size
+                        )
+                    )
+
+                    if "error" in result:
+                        raise Exception(f"API error: {result['error']}")
+
+                    transcription = result.get("text", "").strip()
                     confidence = result.get("confidence", 1.0)
                     logger.debug(
-                        f"Transcription: '{transcription}', confidence: {confidence:.2f}"
+                        f"API Transcription: '{transcription}', confidence: {confidence:.2f}"
                     )
                 except Exception as e:
-                    logger.error(f"Error during audio transcription: {e}")
-                    # Try to reload the model if transcription failed
-                    try:
-                        logger.debug("Attempting to reload Whisper model due to error")
-                        self.whisper_model = whisper.load_model(state.model_size)
-                        state.whisper_model = self.whisper_model
-                        # Retry transcription with fresh model
-                        result = self.whisper_model.transcribe(audio_file)
-                        transcription = result["text"].strip()
-                        confidence = result.get("confidence", 1.0)
-                        logger.debug(
-                            f"Transcription (after reload): '{transcription}', confidence: {confidence:.2f}"
-                        )
-                    except Exception as reload_err:
-                        logger.error(f"Failed to reload model: {reload_err}")
+                    logger.error(f"Error using Speech Recognition API: {e}")
 
-                        # Import here to avoid circular imports
-                        from src.ui.toast_notifications import notify_error
+                    # Import here to avoid circular imports
+                    from src.ui.toast_notifications import notify_error
 
-                        notify_error("Speech recognition failed. Please try again.")
+                    notify_error("Speech recognition API failed. Please check API server.")
 
-                        # Clean up if error occurred
-                        if audio_file and os.path.exists(audio_file):
-                            try:
-                                os.unlink(audio_file)
-                            except:
-                                pass
-                        continue
+                    # Clean up if error occurred
+                    if audio_file and os.path.exists(audio_file):
+                        try:
+                            os.unlink(audio_file)
+                        except:
+                            pass
+                    continue
 
                 # Clean up the audio file
                 try:
@@ -241,6 +256,13 @@ class AudioProcessor:
 
                     notify_error("No clear speech detected")
                     continue
+
+                # Notify transcription callbacks (for API and cloud code)
+                state.notify_transcription(
+                    transcription,
+                    is_command=(not is_dictation_mode),
+                    confidence=confidence
+                )
 
                 # Process based on mode
                 if is_dictation_mode:
@@ -393,5 +415,10 @@ class AudioProcessor:
             return False
 
 
-# Create a singleton instance
-processor = AudioProcessor()
+# Create a singleton instance, but allow for testing mode
+# If TESTING environment variable is set, don't initialize processor yet
+if os.getenv("TESTING", "false").lower() != "true":
+    processor = AudioProcessor()
+else:
+    # In testing mode, just create a placeholder that will be replaced in tests
+    processor = None
