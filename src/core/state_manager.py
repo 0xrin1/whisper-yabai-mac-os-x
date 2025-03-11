@@ -23,7 +23,7 @@ class StateManager:
 
         # Audio processing state
         self.whisper_model = None
-        self.model_size = "medium"  # Default, will be overridden from env
+        self.model_size = "large-v3"  # Default, will be overridden from env
 
         # Modality state
         self.muted = False

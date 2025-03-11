@@ -237,7 +237,7 @@ Edit `config.json` to customize settings:
 
 ```json
 {
-  "MODEL_SIZE": "medium",
+  "MODEL_SIZE": "large-v3",
   "COMMAND_TRIGGER": "hey",
   "DICTATION_TRIGGER": "type",
   "RECORDING_TIMEOUT": 7.0,
@@ -425,8 +425,8 @@ The documentation website includes:
 - Check the logs for detailed error messages.
 - For speech recognition issues, try:
   - Speaking more clearly and directly into the microphone
-  - The system now uses the 'medium' Whisper model by default for better accuracy
-  - If you need faster performance with less accuracy, you can switch to smaller models (base or tiny)
+  - The system now uses the 'large-v3' Whisper model by default for maximum accuracy
+  - If you need faster performance with less accuracy, you can switch to smaller models (medium, small, base, or tiny)
   - Checking for background noise that might be confusing the model
   - If possible, use a better microphone or move to a quieter environment
 - The voice commands are designed to be natural language, so experiment with different phrasings if a command isn't recognized.
