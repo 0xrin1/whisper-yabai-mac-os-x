@@ -162,8 +162,10 @@ class TestTriggerDetection(BaseTestCase):
             "transcription": "what's the weather today"
         }
 
-        # Create a local mock for CodeAgentHandler
+        # Create a local mock for CodeAgentHandler and speak_random
         code_agent_mock = MagicMock()
+        speak_random_patch = patch("src.audio.speech_synthesis.speak_random")
+        mock_speak_random = speak_random_patch.start()
 
         # Monkey patch the handler temporarily
         original_import = __import__
@@ -183,11 +185,15 @@ class TestTriggerDetection(BaseTestCase):
             self.detector.handle_detection(detection_result)
 
             # Verify the appropriate actions were taken
+            # Check that speak_random was called with "jarvis_greeting"
+            mock_speak_random.assert_called_with("jarvis_greeting")
+
             # We can verify that our recording state was updated
             state.stop_recording()
         finally:
             # Restore the original __import__
             builtins.__import__ = original_import
+            speak_random_patch.stop()
 
             # Skip assertions that depend on implementation details
             # These assertions are likely causing failures in CI

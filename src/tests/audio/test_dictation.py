@@ -554,6 +554,94 @@ class DictationTest(BaseVoiceTest):
         # This is a pragmatic approach for CI environments where sound playback doesn't work reliably
         return
 
+    def test_quiet_jarvis_during_dictation(self):
+        """Test that Jarvis stays quiet during dictation mode."""
+        # This is a unit test for the specific behavior where Jarvis should not speak
+        # verbal responses during dictation mode, only play notification sounds.
+
+        # Import the relevant modules
+        from src.audio.trigger_detection import TriggerDetector
+        from unittest.mock import patch, MagicMock
+
+        # We need to patch _start_recording_thread since that's what's called internally
+        with patch.object(TriggerDetector, '_start_recording_thread') as mock_start_recording:
+            # Create a TriggerDetector instance
+            detector = TriggerDetector()
+
+            # Create mocks for the dependencies
+            with patch("src.audio.trigger_detection.AudioRecorder") as mock_recorder_class:
+                # Setup the mock recorder
+                mock_recorder = MagicMock()
+                mock_recorder_class.return_value = mock_recorder
+                detector.recorder = mock_recorder  # Replace the recorder directly
+
+                # Setup the speech_synthesis mock
+                with patch("src.audio.speech_synthesis.speak_random") as mock_speak_random:
+                    with patch("src.ui.toast_notifications.send_notification") as mock_send_notification:
+                        # Create a dictation detection result
+                        dictation_result = {
+                            "detected": True,
+                            "trigger_type": "dictation",
+                            "transcription": "this is a test of dictation"
+                        }
+
+                        # Handle the detection
+                        detector.handle_detection(dictation_result)
+
+                        # Verify that the sound was played but no speech was generated
+                        mock_recorder.play_sound.assert_called_with("dictation")
+                        mock_speak_random.assert_not_called()
+
+                        # Verify that a notification was sent
+                        mock_send_notification.assert_called_once()
+                        call_args = mock_send_notification.call_args[0]
+                        self.assertEqual(call_args[0], "Dictation Mode Activated")
+
+                        # Reset mocks for next test
+                        mock_recorder.reset_mock()
+                        mock_speak_random.reset_mock()
+                        mock_send_notification.reset_mock()
+
+                # Now test the Jarvis trigger with speech
+                with patch("src.audio.speech_synthesis.speak_random") as mock_speak_random:
+                    with patch("src.ui.toast_notifications.send_notification") as mock_send_notification:
+                        # Patch __import__ instead to handle the dynamic import in handle_detection
+                        original_import = __import__
+                        mock_code_agent = MagicMock()
+
+                        def mock_import(name, *args, **kwargs):
+                            if name == 'src.utils.code_agent':
+                                mock_module = MagicMock()
+                                mock_module.CodeAgentHandler = mock_code_agent
+                                return mock_module
+                            return original_import(name, *args, **kwargs)
+
+                        import builtins
+                        builtins.__import__ = mock_import
+
+                        try:
+                            # Create a Jarvis detection result
+                            jarvis_result = {
+                                "detected": True,
+                                "trigger_type": "code_agent",
+                                "transcription": "what time is it"
+                            }
+
+                            # Handle the detection
+                            detector.handle_detection(jarvis_result)
+
+                            # Verify that the sound was played AND speech was generated
+                            mock_recorder.play_sound.assert_called_with("command")
+                            mock_speak_random.assert_called_with("jarvis_greeting")
+
+                            # Verify that a notification was sent
+                            mock_send_notification.assert_called_once()
+                            call_args = mock_send_notification.call_args[0]
+                            self.assertEqual(call_args[0], "Code Agent Activated")
+                        finally:
+                            # Restore the original __import__
+                            builtins.__import__ = original_import
+
 
 if __name__ == "__main__":
     # Use a pattern that works better with the class name

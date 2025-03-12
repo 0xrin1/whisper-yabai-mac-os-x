@@ -245,11 +245,98 @@ class TestJarvisAssistant(unittest.TestCase):
         spoken_text = call_args[0][0][0]
 
         # Verify it ends with a question mark or asks what the user wants
+        # or contains a sarcastic Jarvis-like greeting
         self.assertTrue(
             spoken_text.endswith("?")
             or "what" in spoken_text.lower()
             or "how can i" in spoken_text.lower()
+            or any(phrase in spoken_text.lower() for phrase in [
+                "need me to solve",
+                "impossibly complex",
+                "sarcasm module",
+                "at your service",
+                "summoned again",
+                "beating the chess",
+                "make you look smarter",
+                "digital mountain",
+                "don't worry",
+                "digital disaster"
+            ])
         )
+
+    def test_jarvis_startup_greetings(self):
+        """Test that Jarvis has appropriate startup greetings."""
+        # Test with speech_synthesis module directly
+        from src.audio.speech_synthesis import CASUAL_RESPONSES, speak_random
+
+        # Verify that the jarvis_startup category exists
+        self.assertIn("jarvis_startup", CASUAL_RESPONSES)
+
+        # Verify that there are multiple responses in the category
+        self.assertTrue(len(CASUAL_RESPONSES["jarvis_startup"]) >= 5)
+
+        # Verify some expected phrases in the startup responses
+        startup_text = " ".join(CASUAL_RESPONSES["jarvis_startup"]).lower()
+        expected_phrases = [
+            "i'm awake",
+            "booting up",
+            "back online",
+            "digital",
+            "system online"
+        ]
+
+        for phrase in expected_phrases:
+            self.assertIn(phrase, startup_text,
+                         f"Expected phrase '{phrase}' not found in startup greetings")
+
+        # Test speak_random with jarvis_startup
+        with patch("src.audio.speech_synthesis.speak") as mock_speak:
+            speak_random("jarvis_startup")
+            mock_speak.assert_called_once()
+
+            # Check that the spoken text is one of the startup messages
+            spoken_text = mock_speak.call_args[0][0]
+            self.assertIn(spoken_text, CASUAL_RESPONSES["jarvis_startup"])
+
+    def test_jarvis_greeting_responses(self):
+        """Test that Jarvis has appropriate interactive greetings."""
+        # Test with speech_synthesis module directly
+        from src.audio.speech_synthesis import CASUAL_RESPONSES, speak_random
+
+        # Verify that the jarvis_greeting category exists
+        self.assertIn("jarvis_greeting", CASUAL_RESPONSES)
+
+        # Verify that there are multiple responses in the category
+        self.assertTrue(len(CASUAL_RESPONSES["jarvis_greeting"]) >= 5)
+
+        # Verify some expected phrases in the greeting responses
+        greeting_text = " ".join(CASUAL_RESPONSES["jarvis_greeting"]).lower()
+        expected_phrases = [
+            "what's up",
+            "unsolvable problem",
+            "impossibly complex",
+            "service",
+            "sarcasm",
+            "summoned",
+            "chess",
+            "smarter",
+            "again",
+            "listening",
+            "disaster"
+        ]
+
+        for phrase in expected_phrases:
+            self.assertIn(phrase, greeting_text,
+                         f"Expected phrase '{phrase}' not found in Jarvis greetings")
+
+        # Test speak_random with jarvis_greeting
+        with patch("src.audio.speech_synthesis.speak") as mock_speak:
+            speak_random("jarvis_greeting")
+            mock_speak.assert_called_once()
+
+            # Check that the spoken text is one of the greeting messages
+            spoken_text = mock_speak.call_args[0][0]
+            self.assertIn(spoken_text, CASUAL_RESPONSES["jarvis_greeting"])
 
 
 class TestJarvisTimings(unittest.TestCase):
