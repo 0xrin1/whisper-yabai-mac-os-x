@@ -16,10 +16,10 @@ os.environ["SKIP_AUDIO_RECORDING"] = "true"
 os.environ["SKIP_AUDIO_PLAYBACK"] = "true"
 os.environ["USE_MOCK_SPEECH"] = "true"
 
-# List of tests that work reliably in CI
+# List of tests that work reliably in CI - updated for new directory structure
 SAFE_TEST_FILES = [
-    "src/tests/test_config.py",
-    "src/tests/test_state_manager.py",
+    "src/tests/config/test_config.py",
+    "src/tests/core/test_state_manager.py",
     "src/tests/test_mock_example.py"
 ]
 
