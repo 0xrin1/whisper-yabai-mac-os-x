@@ -243,10 +243,12 @@ class TestTriggerDetectionAsync:
         # Replace the loop.run_until_complete with a direct async call handler
         def mock_run(coro):
             if hasattr(coro, '__await__'):
-                # Just return the value from our mocked check_connection
+                # Call the actual mock to track the call
                 if hasattr(coro, '__self__') and hasattr(coro, '__name__'):
                     if coro.__name__ == 'check_connection':
-                        # Use the return_value from our AsyncMock
+                        # Actually call the AsyncMock to register the call
+                        asyncio.create_task(client_mock.check_connection())
+                        # Return the value directly
                         return client_mock.check_connection.return_value
             return coro
 
