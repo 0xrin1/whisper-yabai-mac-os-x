@@ -17,17 +17,27 @@ This directory contains all the tests for the Whisper Voice Control system. The 
 
 To run all tests:
 ```bash
-pytest
+python -m pytest
 ```
 
 To run tests for a specific module:
 ```bash
-pytest src/tests/audio/
+python -m pytest src/tests/audio/
 ```
 
 To run a specific test file:
 ```bash
-pytest src/tests/audio/test_audio_processor.py
+python -m pytest src/tests/audio/test_audio_processor.py
+```
+
+To run tests in mock mode (without hardware dependencies):
+```bash
+python src/tests/discover_tests.py --mock
+```
+
+To run tests with CI configuration:
+```bash
+python -m pytest -c pytest.ci.ini
 ```
 
 ## Test Organization Principles
@@ -37,6 +47,32 @@ pytest src/tests/audio/test_audio_processor.py
 3. **Base Classes**: Base test classes are defined in `common/base.py` to share setup/teardown code.
 4. **Mocking**: Common mocks are defined in `common/mocks.py` for consistent test behavior.
 5. **Speech Utilities**: Common speech synthesis and playback functions are in `common/speech.py`.
+
+## Common Modules
+
+The `common` directory contains shared utilities used across all tests:
+
+- `base.py`: Contains base test classes like `BaseTestCase` and `AsyncTestCase`
+- `mocks.py`: Contains common mock objects and functions for testing
+- `speech.py`: Contains speech synthesis and playback utilities
+- `legacy.py`: Provides backward compatibility with old imports
+
+Import these utilities in your tests:
+
+```python
+# Base test classes
+from src.tests.common.base import BaseTestCase, AsyncTestCase
+
+# Mock utilities
+from src.tests.common.mocks import (
+    mock_speech_recognition_client,
+    MockSpeechRecognitionClient,
+    mock_asyncio_new_event_loop
+)
+
+# Speech utilities
+from src.tests.common.speech import synthesize_speech, play_audio_file
+```
 
 ## Test Environment
 
@@ -53,11 +89,26 @@ These environment variables are automatically set in CI environments to ensure t
 
 For CI environments, tests are automatically configured to:
 
-1. Skip tests marked with the `ci_skip` mark
+1. Skip tests marked with the `ci_skip` mark using `@pytest.mark.ci_skip`
 2. Use mock implementations instead of real hardware
 3. Run a reduced set of tests that are known to be reliable in CI
 
-The `pytest.ci.ini` configuration file is used for CI test runs.
+The `pytest.ci.ini` configuration file is used for CI test runs, and the `scripts/ci_run_tests.py` script provides a reliable way to run tests in CI.
+
+## Discovery Utility
+
+The `discover_tests.py` script helps find and run tests with the correct configuration:
+
+```bash
+# Run all tests with mock mode
+python src/tests/discover_tests.py --mock
+
+# Run tests for a specific subdirectory
+python src/tests/discover_tests.py --subdir audio
+
+# Run with verbose output
+python src/tests/discover_tests.py --verbose
+```
 
 ## Design Principles
 
@@ -65,3 +116,4 @@ The `pytest.ci.ini` configuration file is used for CI test runs.
 - **Isolation**: Tests should be independent of each other
 - **Mock Dependencies**: Use mocks for external dependencies
 - **Verification**: Verify behavior, not implementation details
+- **Backward Compatibility**: Maintain compatibility with existing tests

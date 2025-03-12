@@ -18,7 +18,7 @@ A voice dictation system with Code Agent integration, leveraging the Speech Reco
 - Audio feedback with sounds for recording start/stop and completion
 - Support for non-standard keyboard layouts during dictation
 - Modular, clean architecture for easier maintenance and extension
-- Comprehensive test suite for API-based components
+- Comprehensive, modular test suite organized by component
 - Standalone Speech Recognition API for distributed processing
 - Simple, intuitive user experience with just two modes
 
@@ -502,26 +502,43 @@ The documentation website includes:
 
 ## Testing
 
-The project includes a robust testing framework for ensuring functionality works correctly:
+The project includes a comprehensive, modular testing framework organized by component:
 
 ```bash
 # Run all tests
-python -m pytest src/tests/
+python -m pytest
 
-# Run specific test file
-python -m pytest src/tests/test_audio_processor.py
+# Run tests for a specific module
+python -m pytest src/tests/audio/
 
-# Run with more detailed output
-python -m pytest -v src/tests/
+# Run a specific test file
+python -m pytest src/tests/audio/test_audio_processor.py
+
+# Run tests in mock mode (without hardware dependencies)
+python src/tests/discover_tests.py --mock
+
+# Run tests with CI configuration
+python -m pytest -c pytest.ci.ini
 ```
 
-For more detailed information about the testing framework, see [TESTING.md](docs/TESTING.md), which covers:
+Tests are organized into subdirectories by component:
 
-- Comprehensive testing of the Speech Recognition API
-- Testing audio processing with the API-only approach
+- `src/tests/api/`: Tests for API components
+- `src/tests/audio/`: Tests for audio processing
+- `src/tests/config/`: Tests for configuration
+- `src/tests/core/`: Tests for core functionality
+- `src/tests/ui/`: Tests for UI components
+- `src/tests/utils/`: Tests for utilities
+- `src/tests/integration/`: Tests for end-to-end flows
+
+Common test utilities are centralized in the `src/tests/common/` directory to implement DRY principles.
+
+For more information about testing practices, see the [Test Organization Guidelines](docs/CLAUDE.md#test-organization-guidelines) section in CLAUDE.md, which covers:
+
 - Testing the trigger detection for "jarvis" and dictation modes
 - Strategies for mocking async API calls
 - Running and extending the test suite
+- Using shared test utilities and base classes
 
 ## License
 

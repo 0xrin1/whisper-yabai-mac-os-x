@@ -6,7 +6,9 @@
 - Run simplified daemon: `python src/simple_dictation.py`
 - Run ultra simplified version: `python src/ultra_simple_dictation.py`
 - Check permissions: `python src/permissions_check.py`
-- Test specific module: `python src/test_*.py`
+- Run tests with pytest: `python -m pytest`
+- Run specific test module: `python -m pytest src/tests/audio/test_audio_processor.py`
+- Run tests with mocks: `python src/tests/discover_tests.py --mock`
 - Install deps: `pip install -r requirements.txt`
 - Run Speech API: `./scripts/run_speech_api.sh`
 - Run Cloud Code API: `./scripts/launch_cloud_api.sh`
@@ -119,6 +121,32 @@
   - Testing scripts: `scripts/gpu/` for GPU/neural server tests
   - Setup scripts: `scripts/setup/` for environment configuration
   - Neural voice scripts: `scripts/neural_voice/` for voice-related utilities
+
+## Test Organization Guidelines
+
+- Tests are organized in module-specific directories:
+  - `src/tests/api/`: Tests for API components
+  - `src/tests/audio/`: Tests for audio processing
+  - `src/tests/config/`: Tests for configuration
+  - `src/tests/core/`: Tests for core functionality
+  - `src/tests/ui/`: Tests for UI components
+  - `src/tests/utils/`: Tests for utilities
+  - `src/tests/integration/`: Tests for end-to-end flows
+  - `src/tests/common/`: Shared utilities for tests
+
+- Use common test utilities:
+  - `from src.tests.common.base import BaseTestCase` for standard test cases
+  - `from src.tests.common.mocks import mock_speech_recognition_client` for mocks
+  - `from src.tests.common.speech import synthesize_speech` for speech utilities
+
+- CI Testing:
+  - Use `python -m pytest -c pytest.ci.ini` for CI-specific test configurations
+  - Mark tests that should be skipped in CI with `@pytest.mark.ci_skip`
+  - Use environment variables to control test behavior:
+    - `MOCK_TEST_MODE=true` to enable mock mode
+    - `SKIP_AUDIO_RECORDING=true` to skip actual audio recording
+    - `SKIP_AUDIO_PLAYBACK=true` to skip actual audio playback
+    - `USE_MOCK_SPEECH=true` to use mock speech synthesis
 
 ## Claude Code Guidelines
 
