@@ -101,6 +101,18 @@ CASUAL_RESPONSES = {
         "Ready for dictation. Say 'Jarvis' if you need my assistance.",
         "Dictation mode is on. I'm listening for your words.",
     ],
+    "jarvis_greeting": [
+        "At your service, sir. The Jarvis system is now online and fully operational.",
+        "Good day, sir. Jarvis at your service. How may I assist you today?",
+        "Jarvis online. All systems operational. Ready when you are, sir.",
+        "Voice interface activated. Jarvis reporting for duty. What's on the agenda today?",
+        "Jarvis initialized and ready. The usual parameters are in effect, sir.",
+        "Hello, sir. I've brought the Jarvis system online. Coffee is next, I assume?",
+        "Jarvis is now active. Shall we get to work, or would you prefer the day's summary first?",
+        "Systems check complete. Jarvis interface engaged. Ready to tackle the impossible, sir.",
+        "Good morning, sir. Jarvis online. I've taken the liberty of warming up the processors.",
+        "Virtual assistant Jarvis, at your command. Quantum computing circuits engaged.",
+    ],
 }
 
 

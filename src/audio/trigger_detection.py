@@ -243,8 +243,8 @@ class TriggerDetector:
             # Add conversational response when Jarvis is triggered
             from src.audio.speech_synthesis import speak_random
 
-            # Respond with a casual acknowledgment like "yes" or "what can I do for ya?"
-            speak_random("acknowledgment")
+            # Respond with a Jarvis-style greeting
+            speak_random("jarvis_greeting")
 
             # Only if there's an actual query after "jarvis", process it with Code Agent
             if transcription.strip():
