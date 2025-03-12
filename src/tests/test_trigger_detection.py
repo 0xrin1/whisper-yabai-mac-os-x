@@ -64,8 +64,8 @@ class TestTriggerDetection(unittest.TestCase):
         # This avoids issues with importing in the setUp() method
         self.mock_cloud_code = MagicMock()
 
-        # Speech synthesis
-        self.speak_patch = patch("src.audio.trigger_detection.speak")
+        # Speech synthesis (patched at the source module)
+        self.speak_patch = patch("src.audio.speech_synthesis.speak")
         self.mock_speak = self.speak_patch.start()
         self.patchers.append(self.speak_patch)
 
