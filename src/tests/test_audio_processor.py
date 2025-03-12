@@ -13,7 +13,7 @@ import time
 import queue
 import asyncio
 import pytest
-from unittest.mock import patch, MagicMock, Mock, mock_open
+from unittest.mock import patch, MagicMock, Mock, mock_open, AsyncMock
 
 # Set testing mode
 os.environ["TESTING"] = "true"

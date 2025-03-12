@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 import pytest
+import asyncio
 from unittest.mock import patch, MagicMock, AsyncMock
 
 # Set testing mode
