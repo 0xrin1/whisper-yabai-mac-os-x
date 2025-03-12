@@ -113,6 +113,18 @@ CASUAL_RESPONSES = {
         "Good morning, sir. Jarvis online. I've taken the liberty of warming up the processors.",
         "Virtual assistant Jarvis, at your command. Quantum computing circuits engaged.",
     ],
+    "jarvis_startup": [
+        "Jarvis online and ready. Core systems initialized. Awaiting your commands, sir.",
+        "Good morning, sir. Jarvis coming online. All systems operational and standing by.",
+        "Initializing Jarvis protocols. Defense systems active, communications online. Ready to assist.",
+        "Voice interface operational. Jarvis system now active. It's a pleasure to be of service again, sir.",
+        "Jarvis activated. Scanning for threats... none detected. How may I assist you today?",
+        "System boot sequence complete. Jarvis ready. Would you like me to run diagnostics, sir?",
+        "Jarvis interface loaded. Always a pleasure working with you, sir. What's on today's agenda?",
+        "Primary systems online. Jarvis artificial intelligence activated and at your service.",
+        "Jarvis initialized. I've taken the liberty of warming up the processors for you, sir.",
+        "Welcome back, sir. Jarvis is now fully operational. Shall we pick up where we left off?",
+    ],
 }
 
 

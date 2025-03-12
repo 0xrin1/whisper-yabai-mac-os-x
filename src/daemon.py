@@ -159,11 +159,11 @@ class VoiceControlDaemon:
                 logger.error(f"Error initializing JARVIS assistant: {e}")
                 # Continue without JARVIS if it fails to initialize
 
-            # Test the speech synthesis system
-            logger.info("Testing speech synthesis...")
+            # Test the speech synthesis system with Jarvis startup greeting
+            logger.info("Testing speech synthesis with Jarvis startup greeting...")
             try:
-                # Quick test of speech synthesis with minimal output
-                tts.speak("Voice assistant initialized", block=True)
+                # Use a Jarvis-style startup greeting
+                tts.speak_random("jarvis_startup", block=True)
                 logger.info("Speech synthesis working correctly")
             except Exception as e:
                 logger.error(f"Error testing speech synthesis: {e}")
@@ -339,9 +339,10 @@ class VoiceControlDaemon:
                 # Greet the user and let them know dictation mode is ready
                 try:
                     from src.audio.speech_synthesis import speak_random
-                    speak_random("welcome_message")
+                    # Use Jarvis startup message for welcome on first start of continuous listening
+                    speak_random("jarvis_startup")
                 except Exception as e:
-                    logger.error(f"Failed to speak welcome message: {e}")
+                    logger.error(f"Failed to speak Jarvis startup message: {e}")
 
                 # Start continuous listening with rolling buffer
                 self.continuous_recorder.start()
