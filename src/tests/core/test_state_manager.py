@@ -7,6 +7,7 @@ Tests state management functionality.
 import os
 import sys
 import time
+import unittest
 from unittest.mock import patch, MagicMock, call
 
 # Import common test utilities

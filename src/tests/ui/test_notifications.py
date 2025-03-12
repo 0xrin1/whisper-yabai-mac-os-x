@@ -5,6 +5,7 @@ Test script for toast notifications in the voice control system.
 
 import time
 import logging
+import unittest
 from src.ui.toast_notifications import (
     notify_listening,
     notify_processing,

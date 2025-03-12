@@ -4,6 +4,7 @@ Test script to verify keyboard hotkey detection
 """
 
 import logging
+import unittest
 from pynput import keyboard
 
 # Configure logging
