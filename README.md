@@ -3,28 +3,24 @@
 ![CI Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/ci.yml/badge.svg)
 ![Lint Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/lint.yml/badge.svg)
 
-A voice command daemon that uses OpenAI's Whisper model locally to control your Mac, with Yabai window manager integration, LLM-powered natural language command interpretation, and text-to-speech feedback via external API.
+A voice dictation system with Cloud Code integration, leveraging the Speech Recognition API for dictation and "jarvis" triggered queries to Claude Code.
 
 ## Features
 
-- Voice control for your Mac using a local Whisper model
-- Dictation mode by default - speak naturally to type text at cursor position
-- Command mode via "jarvis" trigger word
-- Text-to-speech API integration for voice feedback
+- Voice control for your Mac with two simple modes:
+  - Dictation mode (default) - speak naturally to type text at cursor position
+  - Cloud Code mode via "jarvis" trigger word - connects directly to Claude Code
+- Speech Recognition API for efficient, distributed processing
+  - Send audio to API server for transcription
+  - Support for running on a separate machine with GPU acceleration
+  - WebSocket interface for real-time transcriptions
+- Text-to-speech feedback for Cloud Code responses
 - Audio feedback with sounds for recording start/stop and completion
-- Yabai window manager integration for advanced window management
-- Continuous listening mode that automatically processes commands
-- LLM-powered natural language command interpretation with multiple model support
-- Dynamic response generation for ambiguous commands
-- Ability to open applications, type text, manipulate windows, and more
-- Extensible command system
 - Support for non-standard keyboard layouts during dictation
-- Modular, refactored architecture for easier maintenance
-- Support for multiple LLM architectures (Qwen, DeepSeek, LLaMA)
-- Cloud Code API for integrating speech recognition with external applications
-- WebSocket interface for real-time transcriptions
+- Modular, clean architecture for easier maintenance and extension
+- Comprehensive test suite for API-based components
 - Standalone Speech Recognition API for distributed processing
-- Ability to run speech recognition on a separate machine for better resource allocation
+- Simple, intuitive user experience with just two modes
 
 ## Prerequisites
 
