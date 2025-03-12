@@ -323,6 +323,9 @@ class TriggerDetector:
             except Exception as e:
                 logger.error(f"Failed to show dictation notification: {e}")
 
+            # Add a small delay before starting dictation to prevent rapid cycles
+            time.sleep(0.5)
+
             # Start dictation mode - no voice feedback needed for dictation, just sound cues
             self._start_recording_thread("dictation", force=True)
             return True

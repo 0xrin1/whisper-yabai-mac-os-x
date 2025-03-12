@@ -35,13 +35,13 @@ class ContinuousRecorder:
         self.frames_per_second = self.rate / self.chunk
         self.max_buffer_frames = int(self.frames_per_second * self.buffer_seconds)
 
-        # Detection settings
-        self.energy_threshold = 137  # Threshold from voice training
+        # Detection settings - adjusted for better stability
+        self.energy_threshold = 150  # Threshold from voice training - increased to reduce false activations
         self.silence_timeout = 0.8  # Seconds of silence before processing buffer
 
         # Add a cooldown mechanism to prevent rapid re-triggering
         self.last_processing_time = 0
-        self.min_processing_interval = 2.0  # Minimum seconds between processing events
+        self.min_processing_interval = 4.0  # Minimum seconds between processing events - increased to prevent loops
 
         # Create trigger detector
         self.trigger_detector = TriggerDetector()
@@ -189,9 +189,9 @@ class ContinuousRecorder:
                                 )
                                 process_thread.start()
 
-                                # Wait a moment before continuing to prevent overlapping processing
+                                # Wait longer before continuing to prevent overlapping processing
                                 # This gives the system time to properly handle the current speech segment
-                                time.sleep(0.5)
+                                time.sleep(1.5)  # Increased to 1.5 seconds to ensure better separation
                             else:
                                 logger.debug(
                                     "Skipping buffer processing - already recording"
@@ -233,6 +233,9 @@ class ContinuousRecorder:
     def _process_buffer(self):
         """Process the audio buffer to detect trigger words."""
         try:
+            # Add a slight delay before processing to allow system to stabilize
+            time.sleep(0.5)
+
             # Make a copy of the buffer to process
             with state.audio_buffer_lock:
                 if (
@@ -250,7 +253,13 @@ class ContinuousRecorder:
 
             # Handle detection if needed
             if detection_result["detected"]:
+                # Add a slight delay to ensure stable state
+                time.sleep(0.5)
                 self.trigger_detector.handle_detection(detection_result)
+
+                # After handling a detection, ensure there's a substantial cooldown
+                # This prevents the loop from starting again too quickly
+                time.sleep(1.0)
             else:
                 # Reset recording flag to allow future processing
                 logger.debug("No trigger words detected in buffer")
