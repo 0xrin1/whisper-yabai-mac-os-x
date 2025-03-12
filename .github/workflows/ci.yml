@@ -145,10 +145,14 @@ jobs:
     - name: Run unit tests with mocks
       run: |
         echo "Running unit tests with mocks..."
+        # Using pytest to run all tests
+        MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true USE_MOCK_SPEECH=true python -m pytest
+
+        # Fallback: Also run individual test files like before in case some aren't discovered by pytest
         cd src
-        for test_file in test_*.py; do
+        for test_file in tests/test_*.py; do
           if [ -f "$test_file" ]; then
-            echo "Running $test_file..."
-            MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true python "$test_file" || echo "Test $test_file failed but continuing..."
+            echo "Running individual test file: $test_file..."
+            MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true USE_MOCK_SPEECH=true python "$test_file" || echo "Test $test_file failed but continuing..."
           fi
         done
