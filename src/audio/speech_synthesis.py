@@ -47,6 +47,8 @@ CASUAL_RESPONSES = {
         "Hi, how can I help?",
         "Hello. What can I do for you?",
         "Hey there. I'm listening.",
+        "Good to see you.",
+        "Hi there! Ready to help."
     ],
     "acknowledgment": [
         "Got it.",
@@ -54,12 +56,20 @@ CASUAL_RESPONSES = {
         "Working on that now.",
         "Right away.",
         "Consider it done.",
+        "Yes?",
+        "What can I do for ya?",
+        "How can I help?",
+        "I'm here.",
+        "At your service.",
+        "Yes, I'm listening.",
     ],
     "confirmation": [
         "That's done.",
         "I've completed that task.",
         "All finished.",
         "Task complete.",
+        "Done!",
+        "Finished.",
     ],
     "thinking": [
         "Let me think about that...",
@@ -67,18 +77,29 @@ CASUAL_RESPONSES = {
         "Working on it...",
         "Give me a moment...",
         "Analyzing your request...",
+        "Hmm, let me see...",
     ],
     "uncertainty": [
         "I'm not sure about that.",
         "I didn't quite catch that.",
         "Could you rephrase that?",
         "I'm not sure how to help with that.",
+        "I'm not following. Can you explain?",
     ],
     "farewell": [
         "Goodbye for now.",
         "Signing off.",
         "Let me know if you need anything else.",
         "I'll be here if you need me.",
+        "See you later.",
+        "Bye for now.",
+    ],
+    "welcome_message": [
+        "Hello! I'm ready to help with dictation. Just start speaking naturally.",
+        "Welcome! I'm listening and ready to transcribe what you say.",
+        "Hi there! Dictation mode is active. Just speak and I'll type it out.",
+        "Ready for dictation. Say 'Jarvis' if you need my assistance.",
+        "Dictation mode is on. I'm listening for your words.",
     ],
 }
 

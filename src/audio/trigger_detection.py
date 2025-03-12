@@ -240,59 +240,67 @@ class TriggerDetector:
             # Play a notification sound
             self.recorder.play_sound("command")
 
-            # Add a notification to show we're processing with Code Agent
-            try:
-                from src.ui.toast_notifications import send_notification
+            # Add conversational response when Jarvis is triggered
+            from src.audio.speech_synthesis import speak_random
 
-                send_notification(
-                    "Code Agent Activated",
-                    f"Processing: {transcription[:30]}{'...' if len(transcription) > 30 else ''}",
-                    "whisper-code-agent",
-                    3,
-                    False,
-                )
-            except Exception as e:
-                logger.error(f"Failed to show Code Agent notification: {e}")
+            # Respond with a casual acknowledgment like "yes" or "what can I do for ya?"
+            speak_random("acknowledgment")
 
-            # Send the query to Code Agent
-            try:
-                # Import here to avoid circular imports
-                from src.utils.code_agent import CodeAgentHandler
-                from src.core.state_manager import state
-
-                # Create a temporary instance if we don't have one
-                handler = CodeAgentHandler(state)
-
-                # Generate a unique session ID
-                session_id = f"voice_{int(time.time())}"
-
-                # Submit the request
-                request_id = handler.submit_request(transcription, session_id)
-
-                logger.info(f"Submitted Code Agent request: {request_id} with query: '{transcription}'")
-
-                # Process the request synchronously for immediate response
+            # Only if there's an actual query after "jarvis", process it with Code Agent
+            if transcription.strip():
+                # Add a notification to show we're processing with Code Agent
                 try:
-                    response = handler._process_request({
-                        "id": request_id,
-                        "prompt": transcription,
-                        "session_id": session_id,
-                        "submitted_at": time.time(),
-                    })
+                    from src.ui.toast_notifications import send_notification
 
-                    # Speak the response
-                    from src.audio.speech_synthesis import speak
-                    speak(response)
-
-                    logger.info(f"Code Agent response: {response[:100]}{'...' if len(response) > 100 else ''}")
+                    send_notification(
+                        "Code Agent Activated",
+                        f"Processing: {transcription[:30]}{'...' if len(transcription) > 30 else ''}",
+                        "whisper-code-agent",
+                        3,
+                        False,
+                    )
                 except Exception as e:
-                    logger.error(f"Error processing Code Agent response: {e}")
+                    logger.error(f"Failed to show Code Agent notification: {e}")
 
-                    # Notify of the error
-                    from src.ui.toast_notifications import notify_error
-                    notify_error("Failed to process request")
-            except Exception as e:
-                logger.error(f"Failed to submit Code Agent request: {e}")
+                # Send the query to Code Agent
+                try:
+                    # Import here to avoid circular imports
+                    from src.utils.code_agent import CodeAgentHandler
+                    from src.core.state_manager import state
+
+                    # Create a temporary instance if we don't have one
+                    handler = CodeAgentHandler(state)
+
+                    # Generate a unique session ID
+                    session_id = f"voice_{int(time.time())}"
+
+                    # Submit the request
+                    request_id = handler.submit_request(transcription, session_id)
+
+                    logger.info(f"Submitted Code Agent request: {request_id} with query: '{transcription}'")
+
+                    # Process the request synchronously for immediate response
+                    try:
+                        response = handler._process_request({
+                            "id": request_id,
+                            "prompt": transcription,
+                            "session_id": session_id,
+                            "submitted_at": time.time(),
+                        })
+
+                        # Speak the response
+                        from src.audio.speech_synthesis import speak
+                        speak(response)
+
+                        logger.info(f"Code Agent response: {response[:100]}{'...' if len(response) > 100 else ''}")
+                    except Exception as e:
+                        logger.error(f"Error processing Code Agent response: {e}")
+
+                        # Notify of the error
+                        from src.ui.toast_notifications import notify_error
+                        notify_error("Failed to process request")
+                except Exception as e:
+                    logger.error(f"Failed to submit Code Agent request: {e}")
 
             return True
 

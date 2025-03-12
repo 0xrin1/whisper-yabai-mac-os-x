@@ -336,8 +336,34 @@ class VoiceControlDaemon:
                 except Exception as e:
                     logger.error(f"Failed to show trigger notification: {e}")
 
+                # Greet the user and let them know dictation mode is ready
+                try:
+                    from src.audio.speech_synthesis import speak_random
+                    speak_random("welcome_message")
+                except Exception as e:
+                    logger.error(f"Failed to speak welcome message: {e}")
+
                 # Start continuous listening with rolling buffer
                 self.continuous_recorder.start()
+
+                # Automatically start dictation mode right away
+                try:
+                    # Import here to avoid circular imports
+                    from src.audio.trigger_detection import TriggerDetector
+                    detector = TriggerDetector()
+
+                    # Create a detection result that defaults to dictation mode
+                    dictation_result = {
+                        "detected": True,
+                        "trigger_type": "dictation",
+                        "transcription": ""
+                    }
+
+                    # Handle the detection (starts dictation mode)
+                    detector.handle_detection(dictation_result)
+                    logger.info("Automatically started dictation mode on startup")
+                except Exception as e:
+                    logger.error(f"Failed to automatically start dictation mode: {e}")
 
         threading.Thread(target=start_after_delay, daemon=True).start()
 
