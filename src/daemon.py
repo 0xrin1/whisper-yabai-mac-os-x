@@ -336,13 +336,18 @@ class VoiceControlDaemon:
                 except Exception as e:
                     logger.error(f"Failed to show trigger notification: {e}")
 
-                # Greet the user and let them know dictation mode is ready
+                # Initial startup greeting - only on app launch, not regular dictation
                 try:
-                    from src.audio.speech_synthesis import speak_random
-                    # Use Jarvis startup message for welcome on first start of continuous listening
-                    speak_random("jarvis_startup")
+                    # Only speak on app startup, not when entering dictation mode during use
+                    if self.force_onboarding or self._is_first_run():
+                        from src.audio.speech_synthesis import speak_random
+                        # Use Jarvis startup message for welcome on first start only
+                        speak_random("jarvis_startup")
+                        logger.info("Played startup greeting on first run")
+                    else:
+                        logger.info("Skipping startup greeting for returning user")
                 except Exception as e:
-                    logger.error(f"Failed to speak Jarvis startup message: {e}")
+                    logger.error(f"Failed to handle Jarvis startup message: {e}")
 
                 # Start continuous listening with rolling buffer
                 self.continuous_recorder.start()

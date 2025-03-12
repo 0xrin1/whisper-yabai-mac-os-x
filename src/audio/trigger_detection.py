@@ -306,7 +306,7 @@ class TriggerDetector:
 
         # Default to dictation mode
         else:
-            # Play the dictation sound
+            # Play the dictation sound - only use audio cues for dictation, no spoken responses
             self.recorder.play_sound("dictation")
 
             # Add a notification to clearly show we're entering dictation mode
@@ -323,7 +323,7 @@ class TriggerDetector:
             except Exception as e:
                 logger.error(f"Failed to show dictation notification: {e}")
 
-            # Start dictation mode
+            # Start dictation mode - no voice feedback needed for dictation, just sound cues
             self._start_recording_thread("dictation", force=True)
             return True
 
