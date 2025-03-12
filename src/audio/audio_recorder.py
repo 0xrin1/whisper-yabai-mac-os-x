@@ -279,7 +279,7 @@ class AudioRecorder:
         elif dictation_mode:
             SILENCE_THRESHOLD = 119  # Threshold from voice training
             max_silence_seconds = (
-                4.5  # Longer timeout for dictation to avoid premature cutoff
+                2.0  # Shorter timeout for dictation to reduce delay in transcription
             )
         else:
             # For command mode, use even lower threshold and longer timeout
@@ -302,7 +302,7 @@ class AudioRecorder:
             )
         elif dictation_mode:
             min_duration = (
-                4  # At least 4 seconds for dictation to avoid premature cutoff
+                2  # At least 2 seconds for dictation - reduced to speed up transcription
             )
         else:
             min_duration = (
