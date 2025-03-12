@@ -14,9 +14,6 @@ from src.core.state_manager import state
 from src.core.core_dictation import core_dictation
 from src.utils.llm_interpreter import CommandInterpreter
 
-# Import for command processing
-from src.utils.command_processor import commands
-
 # Import for notifications
 from src.ui.toast_notifications import notify_processing, notify_error, send_notification
 
@@ -340,51 +337,48 @@ class AudioProcessor:
                 transcription.lower()
             )
 
-            # If we got a recognized command, execute it
-            if command and command != "none" and commands.has_command(command):
-                logger.info(f"LLM interpreted command: {command} with args: {args}")
-                return commands.execute(command, args)
+            # For dictation commands, handle those
+            if command in ["dictate", "dictation", "type", "write", "text"]:
+                logger.info(f"LLM interpreted dictation command: {command}")
+                return self._start_dictation_mode()
             elif command == "none":
                 logger.info("LLM determined input was not a command")
                 return False
 
-            # If no command was recognized, try to get a dynamic response
-            logger.info("No direct command match, trying dynamic interpretation")
+            # Try dynamic response for other cases
+            logger.info("Checking for dynamic response")
             dynamic_response = self.llm_interpreter.generate_dynamic_response(
                 transcription.lower()
             )
 
             if dynamic_response.get("is_command", False):
                 action = dynamic_response.get("action", "")
-                app = dynamic_response.get("application", "")
-                params = dynamic_response.get("parameters", [])
+                logger.info(f"Dynamic interpretation: {action}")
 
-                logger.info(f"Dynamic interpretation: {action} {app} {params}")
-
-                # Map dynamic response to executable commands
-                if action == "open" and app:
-                    return commands.open_application([app])
-                elif action == "focus" and app:
-                    return commands.focus_application([app])
-                elif action == "maximize":
-                    return commands.maximize_window([])
-                elif action == "move" and params:
-                    return commands.move_window(params)
-                elif action == "resize" and params:
-                    return commands.resize_window(params)
-                elif action == "close":
-                    return commands.close_window([])
-                elif action == "type" and params:
-                    return commands.type_text(params)
-                elif action in ["dictate", "dictation", "type", "write", "text"]:
+                # In the simplified architecture, we only support dictation
+                if action in ["dictate", "dictation", "type", "write", "text"]:
                     logger.info(
                         f"LLM interpreter triggered dictation mode with action: '{action}'"
                     )
                     return self._start_dictation_mode()
+                else:
+                    logger.info(f"Unsupported action in simplified architecture: {action}")
+                    from src.ui.toast_notifications import notify_error
+                    notify_error(f"Command '{action}' not supported in this mode")
+                    return False
 
-        # Fall back to simple command parsing
-        logger.info("Falling back to simple command parsing")
-        return commands.parse_and_execute(transcription.lower())
+        # Check for dictation trigger words in transcription directly
+        dictation_fragments = ["dictate", "dictation", "dict", "type", "write", "text", "note"]
+        for fragment in dictation_fragments:
+            if fragment in transcription.lower():
+                logger.info(f"Detected dictation command: '{fragment}' in '{transcription}'")
+                return self._start_dictation_mode()
+
+        # No command was recognized, send notification
+        logger.info(f"No recognized command in: '{transcription}'")
+        from src.ui.toast_notifications import notify_error
+        notify_error(f"Not recognized as a command")
+        return False
 
     def _start_dictation_mode(self):
         """Start dictation mode.

@@ -72,10 +72,7 @@ class TestAudioProcessor(unittest.TestCase):
         self.interpreter_patch.start().return_value = self.mock_interpreter
         self.patchers.append(self.interpreter_patch)
 
-        # Commands
-        self.commands_patch = patch("src.audio.audio_processor.commands")
-        self.mock_commands = self.commands_patch.start()
-        self.patchers.append(self.commands_patch)
+        # No need to patch commands anymore since we removed the dependency
 
         # Notifications
         self.notify_patch = patch("src.audio.audio_processor.notify_processing")
@@ -367,9 +364,8 @@ class TestAudioProcessor(unittest.TestCase):
             self._add_to_audio_queue(None)  # Signal to exit
             processing_thread.join(timeout=1.0)
 
-            # Check that dictation.process and commands.parse_and_execute were not called
+            # Check that dictation.type_text was not called
             self.mock_dictation.type_text.assert_not_called()
-            self.mock_commands.parse_and_execute.assert_not_called()
 
     def test_low_confidence_handling(self):
         """Test handling of low confidence transcriptions."""
@@ -403,7 +399,6 @@ class TestAudioProcessor(unittest.TestCase):
 
             # Check that the command was not processed
             self.mock_interpreter.interpret_command.assert_not_called()
-            self.mock_commands.parse_and_execute.assert_not_called()
 
     def test_jarvis_trigger_handling(self):
         """Test handling of Jarvis trigger for Cloud Code.

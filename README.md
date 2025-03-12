@@ -359,10 +359,10 @@ Each source directory contains a README.md with detailed information about its c
 
 The modular architecture makes it easy to extend the system:
 
-1. **Adding New Commands**: Add to `commands.json` or extend command processor
-2. **Custom Dictation Processing**: Extend `utils/dictation.py` or implement a new processor
-3. **New Voice Synthesis Options**: Add to `audio/speech_synthesis.py` module
-4. **Enhanced Audio Processing**: Extend `audio/audio_processor.py` with new capabilities
+1. **Custom Dictation Processing**: Extend `utils/dictation.py` or implement a new processor
+2. **New Voice Synthesis Options**: Add to `audio/speech_synthesis.py` module
+3. **Enhanced Audio Processing**: Extend `audio/audio_processor.py` with new capabilities
+4. **Cloud Code Integration**: Extend the API server for more advanced interactions
 
 ### Development Guidelines
 

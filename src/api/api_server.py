@@ -36,7 +36,6 @@ from src.audio.speech_synthesis import speak
 from src.config.config import Config
 from src.core.state_manager import StateManager
 from src.utils.assistant import AssistantResponse
-from src.utils.command_processor import CommandProcessor
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -68,7 +67,6 @@ class APIServer:
         self.state = state
         self.config = config
         self.app = FastAPI(title="Whisper Voice Control API")
-        self.command_processor = CommandProcessor(state)
 
         # Set up CORS middleware
         self.app.add_middleware(

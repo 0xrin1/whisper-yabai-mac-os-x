@@ -10,7 +10,9 @@ The system consists of several key components:
 2. **Speech Recognition**: Transcribes audio to text using Whisper
    - Local model for standalone usage
    - Speech Recognition API for distributed processing
-3. **Command Processing**: Interprets text as commands or dictation
+3. **Audio Processing**: Handles audio transcription and determines if it's:
+   - Dictation (default) - types text at cursor position
+   - Cloud Code request via "jarvis" trigger - sends to Claude Code
 4. **Speech Synthesis**: Converts text to speech via external API
 5. **UI Integration**: Provides user feedback
 6. **Cloud Code API**: Allows external applications to integrate with speech recognition
@@ -29,20 +31,20 @@ The system consists of several key components:
 └─────────────────┘     └─────────────────┘     └────────┬────────┘
                                                          │
                                                          ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │
-│  macOS System   │◄────┤  Command        │◄────┤  Text           │
-│  (Actions)      │     │  Processor      │     │  Transcription  │
-│                 │     │                 │     │                 │
-└─────────────────┘     └────────┬────────┘     └─────────────────┘
-                                 │
-                                 │
-┌─────────────────┐     ┌────────▼────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │
-│  Audio Output   │◄────┤  Speech         │◄────┤  External TTS   │
-│  (Speakers)     │     │  Synthesis      │     │  API Server     │
-│                 │     │                 │     │                 │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+┌─────────────────┐                             ┌─────────────────┐
+│                 │                             │                 │
+│  Core Dictation │◄──────────────┐             │  Text           │
+│  (Type Text)    │               │             │  Transcription  │
+│                 │               │             │                 │
+└─────────────────┘               │             └─────────────────┘
+                                  │                     │
+                                  │                     │
+┌─────────────────┐     ┌─────────┴───────┐     ┌──────▼────────┐
+│                 │     │                 │     │                │
+│  Audio Output   │◄────┤  Speech         │◄────┤  Cloud Code    │
+│  (Speakers)     │     │  Synthesis      │     │  (via Jarvis)  │
+│                 │     │                 │     │                │
+└─────────────────┘     └─────────────────┘     └────────────────┘
 ```
 
 ### Distributed Architecture with Speech API
@@ -65,14 +67,21 @@ The system consists of several key components:
 └────────┬────────┘     └─────────────────┘     └─────────────────┘
          │
          ▼
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│                 │     │                 │     │                 │
-│  Cloud Code     │     │  Command        │     │  Text           │
-│  API Server     │◄────┤  Processor      │◄────┤  Transcription  │
-│                 │     │                 │     │                 │
-└────────┬────────┘     └────────┬────────┘     └─────────────────┘
-         │                       │
-         ▼                       ▼
+┌─────────────────┐                             ┌─────────────────┐
+│                 │                             │                 │
+│  Cloud Code     │                             │  Text           │
+│  API Server     │◄────────────────────────────┤  Transcription  │
+│                 │                             │                 │
+└────────┬────────┘                             └───────┬─────────┘
+         │                                              │
+         │                                              ▼
+         │                                     ┌─────────────────┐
+         │                                     │                 │
+         │                                     │  Core Dictation │
+         │                                     │  (Type Text)    │
+         │                                     │                 │
+         │                                     └─────────────────┘
+         ▼
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │     │                 │
 │  Web Client     │     │  Speech         │◄────┤  External TTS   │
@@ -91,9 +100,9 @@ The system consists of several key components:
 
 ## Sequence Diagrams
 
-### Voice Command Processing
+### Cloud Code Processing
 
-This sequence diagram shows the flow from voice input to command execution and speech feedback:
+This sequence diagram shows the flow from voice input to Cloud Code execution and speech feedback:
 
 ```mermaid
 sequenceDiagram
@@ -101,17 +110,18 @@ sequenceDiagram
     participant Microphone
     participant AudioProcessor
     participant WhisperModel
-    participant CommandProcessor
+    participant TriggerDetector
+    participant CloudCodeAPI
     participant TTSAPIServer
     participant SpeechSynthesis
-    participant System
 
-    User->>Microphone: Speak command
+    User->>Microphone: Speak "jarvis" + query
     Microphone->>AudioProcessor: Capture audio
     AudioProcessor->>WhisperModel: Process audio
-    WhisperModel->>CommandProcessor: Transcribed text
-    CommandProcessor->>System: Execute command
-    CommandProcessor->>TTSAPIServer: Request speech synthesis
+    WhisperModel->>AudioProcessor: Transcribed text
+    AudioProcessor->>TriggerDetector: Detect "jarvis"
+    TriggerDetector->>CloudCodeAPI: Send query to Claude Code
+    CloudCodeAPI->>TTSAPIServer: Request speech synthesis
     TTSAPIServer->>SpeechSynthesis: Return audio data
     SpeechSynthesis->>User: Play audio feedback
 ```
@@ -177,12 +187,13 @@ sequenceDiagram
     participant SpeechClient
     participant SpeechAPI
     participant WhisperModel
-    participant CommandProcessor
-    participant System
+    participant TriggerDetector
+    participant CoreDictation
+    participant CloudCode
     participant TTSAPIServer
     participant SpeechSynthesis
 
-    User->>Microphone: Speak command
+    User->>Microphone: Speak input
     Microphone->>AudioProcessor: Capture audio
     AudioProcessor->>SpeechClient: Send audio data
     SpeechClient->>SpeechAPI: API request with audio
@@ -190,11 +201,17 @@ sequenceDiagram
     WhisperModel->>SpeechAPI: Transcription result
     SpeechAPI->>SpeechClient: JSON response
     SpeechClient->>AudioProcessor: Transcribed text
-    AudioProcessor->>CommandProcessor: Interpreted command
-    CommandProcessor->>System: Execute command
-    CommandProcessor->>TTSAPIServer: Request speech synthesis
-    TTSAPIServer->>SpeechSynthesis: Return audio data
-    SpeechSynthesis->>User: Play audio feedback
+
+    alt Contains "jarvis" trigger
+        AudioProcessor->>TriggerDetector: Detect trigger
+        TriggerDetector->>CloudCode: Send to Claude Code
+        CloudCode->>TTSAPIServer: Request speech synthesis
+        TTSAPIServer->>SpeechSynthesis: Return audio data
+        SpeechSynthesis->>User: Play audio response
+    else Default dictation mode
+        AudioProcessor->>CoreDictation: Send text
+        CoreDictation->>User: Type text at cursor
+    end
 ```
 
 ### Cloud Code API Integration
@@ -208,7 +225,7 @@ sequenceDiagram
     participant WebSocket
     participant AudioProcessor
     participant SpeechAPI
-    participant CommandProcessor
+    participant ClaudeCode
     participant TTSAPIServer
 
     ExternalApp->>WebSocket: Connect to /ws/transcription
@@ -220,8 +237,8 @@ sequenceDiagram
     WebSocket-->>ExternalApp: Real-time transcription
 
     ExternalApp->>CloudCodeAPI: POST /cloud-code request
-    CloudCodeAPI->>CommandProcessor: Process request
-    CommandProcessor-->>CloudCodeAPI: Generate response
+    CloudCodeAPI->>ClaudeCode: Process request
+    ClaudeCode-->>CloudCodeAPI: Generate response
     CloudCodeAPI-->>ExternalApp: JSON response
 
     ExternalApp->>CloudCodeAPI: POST /speak request
@@ -238,15 +255,10 @@ sequenceDiagram
 - Manages silence detection and audio chunking
 - Provides sound effects for user feedback
 - Interfaces with Whisper for transcription
+- Processes transcriptions to determine:
+  - Default dictation mode (type at cursor)
+  - Cloud Code requests (when "jarvis" trigger is detected)
 - Can connect to external Speech Recognition API
-
-### Command Processing
-
-- Interprets transcribed text
-- Identifies commands vs. dictation
-- Uses LLM for natural language understanding (optional)
-- Executes commands via appropriate system interfaces
-- Can be integrated with Cloud Code API
 
 ### Speech Synthesis
 
