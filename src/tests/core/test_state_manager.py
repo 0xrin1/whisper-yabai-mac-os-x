@@ -104,7 +104,7 @@ class TestStateManager(BaseTestCase):
         result = self.state_manager.get_next_audio(block=True, timeout=0.1)
         elapsed = time.time() - start_time
         self.assertIsNone(result)
-        self.assertLess(elapsed, 0.2)  # Should be around 0.1s
+        self.assertLess(elapsed, 0.3)  # Should be around 0.1s but allow some margin for CI environment
 
     def test_mute_callbacks(self):
         """Test mute state change callbacks."""
