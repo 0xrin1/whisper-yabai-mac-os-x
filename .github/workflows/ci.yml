@@ -145,14 +145,8 @@ jobs:
     - name: Run unit tests with mocks
       run: |
         echo "Running unit tests with mocks..."
-        # Using pytest to run all tests
-        MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true USE_MOCK_SPEECH=true python -m pytest
+        # Using pytest with CI-specific configuration
+        MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true USE_MOCK_SPEECH=true python -m pytest -c pytest.ci.ini
 
-        # Fallback: Also run individual test files like before in case some aren't discovered by pytest
-        cd src
-        for test_file in tests/test_*.py; do
-          if [ -f "$test_file" ]; then
-            echo "Running individual test file: $test_file..."
-            MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true USE_MOCK_SPEECH=true python "$test_file" || echo "Test $test_file failed but continuing..."
-          fi
-        done
+        # We're no longer running individual test files directly since
+        # we're using pytest with proper configuration and test discovery

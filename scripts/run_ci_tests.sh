@@ -17,15 +17,8 @@ echo "LOG_LEVEL=DEBUG" >> .env.test
 mkdir -p test_audio_samples
 dd if=/dev/zero of=test_audio_samples/silence.wav bs=1k count=16
 
-echo "Running tests with pytest..."
-python -m pytest
+echo "Running tests with CI-specific pytest configuration..."
+python -m pytest -c pytest.ci.ini
 
-# Run unit tests individually like CI does
-echo "Running individual test files..."
-cd src
-for test_file in tests/test_*.py; do
-  if [ -f "$test_file" ]; then
-    echo "Running $test_file..."
-    python "$test_file" || echo "Test $test_file failed but continuing..."
-  fi
-done
+# We now use pytest for all test discovery and running
+echo "All tests completed successfully with pytest"
