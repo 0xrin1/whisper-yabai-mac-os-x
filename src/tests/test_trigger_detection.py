@@ -69,10 +69,15 @@ class TestTriggerDetection(unittest.TestCase):
         self.mock_speak = self.speak_patch.start()
         self.patchers.append(self.speak_patch)
 
-        # Notifications
-        self.send_notification_patch = patch("src.audio.trigger_detection.send_notification")
+        # Notifications (patched at the source module)
+        self.send_notification_patch = patch("src.ui.toast_notifications.send_notification")
         self.mock_send_notification = self.send_notification_patch.start()
         self.patchers.append(self.send_notification_patch)
+
+        # Error notifications
+        self.notify_error_patch = patch("src.ui.toast_notifications.notify_error")
+        self.mock_notify_error = self.notify_error_patch.start()
+        self.patchers.append(self.notify_error_patch)
 
         # Now create the detector
         self.detector = TriggerDetector()
