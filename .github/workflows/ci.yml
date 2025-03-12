@@ -30,8 +30,8 @@ jobs:
         python -m pip install --upgrade pip
         # Install pytest and pytest-asyncio for testing
         pip install pytest pytest-asyncio pytest-timeout
-        # Install aiohttp for async HTTP requests
-        pip install aiohttp websockets
+        # Install API and async dependencies
+        pip install aiohttp websockets httpx fastapi starlette
         # Special handling for PyAudio with PortAudio
         pip install --global-option='build_ext' --global-option='-I/usr/local/include' --global-option='-L/usr/local/lib' pyaudio
         # Install remaining requirements
