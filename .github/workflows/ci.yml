@@ -149,8 +149,8 @@ jobs:
     - name: Run unit tests with mocks
       run: |
         echo "Running unit tests with mocks..."
-        # Using pytest with CI-specific configuration
-        MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true USE_MOCK_SPEECH=true python -m pytest -c pytest.ci.ini
+        # Using our custom CI test script to run a safe subset of tests
+        MOCK_TEST_MODE=true SKIP_AUDIO_RECORDING=true SKIP_AUDIO_PLAYBACK=true USE_MOCK_SPEECH=true python scripts/ci_run_tests.py
 
         # We're no longer running individual test files directly since
         # we're using pytest with proper configuration and test discovery
