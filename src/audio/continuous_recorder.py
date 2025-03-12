@@ -39,6 +39,10 @@ class ContinuousRecorder:
         self.energy_threshold = 137  # Threshold from voice training
         self.silence_timeout = 0.8  # Seconds of silence before processing buffer
 
+        # Add a cooldown mechanism to prevent rapid re-triggering
+        self.last_processing_time = 0
+        self.min_processing_interval = 2.0  # Minimum seconds between processing events
+
         # Create trigger detector
         self.trigger_detector = TriggerDetector()
 
@@ -155,9 +159,24 @@ class ContinuousRecorder:
 
                         # If we had speech and now detect enough silence, trigger processing
                         if has_speech and silence_frames >= max_silence_frames:
+                            # Check cooldown period to prevent rapid re-triggering
+                            current_time = time.time()
+                            time_since_last = current_time - self.last_processing_time
+
+                            if time_since_last < self.min_processing_interval:
+                                logger.debug(
+                                    f"Cooldown active - skipping processing ({time_since_last:.1f}s < {self.min_processing_interval:.1f}s)"
+                                )
+                                has_speech = False
+                                silence_frames = 0
+                                continue
+
                             logger.debug(
                                 f"Potential trigger word - processing buffer after {silence_frames/self.frames_per_second:.1f}s silence"
                             )
+
+                            # Update last processing time
+                            self.last_processing_time = current_time
 
                             # We need to be careful about setting recording here to prevent race conditions
                             # Only process if we're not already in recording mode
@@ -165,15 +184,23 @@ class ContinuousRecorder:
                                 # First set recording to True to block other recordings
                                 state.start_recording()
                                 # Process buffer in a separate thread to avoid blocking the continuous recording
-                                threading.Thread(
+                                process_thread = threading.Thread(
                                     target=self._process_buffer, daemon=True
-                                ).start()
+                                )
+                                process_thread.start()
+
+                                # Wait a moment before continuing to prevent overlapping processing
+                                # This gives the system time to properly handle the current speech segment
+                                time.sleep(0.5)
                             else:
                                 logger.debug(
                                     "Skipping buffer processing - already recording"
                                 )
 
+                            # Reset speech detection
                             has_speech = False
+                            # Add a cooldown period to prevent immediate re-triggering
+                            silence_frames = 0
 
                     # Add data to the rolling buffer with thread safety
                     with state.audio_buffer_lock:
