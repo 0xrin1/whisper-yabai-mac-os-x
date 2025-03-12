@@ -8,27 +8,30 @@ A voice dictation system with Code Agent integration, leveraging the Speech Reco
 ## Features
 
 - Voice control for your Mac with two simple modes:
-  - Dictation mode (default) - speak naturally to type text at cursor position
-  - Code Agent mode via "jarvis" trigger word - connects directly to Claude Code
-- Speech Recognition API for efficient, distributed processing
-  - Send audio to API server for transcription
-  - Support for running on a separate machine with GPU acceleration
-  - WebSocket interface for real-time transcriptions
-- Text-to-speech feedback for Code Agent responses
-- Audio feedback with sounds for recording start/stop and completion
+  - **Dictation mode (default)** - speak naturally to type text at cursor position without any trigger word
+  - **Code Agent mode** - say "jarvis" followed by your question or request to interact with Claude Code
+- **Speech Recognition API** - distributed processing architecture:
+  - Standalone API server that can run on a separate machine with GPU
+  - Efficient client-server communication via REST and WebSocket interfaces
+  - Support for multiple Whisper models with automatic selection
+- **Conversational AI** with natural speech synthesis:
+  - Text-to-speech feedback for AI assistant responses
+  - Automatic dictation startup with welcome message
+  - Contextual responses from AI assistant
+- **Audio processing** with feedback sounds for recording states
 - Support for non-standard keyboard layouts during dictation
 - Modular, clean architecture for easier maintenance and extension
 - Comprehensive, modular test suite organized by component
-- Standalone Speech Recognition API for distributed processing
 - Simple, intuitive user experience with just two modes
 
 ## Prerequisites
 
 - macOS
-- [Yabai](https://github.com/koekeishiya/yabai) window manager installed and configured
 - Python 3.8+ installed
 - Required Python packages (see requirements.txt)
-- Local LLM model in GGUF format (for natural language command processing)
+- Microphone and speakers for audio input/output
+- Internet connection for neural voice synthesis (optional)
+- [Yabai](https://github.com/koekeishiya/yabai) window manager (optional, for window control commands)
 
 ## Installation
 
@@ -49,31 +52,28 @@ A voice dictation system with Code Agent integration, leveraging the Speech Reco
    pip install -r requirements.txt
    ```
 
-4. Download a Whisper model (this will happen automatically on first run, but you can pre-download your preferred model size):
+4. Set up the Speech Recognition API:
    ```
-   # Example for downloading the base model
-   python -c "import whisper; whisper.load_model('base')"
+   # Ensure you have the ffmpeg dependency installed
+   # On macOS with Homebrew:
+   brew install ffmpeg
+
+   # The API will automatically download the Whisper model on first run
    ```
 
-5. Download a GGUF model for the LLM interpreter:
-   ```
-   # Create models directory
-   mkdir -p models
-
-   # Download a GGUF model (e.g., Llama 2 7B Chat quantized)
-   # You can download from https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/tree/main
-   # Example using curl:
-   curl -L https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf -o models/llama-2-7b-chat.Q4_K_M.gguf
-   ```
-
-6. Copy the example environment file and customize as needed:
+5. Copy the example environment file and customize as needed:
    ```
    cp .env.example .env
    ```
 
-   Ensure the LLM model path is correctly set in the .env file:
+6. Configure environment variables for the Speech API:
    ```
-   LLM_MODEL_PATH=models/llama-2-7b-chat.Q4_K_M.gguf
+   # Set environment variables
+   export USE_SPEECH_API=true
+   export SPEECH_RECOGNITION_API_URL=http://localhost:8080
+
+   # Or use the provided configuration file
+   source config/speech_api.env
    ```
 
 ## Usage
@@ -93,33 +93,42 @@ On macOS, you must grant permissions for both microphone access and keyboard mon
 
 The script will help guide you through this process and verify if the permissions have been granted correctly.
 
+### Setting Up the Speech Recognition API (Required)
+
+The system now uses a separate Speech Recognition API for transcription:
+
+1. Start the Speech Recognition API server:
+   ```bash
+   ./scripts/run_speech_api.sh
+   ```
+
+   This will start the API server on port 8080 by default. For more options:
+   ```bash
+   ./scripts/run_speech_api.sh --help
+   ```
+
+2. Configure the client to use the API:
+   ```bash
+   # Set environment variables
+   export USE_SPEECH_API=true
+   export SPEECH_RECOGNITION_API_URL=http://localhost:8080
+
+   # Or use the provided configuration file
+   source config/speech_api.env
+   ```
+
 ### Running the Voice Control Daemon
-
-There are two versions of the daemon:
-
-#### Standard Version (Hotkey Activated)
 
 1. Start the daemon:
    ```
-   python src/daemon.py
+   python -m src.daemon
    ```
 
-2. Press the activation hotkey (default: Ctrl+Shift+Space) and speak a command.
+2. The system starts in dictation mode by default - just speak and your words will be converted to text.
 
-3. To exit, press Ctrl+C in the terminal.
+3. Say "jarvis" followed by your question or request to interact with the AI assistant.
 
-#### Simplified Version (Hotkey Activated)
-
-1. Start the simplified daemon:
-   ```
-   python src/simplified_daemon.py
-   ```
-
-2. Use the following hotkeys:
-   - **Command Mode**: Press Ctrl+Shift+Space to start recording, then speak a command to be executed
-   - **Dictation Mode**: Press Ctrl+Shift+D to start recording, then speak text to be typed at the current cursor position
-
-3. To exit, press Ctrl+C in the terminal or press ESC to exit gracefully.
+4. To exit, press Ctrl+C in the terminal or press ESC to exit gracefully.
 
 ### Configuring the Speech Synthesis API
 
