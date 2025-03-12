@@ -245,10 +245,10 @@ class TestAudioProcessor(unittest.TestCase):
                     # Verify dictation was processed
                     self.mock_dictation.type_text.assert_called_with(custom_text)
 
-    def test_process_cloud_code(self):
-        """Test processing audio for Cloud Code integration.
+    def test_process_code_agent(self):
+        """Test processing audio for Code Agent integration.
 
-        This replaces the old command processing test, as the system now uses Cloud Code
+        This replaces the old command processing test, as the system now uses Code Agent
         integration instead of traditional commands.
         """
         query_text = "what is the weather like today"

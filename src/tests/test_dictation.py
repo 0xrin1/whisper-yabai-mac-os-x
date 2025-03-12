@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 Dedicated test for the dictation functionality including the complete flow:
-1. Default dictation mode or explicit 'type' trigger detection
-2. Transcribe speech
-3. Verify the AppleScript execution
+1. Default dictation mode (no trigger required)
+2. Optional dictation triggers (e.g., 'type', 'dictate')
+3. Transcription of spoken text
+4. Verification of text input via AppleScript
 
-Note: This test has been updated to reflect the new architecture where:
+This test aligns with the current architecture where:
 - Dictation is the default mode
-- 'jarvis' is the command trigger
-- Explicit dictation triggers like 'type' are optional
+- 'jarvis' trigger activates Code Agent mode
+- System handles both modes appropriately
 """
 
 import os
@@ -28,11 +29,11 @@ from datetime import datetime
 from src.tests.test_utils import BaseVoiceTest, DaemonManager
 
 # Set up logging
-logger = logging.getLogger("type-trigger-test")
+logger = logging.getLogger("dictation-test")
 
 
-class TypeTriggerTest(BaseVoiceTest):
-    """Test suite for the dictation functionality (with or without explicit triggers)."""
+class DictationTest(BaseVoiceTest):
+    """Test suite for the dictation functionality (default mode and with optional triggers)."""
 
     @classmethod
     def setUpClass(cls):
@@ -143,8 +144,8 @@ class TypeTriggerTest(BaseVoiceTest):
         """
         return DaemonManager(log_dir=self.log_dir, capture_output=True)
 
-    def test_type_trigger_complete_flow(self):
-        """Test the complete flow from type trigger to dictation execution."""
+    def test_dictation_trigger_flow(self):
+        """Test the flow from explicit dictation triggers to text execution."""
         # Use DaemonManager to handle daemon lifecycle
         daemon_mgr = self.create_daemon_manager()
         daemon_mgr.start()
@@ -599,4 +600,5 @@ class TypeTriggerTest(BaseVoiceTest):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    # Use a pattern that works better with the class name
+    unittest.main(defaultTest="DictationTest")

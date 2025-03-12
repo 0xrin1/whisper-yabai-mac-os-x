@@ -198,9 +198,9 @@ class TriggerDetector:
             variation in transcription.lower() for variation in self.command_variations
         )
 
-        # Process Jarvis trigger to activate Cloud Code
+        # Process Jarvis trigger to activate Code Agent
         if contains_jarvis_trigger:
-            logger.info(f"Jarvis trigger detected for Cloud Code: '{transcription}'")
+            logger.info(f"Jarvis trigger detected for Code Agent: '{transcription}'")
             # Extract the query part (remove jarvis trigger)
             for trigger in self.command_variations:
                 if trigger in transcription.lower():
@@ -210,8 +210,8 @@ class TriggerDetector:
                     # If there's a query, use it, otherwise use the whole text
                     if query:
                         result["transcription"] = query
-                    # Set to cloud_code type
-                    result["trigger_type"] = "cloud_code"
+                    # Set to code_agent type
+                    result["trigger_type"] = "code_agent"
                     break
         # Otherwise use dictation as the default
         else:
@@ -235,33 +235,33 @@ class TriggerDetector:
         trigger_type = detection_result["trigger_type"]
         transcription = detection_result["transcription"]
 
-        # Handle Cloud Code request (triggered by "jarvis")
-        if trigger_type == "cloud_code":
+        # Handle Code Agent request (triggered by "jarvis")
+        if trigger_type == "code_agent":
             # Play a notification sound
             self.recorder.play_sound("command")
 
-            # Add a notification to show we're processing with Cloud Code
+            # Add a notification to show we're processing with Code Agent
             try:
                 from src.ui.toast_notifications import send_notification
 
                 send_notification(
-                    "Cloud Code Activated",
+                    "Code Agent Activated",
                     f"Processing: {transcription[:30]}{'...' if len(transcription) > 30 else ''}",
-                    "whisper-cloud-code",
+                    "whisper-code-agent",
                     3,
                     False,
                 )
             except Exception as e:
-                logger.error(f"Failed to show Cloud Code notification: {e}")
+                logger.error(f"Failed to show Code Agent notification: {e}")
 
-            # Send the query to Cloud Code
+            # Send the query to Code Agent
             try:
                 # Import here to avoid circular imports
-                from src.utils.cloud_code import CloudCodeHandler
+                from src.utils.code_agent import CodeAgentHandler
                 from src.core.state_manager import state
 
                 # Create a temporary instance if we don't have one
-                handler = CloudCodeHandler(state)
+                handler = CodeAgentHandler(state)
 
                 # Generate a unique session ID
                 session_id = f"voice_{int(time.time())}"
@@ -269,7 +269,7 @@ class TriggerDetector:
                 # Submit the request
                 request_id = handler.submit_request(transcription, session_id)
 
-                logger.info(f"Submitted Cloud Code request: {request_id} with query: '{transcription}'")
+                logger.info(f"Submitted Code Agent request: {request_id} with query: '{transcription}'")
 
                 # Process the request synchronously for immediate response
                 try:
@@ -284,15 +284,15 @@ class TriggerDetector:
                     from src.audio.speech_synthesis import speak
                     speak(response)
 
-                    logger.info(f"Cloud Code response: {response[:100]}{'...' if len(response) > 100 else ''}")
+                    logger.info(f"Code Agent response: {response[:100]}{'...' if len(response) > 100 else ''}")
                 except Exception as e:
-                    logger.error(f"Error processing Cloud Code response: {e}")
+                    logger.error(f"Error processing Code Agent response: {e}")
 
                     # Notify of the error
                     from src.ui.toast_notifications import notify_error
                     notify_error("Failed to process request")
             except Exception as e:
-                logger.error(f"Failed to submit Cloud Code request: {e}")
+                logger.error(f"Failed to submit Code Agent request: {e}")
 
             return True
 

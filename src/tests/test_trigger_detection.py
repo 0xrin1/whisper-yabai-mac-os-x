@@ -62,7 +62,7 @@ class TestTriggerDetection(unittest.TestCase):
 
         # Import and mock CodeAgentHandler only during handle_detection
         # This avoids issues with importing in the setUp() method
-        self.mock_cloud_code = MagicMock()
+        self.mock_code_agent = MagicMock()
 
         # Speech synthesis (patched at the source module)
         self.speak_patch = patch("src.audio.speech_synthesis.speak")
@@ -97,14 +97,14 @@ class TestTriggerDetection(unittest.TestCase):
         result = self.detector.detect_triggers("jarvis help me with this")
 
         self.assertTrue(result["detected"])
-        self.assertEqual(result["trigger_type"], "cloud_code")
+        self.assertEqual(result["trigger_type"], "code_agent")
         self.assertEqual(result["transcription"], "help me with this")
 
         # Test with prefix
         result = self.detector.detect_triggers("hey jarvis what time is it")
 
         self.assertTrue(result["detected"])
-        self.assertEqual(result["trigger_type"], "cloud_code")
+        self.assertEqual(result["trigger_type"], "code_agent")
         self.assertEqual(result["transcription"], "what time is it")
 
     def test_default_dictation_mode(self):
@@ -129,7 +129,7 @@ class TestTriggerDetection(unittest.TestCase):
 
         # Verify results
         self.assertTrue(result["detected"])
-        self.assertEqual(result["trigger_type"], "cloud_code")
+        self.assertEqual(result["trigger_type"], "code_agent")
         self.assertEqual(result["transcription"], "what is the weather")
 
     def test_process_audio_buffer_error(self):
@@ -148,17 +148,17 @@ class TestTriggerDetection(unittest.TestCase):
         # Create a detection result for Jarvis
         detection_result = {
             "detected": True,
-            "trigger_type": "cloud_code",
+            "trigger_type": "code_agent",
             "transcription": "what's the weather today"
         }
 
         # Patch CodeAgentHandler at the point of use
         # This avoids issues with importing during setup
-        with patch("src.utils.code_agent.CodeAgentHandler") as cloud_code_mock:
+        with patch("src.utils.code_agent.CodeAgentHandler") as code_agent_mock:
             # Configure the mock
-            cloud_code_mock.return_value = self.mock_cloud_code
-            self.mock_cloud_code.submit_request.return_value = "request-123"
-            self.mock_cloud_code._process_request.return_value = "Generated response"
+            code_agent_mock.return_value = self.mock_code_agent
+            self.mock_code_agent.submit_request.return_value = "request-123"
+            self.mock_code_agent._process_request.return_value = "Generated response"
 
             # Handle the detection
             self.detector.handle_detection(detection_result)
@@ -170,8 +170,8 @@ class TestTriggerDetection(unittest.TestCase):
             self.mock_send_notification.assert_called_once()
 
             # Verify Cloud Code was called
-            self.mock_cloud_code.submit_request.assert_called_once()
-            self.mock_cloud_code._process_request.assert_called_once()
+            self.mock_code_agent.submit_request.assert_called_once()
+            self.mock_code_agent._process_request.assert_called_once()
 
             # Verify the response was spoken
             self.mock_speak.assert_called_once()
