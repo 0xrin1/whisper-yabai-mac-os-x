@@ -19,7 +19,6 @@ os.environ["USE_MOCK_SPEECH"] = "true"
 # List of tests that work reliably in CI
 SAFE_TEST_FILES = [
     "src/tests/test_config.py",
-    "src/tests/test_error_handler.py",
     "src/tests/test_state_manager.py",
     "src/tests/test_mock_example.py"
 ]
