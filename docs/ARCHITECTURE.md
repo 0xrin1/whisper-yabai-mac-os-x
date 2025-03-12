@@ -12,10 +12,10 @@ The system consists of several key components:
    - Speech Recognition API for distributed processing
 3. **Audio Processing**: Handles audio transcription and determines if it's:
    - Dictation (default) - types text at cursor position
-   - Cloud Code request via "jarvis" trigger - sends to Claude Code
+   - Code Agent request via "jarvis" trigger - sends to Claude Code
 4. **Speech Synthesis**: Converts text to speech via external API
 5. **UI Integration**: Provides user feedback
-6. **Cloud Code API**: Allows external applications to integrate with speech recognition
+6. **Code Agent API**: Allows external applications to integrate with speech recognition
 7. **Standalone Speech API**: Provides speech recognition as a separate service
 
 ## Architecture Diagrams
@@ -41,7 +41,7 @@ The system consists of several key components:
                                   │                     │
 ┌─────────────────┐     ┌─────────┴───────┐     ┌──────▼────────┐
 │                 │     │                 │     │                │
-│  Audio Output   │◄────┤  Speech         │◄────┤  Cloud Code    │
+│  Audio Output   │◄────┤  Speech         │◄────┤  Code Agent    │
 │  (Speakers)     │     │  Synthesis      │     │  (via Jarvis)  │
 │                 │     │                 │     │                │
 └─────────────────┘     └─────────────────┘     └────────────────┘
@@ -69,7 +69,7 @@ The system consists of several key components:
          ▼
 ┌─────────────────┐                             ┌─────────────────┐
 │                 │                             │                 │
-│  Cloud Code     │                             │  Text           │
+│  Code Agent     │                             │  Text           │
 │  API Server     │◄────────────────────────────┤  Transcription  │
 │                 │                             │                 │
 └────────┬────────┘                             └───────┬─────────┘
@@ -100,9 +100,9 @@ The system consists of several key components:
 
 ## Sequence Diagrams
 
-### Cloud Code Processing
+### Code Agent Processing
 
-This sequence diagram shows the flow from voice input to Cloud Code execution and speech feedback:
+This sequence diagram shows the flow from voice input to Code Agent execution and speech feedback:
 
 ```mermaid
 sequenceDiagram
@@ -111,7 +111,7 @@ sequenceDiagram
     participant AudioProcessor
     participant WhisperModel
     participant TriggerDetector
-    participant CloudCodeAPI
+    participant CodeAgentAPI
     participant TTSAPIServer
     participant SpeechSynthesis
 
@@ -120,8 +120,8 @@ sequenceDiagram
     AudioProcessor->>WhisperModel: Process audio
     WhisperModel->>AudioProcessor: Transcribed text
     AudioProcessor->>TriggerDetector: Detect "jarvis"
-    TriggerDetector->>CloudCodeAPI: Send query to Claude Code
-    CloudCodeAPI->>TTSAPIServer: Request speech synthesis
+    TriggerDetector->>CodeAgentAPI: Send query to Claude Code
+    CodeAgentAPI->>TTSAPIServer: Request speech synthesis
     TTSAPIServer->>SpeechSynthesis: Return audio data
     SpeechSynthesis->>User: Play audio feedback
 ```
@@ -189,7 +189,7 @@ sequenceDiagram
     participant WhisperModel
     participant TriggerDetector
     participant CoreDictation
-    participant CloudCode
+    participant CodeAgent
     participant TTSAPIServer
     participant SpeechSynthesis
 
@@ -204,8 +204,8 @@ sequenceDiagram
 
     alt Contains "jarvis" trigger
         AudioProcessor->>TriggerDetector: Detect trigger
-        TriggerDetector->>CloudCode: Send to Claude Code
-        CloudCode->>TTSAPIServer: Request speech synthesis
+        TriggerDetector->>CodeAgent: Send to Claude Code
+        CodeAgent->>TTSAPIServer: Request speech synthesis
         TTSAPIServer->>SpeechSynthesis: Return audio data
         SpeechSynthesis->>User: Play audio response
     else Default dictation mode
@@ -214,14 +214,14 @@ sequenceDiagram
     end
 ```
 
-### Cloud Code API Integration
+### Code Agent API Integration
 
 This sequence diagram shows how external applications can integrate with the system:
 
 ```mermaid
 sequenceDiagram
     participant ExternalApp
-    participant CloudCodeAPI
+    participant CodeAgentAPI
     participant WebSocket
     participant AudioProcessor
     participant SpeechAPI
@@ -236,15 +236,15 @@ sequenceDiagram
     AudioProcessor->>WebSocket: Transcription event
     WebSocket-->>ExternalApp: Real-time transcription
 
-    ExternalApp->>CloudCodeAPI: POST /cloud-code request
-    CloudCodeAPI->>ClaudeCode: Process request
-    ClaudeCode-->>CloudCodeAPI: Generate response
-    CloudCodeAPI-->>ExternalApp: JSON response
+    ExternalApp->>CodeAgentAPI: POST /cloud-code request
+    CodeAgentAPI->>ClaudeCode: Process request
+    ClaudeCode-->>CodeAgentAPI: Generate response
+    CodeAgentAPI-->>ExternalApp: JSON response
 
-    ExternalApp->>CloudCodeAPI: POST /speak request
-    CloudCodeAPI->>TTSAPIServer: Synthesize speech
-    TTSAPIServer-->>CloudCodeAPI: Speech processed
-    CloudCodeAPI-->>ExternalApp: Success response
+    ExternalApp->>CodeAgentAPI: POST /speak request
+    CodeAgentAPI->>TTSAPIServer: Synthesize speech
+    TTSAPIServer-->>CodeAgentAPI: Speech processed
+    CodeAgentAPI-->>ExternalApp: Success response
 ```
 
 ## Component Details
@@ -257,7 +257,7 @@ sequenceDiagram
 - Interfaces with Whisper for transcription
 - Processes transcriptions to determine:
   - Default dictation mode (type at cursor)
-  - Cloud Code requests (when "jarvis" trigger is detected)
+  - Code Agent requests (when "jarvis" trigger is detected)
 - Can connect to external Speech Recognition API
 
 ### Speech Synthesis
@@ -286,7 +286,7 @@ sequenceDiagram
 - Docker container support for easy deployment
 - Fallback mechanisms for reliability
 
-### Cloud Code API
+### Code Agent API
 
 - Integration point for external applications
 - WebSocket server for real-time transcription events
@@ -317,7 +317,7 @@ SPEECH_API_HOST="0.0.0.0"
 SPEECH_API_PORT="8080"
 ```
 
-### Cloud Code API
+### Code Agent API
 ```
 API_PORT="8000"
 API_HOST="127.0.0.1"

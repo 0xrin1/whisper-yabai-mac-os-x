@@ -60,7 +60,7 @@ class TestTriggerDetection(unittest.TestCase):
         self.recorder_patch.start().return_value = self.mock_recorder
         self.patchers.append(self.recorder_patch)
 
-        # Import and mock CloudCodeHandler only during handle_detection
+        # Import and mock CodeAgentHandler only during handle_detection
         # This avoids issues with importing in the setUp() method
         self.mock_cloud_code = MagicMock()
 
@@ -152,9 +152,9 @@ class TestTriggerDetection(unittest.TestCase):
             "transcription": "what's the weather today"
         }
 
-        # Patch CloudCodeHandler at the point of use
+        # Patch CodeAgentHandler at the point of use
         # This avoids issues with importing during setup
-        with patch("src.utils.cloud_code.CloudCodeHandler") as cloud_code_mock:
+        with patch("src.utils.code_agent.CodeAgentHandler") as cloud_code_mock:
             # Configure the mock
             cloud_code_mock.return_value = self.mock_cloud_code
             self.mock_cloud_code.submit_request.return_value = "request-123"

@@ -27,14 +27,14 @@ import src.audio.speech_synthesis as tts
 import src.utils.assistant as assistant
 from src.ui.toast_notifications import send_notification
 
-# Import cloud code components
+# Import code agent components
 try:
     from src.api.api_server import APIServer
-    from src.utils.cloud_code import CloudCodeHandler
+    from src.utils.code_agent import CodeAgentHandler
     api_available = True
 except ImportError:
     api_available = False
-    logging.getLogger("voice-control").warning("API server components not available. Cloud code features will be disabled.")
+    logging.getLogger("voice-control").warning("API server components not available. Code agent features will be disabled.")
 
 logger = logging.getLogger("voice-control")
 
@@ -69,9 +69,9 @@ class VoiceControlDaemon:
         self.continuous_recorder = ContinuousRecorder()
         self.running = False
 
-        # API and cloud code components
+        # API and code agent components
         self.api_server = None
-        self.cloud_code_handler = None
+        self.code_agent_handler = None
 
     def _setup_logging(self):
         """Set up logging configuration."""
@@ -122,14 +122,14 @@ class VoiceControlDaemon:
         self.continuous_recorder.stop()
         hotkeys.stop()
 
-        # Stop API and cloud code components if they exist
+        # Stop API and code agent components if they exist
         if self.api_server:
             logger.info("Stopping API server...")
             self.api_server.stop()
 
-        if self.cloud_code_handler:
-            logger.info("Stopping Cloud Code handler...")
-            self.cloud_code_handler.stop()
+        if self.code_agent_handler:
+            logger.info("Stopping Code Agent handler...")
+            self.code_agent_handler.stop()
 
         # Clean up resources
         self.recorder.cleanup()
@@ -221,14 +221,14 @@ class VoiceControlDaemon:
             os._exit(1)
 
     def _initialize_cloud_components(self):
-        """Initialize API server and Cloud Code handler."""
+        """Initialize API server and Code Agent handler."""
         try:
-            # Initialize Cloud Code handler (always initialize for voice commands)
-            logger.info("Initializing Cloud Code handler...")
+            # Initialize Code Agent handler (always initialize for voice commands)
+            logger.info("Initializing Code Agent handler...")
             from src.config.config import config
-            self.cloud_code_handler = CloudCodeHandler(state)
-            self.cloud_code_handler.start()
-            logger.info("Cloud Code handler initialized successfully")
+            self.code_agent_handler = CodeAgentHandler(state)
+            self.code_agent_handler.start()
+            logger.info("Code Agent handler initialized successfully")
 
             # Initialize API server (only if API is explicitly enabled)
             if self.api_enabled:
@@ -255,7 +255,7 @@ class VoiceControlDaemon:
                 # Announce via speech synthesis
                 tts.speak("Cloud Code API is now ready for integration", block=False)
             else:
-                logger.info("API server not enabled, but Cloud Code handler is ready for 'jarvis' commands")
+                logger.info("API server not enabled, but Code Agent handler is ready for 'jarvis' commands")
 
         except Exception as e:
             logger.error(f"Error initializing cloud components: {e}")

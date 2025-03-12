@@ -3,18 +3,18 @@
 ![CI Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/ci.yml/badge.svg)
 ![Lint Status](https://github.com/0xrin1/whisper-yabai-mac-os-x/actions/workflows/lint.yml/badge.svg)
 
-A voice dictation system with Cloud Code integration, leveraging the Speech Recognition API for dictation and "jarvis" triggered queries to Claude Code.
+A voice dictation system with Code Agent integration, leveraging the Speech Recognition API for dictation and "jarvis" triggered queries to Claude Code.
 
 ## Features
 
 - Voice control for your Mac with two simple modes:
   - Dictation mode (default) - speak naturally to type text at cursor position
-  - Cloud Code mode via "jarvis" trigger word - connects directly to Claude Code
+  - Code Agent mode via "jarvis" trigger word - connects directly to Claude Code
 - Speech Recognition API for efficient, distributed processing
   - Send audio to API server for transcription
   - Support for running on a separate machine with GPU acceleration
   - WebSocket interface for real-time transcriptions
-- Text-to-speech feedback for Cloud Code responses
+- Text-to-speech feedback for Code Agent responses
 - Audio feedback with sounds for recording start/stop and completion
 - Support for non-standard keyboard layouts during dictation
 - Modular, clean architecture for easier maintenance and extension
@@ -147,7 +147,7 @@ The voice control system now has two main modes:
 - No trigger word needed - dictation is the default behavior
 - Useful for writing emails, messages, documents, etc.
 
-### Cloud Code Mode
+### Code Agent Mode
 - Say "jarvis" followed by your question or request
 - Interact directly with Claude Code AI assistant
 - Get answers to questions, coding help, creative content, etc.
@@ -160,13 +160,13 @@ The voice control system now has two main modes:
 - `Ctrl+Shift+M` - Toggle microphone mute
 - `ESC` - Stop the daemon
 
-For more details about the Cloud Code integration and dictation features, see `docs/COMMANDS_CHEATSHEET.md` and `docs/CLOUD_CODE_API.md`.
+For more details about the Code Agent integration and dictation features, see `docs/COMMANDS_CHEATSHEET.md` and `docs/CODE_AGENT_API.md`.
 
 ## Customization
 
-### Cloud Code Integration
+### Code Agent Integration
 
-The system now uses Cloud Code integration to process all "jarvis" commands. This provides a more natural way to interact with the assistant:
+The system now uses Code Agent integration to process all "jarvis" commands. This provides a more natural way to interact with the assistant:
 
 ```
 "Jarvis, what's the capital of France?"
@@ -241,7 +241,7 @@ To run the daemon as a background service that starts automatically:
    launchctl load ~/Library/LaunchAgents/com.example.whispervoicecontrol.plist
    ```
 
-## Cloud Code API
+## Code Agent API
 
 The system includes a built-in API server that allows external applications to interact with the speech recognition system, providing a way to create cloud-based assistants that leverage the local speech processing capabilities.
 
@@ -257,7 +257,7 @@ python src/daemon.py --api --api-port 8000 --api-host 127.0.0.1
 
 - `GET /status`: Get the current status of the voice control system
 - `POST /speak`: Synthesize speech from text
-- `POST /cloud-code`: Process a cloud code request
+- `POST /code-agent`: Process a code agent request
 - `WebSocket /ws/transcription`: Real-time transcription stream
 
 ### Using the API Client
@@ -274,13 +274,13 @@ python src/api/client.py --ws
 # Test speech synthesis
 python src/api/client.py --speak "Hello, world"
 
-# Test cloud code integration
+# Test code agent integration
 python src/api/client.py --prompt "What's the weather like today?"
 ```
 
 ### Integration Example
 
-To integrate with your own application, connect to the WebSocket endpoint to receive transcriptions in real-time, and use the cloud-code endpoint to send responses back to the user via speech synthesis.
+To integrate with your own application, connect to the WebSocket endpoint to receive transcriptions in real-time, and use the code-agent endpoint to send responses back to the user via speech synthesis.
 
 ## Natural Language Commands with LLM
 
@@ -362,7 +362,7 @@ The modular architecture makes it easy to extend the system:
 1. **Custom Dictation Processing**: Extend `utils/dictation.py` or implement a new processor
 2. **New Voice Synthesis Options**: Add to `audio/speech_synthesis.py` module
 3. **Enhanced Audio Processing**: Extend `audio/audio_processor.py` with new capabilities
-4. **Cloud Code Integration**: Extend the API server for more advanced interactions
+4. **Code Agent Integration**: Extend the API server for more advanced interactions
 
 ### Development Guidelines
 
@@ -393,7 +393,7 @@ Additional documentation:
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): Detailed system architecture and diagrams
 - [COMMANDS_CHEATSHEET.md](docs/COMMANDS_CHEATSHEET.md): Quick reference for voice commands
 - [NEURAL_VOICE_SETUP.md](docs/NEURAL_VOICE_SETUP.md): Guide for setting up text-to-speech
-- [CLOUD_CODE_API.md](docs/CLOUD_CODE_API.md): Cloud Code API documentation
+- [CLOUD_CODE_API.md](docs/CLOUD_CODE_API.md): Code Agent API documentation
 - [SPEECH_API.md](docs/SPEECH_API.md): Speech Recognition API documentation
 
 To generate the documentation:

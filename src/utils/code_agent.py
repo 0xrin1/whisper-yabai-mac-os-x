@@ -1,4 +1,4 @@
-"""Cloud Code integration to process requests from the API."""
+"""Code Agent integration to process requests for AI assistance."""
 import json
 import logging
 import threading
@@ -12,11 +12,11 @@ from src.utils.assistant import get_assistant_response
 # Configure logging
 logger = logging.getLogger(__name__)
 
-class CloudCodeHandler:
-    """Handler for Cloud Code requests and integration with speech processing."""
+class CodeAgentHandler:
+    """Handler for AI Code Agent requests and integration with speech processing."""
 
     def __init__(self, state: StateManager):
-        """Initialize the Cloud Code handler.
+        """Initialize the Code Agent handler.
 
         Args:
             state: The shared state manager
@@ -32,7 +32,7 @@ class CloudCodeHandler:
         self.processing_thread = None
 
     def start(self):
-        """Start the Cloud Code handler."""
+        """Start the Code Agent handler."""
         if self.running:
             return
 
@@ -42,17 +42,17 @@ class CloudCodeHandler:
             daemon=True,
         )
         self.processing_thread.start()
-        logger.info("Cloud Code handler started")
+        logger.info("Code Agent handler started")
 
     def stop(self):
-        """Stop the Cloud Code handler."""
+        """Stop the Code Agent handler."""
         self.running = False
         if self.processing_thread:
             self.processing_thread.join(timeout=1.0)
-        logger.info("Cloud Code handler stopped")
+        logger.info("Code Agent handler stopped")
 
     def submit_request(self, prompt: str, session_id: str) -> str:
-        """Submit a Cloud Code request.
+        """Submit a Code Agent request.
 
         Args:
             prompt: The prompt to process
@@ -121,7 +121,7 @@ class CloudCodeHandler:
                 logger.error(f"Error processing request {request['id']}: {e}")
 
     def _process_request(self, request: Dict) -> str:
-        """Process a single Cloud Code request.
+        """Process a single Code Agent request.
 
         Args:
             request: The request to process
@@ -147,7 +147,7 @@ class CloudCodeHandler:
         try:
             speak(response.text)
         except Exception as e:
-            logger.error(f"Error speaking Cloud Code response: {e}")
+            logger.error(f"Error speaking Code Agent response: {e}")
 
         return response.text
 
