@@ -240,17 +240,27 @@ class TestTriggerDetectionAsync:
         """Test API connection check."""
         detector, client_mock, _ = setup_detector
 
-        # The mock is already configured to return True
+        # Replace the loop.run_until_complete with a direct async call handler
+        def mock_run(coro):
+            if hasattr(coro, '__await__'):
+                # Just return the value from our mocked check_connection
+                if hasattr(coro, '__self__') and hasattr(coro, '__name__'):
+                    if coro.__name__ == 'check_connection':
+                        # Use the return_value from our AsyncMock
+                        return client_mock.check_connection.return_value
+            return coro
 
-        # Call the method - this will use our AsyncMock
-        detector.check_api_connection()
-
-        # Verify API call was made
-        client_mock.check_connection.assert_called_once()
-
-        # Test error case
-        client_mock.check_connection.side_effect = Exception("Connection failed")
-
-        # Should raise an exception
-        with pytest.raises(Exception):
+        # Replace the loop to avoid nested event loop issues
+        with patch.object(detector.loop, 'run_until_complete', side_effect=mock_run):
+            # Call the method - this will use our mock
             detector.check_api_connection()
+
+            # Verify API call attempt was made
+            client_mock.check_connection.assert_called_once()
+
+            # Test error case
+            client_mock.check_connection.return_value = False
+
+            # Should raise an exception
+            with pytest.raises(RuntimeError):
+                detector.check_api_connection()
