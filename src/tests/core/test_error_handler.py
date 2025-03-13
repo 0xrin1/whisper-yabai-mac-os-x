@@ -49,7 +49,7 @@ class TestErrorHandler(unittest.TestCase):
         # Verify the mock logger was called with the right context
         self.mock_logger.error.assert_any_call(f"[{test_context}] Error: Test error")
 
-    @patch("src.toast_notifications.notify_error")
+    @patch("src.ui.toast_notifications.notify_error")
     def test_handle_error_with_notification(self, mock_notify):
         """Test handle_error with notification."""
         test_error = ValueError("Test error")
