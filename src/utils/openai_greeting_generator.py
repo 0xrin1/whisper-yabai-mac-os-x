@@ -35,7 +35,7 @@ DEFAULT_GREETINGS = [
 def generate_greeting() -> str:
     """
     Generate a witty Jarvis-style greeting using the OpenAI API.
-    
+
     Returns:
         A dynamically generated greeting, or a fallback one if generation fails
     """
@@ -43,22 +43,22 @@ def generate_greeting() -> str:
     server_url = os.getenv("LLM_SERVER_URL", config.get("LLM_SERVER_URL", "http://192.168.191.55:7860"))
     model_name = os.getenv("LLM_MODEL_NAME", config.get("LLM_MODEL_NAME", "unsloth/QwQ-32B-GGUF:Q4_K_M"))
     api_key = os.getenv("OPENWEBUI_API_KEY", "")
-    
+
     # Prepare a shorter prompt for a witty Jarvis-style greeting
     prompt = "Create a short, witty, sarcastic Jarvis greeting (10-15 words max)."
-    
+
     # Try to generate a greeting
     try:
-        # Initialize the OpenAI client with custom base URL and API key 
+        # Initialize the OpenAI client with custom base URL and API key
         # For Ollama models in OpenWebUI, we need to use the openai compatible API path
         client = OpenAI(
             base_url=f"{server_url}/v1",  # OpenAI compatible endpoint in OpenWebUI
             api_key=api_key or "sk-no-key-needed"  # Provide a fallback key if none is set
         )
-        
+
         # Extract just the model name without the host/organization prefix
         model_short_name = model_name.split("/")[-1].split(":")[0]
-        
+
         # Use OpenAI's chat completion format, which is more widely supported
         response = client.chat.completions.create(
             model=model_short_name,
@@ -70,15 +70,15 @@ def generate_greeting() -> str:
             max_tokens=30,
             timeout=0.8  # Very short timeout to avoid delaying startup
         )
-        
+
         # Get the generated text from OpenAI's chat completion response format
         greeting = response.choices[0].message.content.strip()
         logger.info(f"Generated greeting: {greeting}")
-        
+
         # Clean up the response if needed (remove quotes, etc.)
         greeting = greeting.strip('"').strip()
         return greeting
-        
+
     except Exception as e:
         logger.warning(f"Failed to generate greeting: {e}. Using default.")
         return random.choice(DEFAULT_GREETINGS)
@@ -89,7 +89,7 @@ if __name__ == "__main__":
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
-    
+
     # Test the greeting generator
     greeting = generate_greeting()
     print(f"Generated greeting: {greeting}")

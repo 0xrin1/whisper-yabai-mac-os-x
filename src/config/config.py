@@ -84,7 +84,6 @@ class Config:
                 "USE_LLM": True,
                 "LLM_MODEL_PATH": None,
                 # Neural voice settings
-                "NEURAL_SERVER": None,
                 "NEURAL_VOICE_ID": "p230",
                 # Logging
                 "LOG_LEVEL": "INFO",
@@ -109,7 +108,6 @@ class Config:
             "BUFFER_SECONDS": ("BUFFER_SECONDS", int),
             "USE_LLM": ("USE_LLM", lambda v: v.lower() == "true"),
             "LLM_MODEL_PATH": "LLM_MODEL_PATH",
-            "NEURAL_SERVER": "NEURAL_SERVER",
             "NEURAL_VOICE_ID": "NEURAL_VOICE_ID",
             "LOG_LEVEL": "LOG_LEVEL",
             "LOG_TO_FILE": ("LOG_TO_FILE", lambda v: v.lower() == "true"),

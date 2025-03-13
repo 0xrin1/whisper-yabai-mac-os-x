@@ -175,17 +175,20 @@ class VoiceControlDaemon:
                         # Fall back to the original greeting generator if neither is available
                         from src.utils.llm_greeting_generator import generate_greeting
                         logger.info("Using fallback greeting generator")
-                
-                # Try to generate a dynamic greeting using the LLM
+
+                # Try to generate a dynamic greeting using the unified greeting generator
                 try:
-                    # Try to get a dynamic greeting, but with a short timeout to not delay startup
+                    # Import the unified greeting generator
+                    from src.utils.greeting_generator import generate_greeting
+
+                    # Generate greeting with timeout handling
                     import threading
                     import time
-                    
-                    # Flag to track if generation was successful
+
+                    # Generate greeting in a separate thread with timeout
                     generated = [False]
                     greeting = [None]
-                    
+
                     def generate_with_timeout():
                         try:
                             result = generate_greeting()
@@ -194,47 +197,35 @@ class VoiceControlDaemon:
                                 generated[0] = True
                         except Exception as e:
                             logger.warning(f"Error in greeting generation thread: {e}")
-                    
+
                     # Start generation in a separate thread
                     gen_thread = threading.Thread(target=generate_with_timeout)
                     gen_thread.daemon = True
                     gen_thread.start()
-                    
+
                     # Wait for up to 5 seconds for generation to complete
                     start_time = time.time()
                     while time.time() - start_time < 5 and not generated[0]:
                         time.sleep(0.2)
-                    
+
                     if generated[0] and greeting[0]:
                         # Successfully generated a greeting
                         dynamic_greeting = greeting[0]
-                        # Verify the greeting is not a thinking or debugging message
-                        # Check for various thinking patterns or unusually long responses
-                        if ("<think>" in dynamic_greeting or 
-                            dynamic_greeting.startswith("<") or 
-                            dynamic_greeting.startswith("I should") or 
-                            dynamic_greeting.startswith("Let me") or 
-                            dynamic_greeting.startswith("Okay") or
-                            "user wants" in dynamic_greeting or
-                            len(dynamic_greeting) > 100):
-                            logger.warning(f"Invalid greeting format: '{dynamic_greeting[:50]}...' - falling back to predefined")
-                            tts.speak_random("jarvis_startup", block=True)
-                        else:
-                            logger.info(f"Using dynamically generated greeting: '{dynamic_greeting}'")
-                            # Speak the dynamic greeting
-                            tts.speak(dynamic_greeting, block=True)
-                            logger.info("Dynamic greeting generated and spoken successfully")
+                        logger.info(f"Using dynamically generated greeting: '{dynamic_greeting}'")
+                        # Speak the dynamic greeting
+                        tts.speak(dynamic_greeting, block=True)
+                        logger.info("Dynamic greeting generated and spoken successfully")
                     else:
                         # Generation failed or timed out
                         logger.warning("Falling back to predefined greeting due to timeout or generation failure")
                         # Fall back to predefined greeting
                         tts.speak_random("jarvis_startup", block=True)
-                        
+
                 except Exception as e:
                     logger.warning(f"Falling back to predefined greeting due to error: {e}")
                     # Fall back to predefined greeting if generation fails
                     tts.speak_random("jarvis_startup", block=True)
-                
+
                 logger.info("Speech synthesis working correctly")
             except Exception as e:
                 logger.error(f"Error testing speech synthesis: {e}")
@@ -413,28 +404,18 @@ class VoiceControlDaemon:
                     if self.force_onboarding or self._is_first_run():
                         # Use dynamic Jarvis greeting for welcome on first start
                         try:
-                            # Import the Ollama API-based greeting generator
-                            try:
-                                from src.utils.ollama_greeting_generator import generate_greeting
-                                logger.info("Using direct Ollama API-based greeting generator for onboarding")
-                            except ImportError:
-                                try:
-                                    # Try OpenAI SDK-based generator as second option
-                                    from src.utils.openai_greeting_generator import generate_greeting
-                                    logger.info("Using OpenAI SDK-based greeting generator for onboarding")
-                                except ImportError:
-                                    # Fall back to the original greeting generator if neither is available
-                                    from src.utils.llm_greeting_generator import generate_greeting
-                                    logger.info("Using fallback greeting generator for onboarding")
-                                
+                            # Import the unified greeting generator
+                            from src.utils.greeting_generator import generate_greeting
+                            logger.info("Using unified greeting generator for onboarding")
+
                             from src.audio.speech_synthesis import speak, speak_random
                             import threading
                             import time
-                            
+
                             # Try to generate with a short timeout
                             generated = [False]
                             greeting = [None]
-                            
+
                             def generate_with_timeout():
                                 try:
                                     result = generate_greeting()
@@ -443,40 +424,29 @@ class VoiceControlDaemon:
                                         generated[0] = True
                                 except Exception as e:
                                     logger.warning(f"Error in greeting generation thread: {e}")
-                            
+
                             # Start generation in a separate thread
                             gen_thread = threading.Thread(target=generate_with_timeout)
                             gen_thread.daemon = True
                             gen_thread.start()
-                            
+
                             # Wait for up to 5 seconds for generation to complete
                             start_time = time.time()
                             while time.time() - start_time < 5 and not generated[0]:
                                 time.sleep(0.2)
-                            
+
                             if generated[0] and greeting[0]:
                                 # Successfully generated a greeting
                                 dynamic_greeting = greeting[0]
-                                # Verify the greeting is not a thinking or debugging message
-                                # Check for various thinking patterns or unusually long responses
-                                if ("<think>" in dynamic_greeting or 
-                                    dynamic_greeting.startswith("<") or 
-                                    dynamic_greeting.startswith("I should") or 
-                                    dynamic_greeting.startswith("Let me") or 
-                                    dynamic_greeting.startswith("Okay") or
-                                    "user wants" in dynamic_greeting or
-                                    len(dynamic_greeting) > 100):
-                                    logger.warning(f"Invalid greeting format: '{dynamic_greeting[:50]}...' - falling back to predefined")
-                                    speak_random("jarvis_startup", block=True)
-                                else:
-                                    speak(dynamic_greeting, block=True)
-                                    logger.info(f"Played dynamic startup greeting on first run: '{dynamic_greeting}'")
+                                # The greeting is already validated by the greeting generator
+                                speak(dynamic_greeting, block=True)
+                                logger.info(f"Played dynamic startup greeting on first run: '{dynamic_greeting}'")
                             else:
                                 # Generation failed or timed out
                                 logger.warning("Falling back to predefined greeting due to timeout")
                                 speak_random("jarvis_startup")
                                 logger.info("Played predefined startup greeting on first run")
-                                
+
                         except Exception as e:
                             # Fall back to predefined greeting
                             logger.warning(f"Falling back to predefined greeting: {e}")

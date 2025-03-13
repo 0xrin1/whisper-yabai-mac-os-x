@@ -23,21 +23,23 @@ class CommandInterpreter:
     def __init__(self, model_path: Optional[str] = None, n_ctx: int = 4096):
         """Initialize the LLM-based command interpreter."""
 
-        # Get server URL from environment or config
-        from src.config.config import config
-        self.server_url = os.getenv("LLM_SERVER_URL", config.get("LLM_SERVER_URL", "http://192.168.191.55:7860"))
-        self.model_name = os.getenv("LLM_MODEL_NAME", config.get("LLM_MODEL_NAME", "unsloth/QwQ-32B-GGUF:Q4_K_M"))
-        self.api_key = os.getenv("OPENWEBUI_API_KEY", "")
-        
         # For backward compatibility
         self.model_path = model_path
         self.n_ctx = n_ctx
-        self.llm_server_available = False
-        self.available_commands = self._load_available_commands()
-        self.model_type = "qwen"  # Default to qwen-style prompting for the QwQ model
 
-        # Load the model
-        self._load_model()
+        # Use the unified LLM client
+        from src.utils.llm_client import LLMClient
+        self.llm_client = LLMClient()
+
+        # Set properties based on LLM client
+        self.server_url = self.llm_client.server_url
+        self.model_name = self.llm_client.model_name
+        self.api_key = self.llm_client.api_key
+        self.llm_server_available = self.llm_client.server_available
+        self.model_type = self.llm_client.model_type
+
+        # Load available commands
+        self.available_commands = self._load_available_commands()
 
     def _determine_model_type(self):
         """Determine the model type based on the filename."""
@@ -53,52 +55,11 @@ class CommandInterpreter:
             # Default to llama-style models
             return "llama"
 
-    def _load_model(self):
-        """Check connection to the LLM server."""
-        try:
-            # Test the server connection with a ping
-            logger.info(f"Connecting to LLM server at {self.server_url}")
-            
-            # Check if server is responsive using the OpenAI models endpoint with API key
-            try:
-                headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                response = requests.get(f"{self.server_url}/v1/models", headers=headers, timeout=5)
-                
-                if response.status_code == 200:
-                    self.llm_server_available = True
-                    logger.info("Successfully connected to LLM server with OpenAI-compatible API")
-                    logger.info(f"Using model: {self.model_name}")
-                    return True
-                else:
-                    # Fall back to just checking if the server is up by hitting the root URL
-                    logger.info(f"OpenAI models endpoint not available ({response.status_code}), trying root URL")
-                    response = requests.get(self.server_url, timeout=5)
-                    if response.status_code == 200:
-                        self.llm_server_available = True
-                        logger.info("Successfully connected to LLM server")
-                        logger.info(f"Using model: {self.model_name}")
-                        return True
-                    else:
-                        logger.error(f"LLM server responded with status code: {response.status_code}")
-                        self.llm_server_available = False
-                        return False
-            except requests.exceptions.RequestException as e:
-                raise e  # Re-raise to be caught by the outer exception handler
-            
-            # If we get here, the first request succeeded but returned a non-200 status
-            logger.error(f"LLM server responded with status code: {response.status_code}")
-            self.llm_server_available = False
-            return False
-                
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to connect to LLM server: {e}")
-            logger.warning("Will fall back to simple command extraction")
-            self.llm_server_available = False
-            return False
+    def _determine_model_type(self):
+        """Determine the model type based on the filename."""
+        # This method is kept for backward compatibility
+        # The actual model type detection is now handled by LLMClient
+        return self.model_type
 
     def _load_available_commands(self) -> Dict[str, Any]:
         """Load available commands from commands.json."""
@@ -156,143 +117,44 @@ class CommandInterpreter:
             [f"- {cmd}: {desc}" for cmd, desc in self.available_commands.items()]
         )
 
-        # Select the appropriate prompt template based on model type
+        # Create system prompt and user prompt based on model type
         if self.model_type == "qwen":
-            template = self._get_qwen_prompt_template(commands_list, text)
+            system_prompt = "You are a voice command interpreter for Mac OS X that converts natural language into structured commands."
+            user_prompt = f"Available commands:\n{commands_list}\n\nUser input: \"{text}\"\n\nExtract the command and arguments in this format:\nCOMMAND: [command]\nARGS: [comma-separated args]"
         elif self.model_type == "deepseek":
-            template = self._get_deepseek_prompt_template(commands_list, text)
+            system_prompt = "You are a voice command interpreter for a Mac OS X system."
+            user_prompt = f"Available commands:\n{commands_list}\n\nInput: \"{text}\"\n\nIf this is clearly a command, respond with:\nCOMMAND: [command name]\nARGS: [comma-separated arguments]\n\nIf this is not a command, respond with:\nCOMMAND: none\nARGS:"
         else:
             # Default/Llama-style prompt
-            template = self._get_llama_prompt_template(commands_list, text)
+            system_prompt = "You are a voice command interpreter for Mac OS X that converts natural language into structured commands."
+            user_prompt = f"Available commands:\n{commands_list}\n\nConvert the following natural language input into a structured command and arguments ONLY if it's clearly a command. If not a command, respond with 'COMMAND: none'\n\nInput: \"{text}\"\n\nOutput format:\nCOMMAND: [command or 'none']\nARGS: [comma-separated arguments]"
 
-        # Try multiple API formats (Text Generation Web UI, Gradio, etc.)
         try:
-            # Try OpenAI-compatible API with the API key
-            try:
-                logger.info("Trying OpenAI-compatible API")
-                openai_headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                openai_payload = {
-                    "model": self.model_name,
-                    "messages": [
-                        {"role": "system", "content": "You are a voice command interpreter for Mac OS X that converts natural language into structured commands."},
-                        {"role": "user", "content": f"Available commands:\n{commands_list}\n\nUser input: {text}\n\nExtract the command and arguments in this format:\nCOMMAND: [command]\nARGS: [comma-separated args]"}
-                    ],
-                    "temperature": 0.1,
-                    "max_tokens": 128
-                }
-                
-                response = requests.post(
-                    f"{self.server_url}/v1/chat/completions",
-                    headers=openai_headers,
-                    json=openai_payload,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    response_data = response.json()
-                    if "choices" in response_data and len(response_data["choices"]) > 0:
-                        response_text = response_data["choices"][0]["message"]["content"].strip()
-                        logger.debug(f"LLM response (OpenAI): {response_text}")
-                        return response_text
-                    else:
-                        raise Exception("Unexpected response format from OpenAI API")
-            except Exception as e:
-                logger.info(f"OpenAI-compatible API not available: {e}")
-                
-            # 1. Try Text Generation Web UI format
-            try:
-                logger.info("Trying Text Generation Web UI API")
-                tgwui_payload = {
-                    "prompt": template,
-                    "max_new_tokens": 128,
-                    "temperature": 0.1,
-                    "top_p": 0.9,
-                    "stop": ["Input:", "\n\n", "User:"],
-                    "seed": -1,
-                    "stream": False
-                }
-                
-                response = requests.post(
-                    f"{self.server_url}/api/v1/generate",
-                    json=tgwui_payload,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    # Parse Text Generation Web UI response
-                    response_data = response.json()
-                    if "results" in response_data and len(response_data["results"]) > 0:
-                        response_text = response_data["results"][0].get("text", "").strip()
-                        logger.debug(f"LLM response (TGWUI): {response_text}")
-                        return response_text
-                    else:
-                        raise Exception("Unexpected response format from Text Generation Web UI API")
-            except Exception as e:
-                logger.info(f"Text Generation Web UI API not available: {e}")
-            
-            # 2. Try Gradio API
-            try:
-                logger.info("Trying Gradio API")
-                gradio_payload = {
-                    "data": [
-                        template,  # prompt
-                        0.1,       # temperature
-                        128,       # max_tokens
-                        0.9,       # top_p
-                    ]
-                }
-                
-                response = requests.post(
-                    f"{self.server_url}/run/predict",  # Alternate Gradio endpoint
-                    json=gradio_payload,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    # Parse Gradio response
-                    response_data = response.json()
-                    if "data" in response_data and len(response_data["data"]) > 0:
-                        response_text = str(response_data["data"][0]).strip()
-                        logger.debug(f"LLM response (Gradio): {response_text}")
-                        return response_text
-                    else:
-                        raise Exception("Unexpected response format from Gradio API")
-            except Exception as e:
-                logger.info(f"Gradio API not available: {e}")
-            
-            # 3. Try standard Gradio API
-            try:
-                logger.info("Trying standard Gradio endpoint")
-                gradio_payload = {
-                    "fn_index": 0,  # Usually the main interface is at index 0
-                    "data": [template],
-                }
-                
-                response = requests.post(
-                    f"{self.server_url}/api/predict",
-                    json=gradio_payload,
-                    timeout=10
-                )
-                
-                if response.status_code == 200:
-                    response_data = response.json()
-                    if "data" in response_data:
-                        response_text = str(response_data["data"]).strip()
-                        logger.debug(f"LLM response (Standard Gradio): {response_text}")
-                        return response_text
-                    else:
-                        raise Exception("Unexpected response format from Standard Gradio API")
-            except Exception as e:
-                logger.info(f"Standard Gradio API not available: {e}")
-            
-            # If we've tried all APIs and none worked, raise an exception
-            logger.error("All API endpoints failed")
-            raise Exception("No compatible API endpoint found on the server")
-        
+            # Generate response using the unified LLM client
+            response_text = self.llm_client.generate(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                max_tokens=128,
+                temperature=0.1,
+                stop_sequences=["Input:", "\n\n", "User:"]
+            )
+
+            # Parse the response to extract command and arguments
+            command = ""
+            args = []
+
+            for line in response_text.split("\n"):
+                line = line.strip()
+                if line.startswith("COMMAND:"):
+                    command = line[8:].strip().lower()
+                elif line.startswith("ARGS:"):
+                    args_str = line[5:].strip()
+                    if args_str:
+                        args = [arg.strip() for arg in args_str.split(",")]
+
+            logger.info(f"Interpreted command: {command}, args: {args}")
+            return (command, args)
+
         except Exception as e:
             logger.error(f"Error interpreting command with LLM: {e}")
             # Fall back to simple command extraction
@@ -300,22 +162,6 @@ class CommandInterpreter:
             if not parts:
                 return ("", [])
             return (parts[0], parts[1:])
-            
-        # If we get a response, process it to extract command and args    
-        command = ""
-        args = []
-        
-        for line in response_text.split("\n"):
-            line = line.strip()
-            if line.startswith("COMMAND:"):
-                command = line[8:].strip().lower()
-            elif line.startswith("ARGS:"):
-                args_str = line[5:].strip()
-                if args_str:
-                    args = [arg.strip() for arg in args_str.split(",")]
-        
-        logger.info(f"Interpreted command: {command}, args: {args}")
-        return (command, args)
 
     def _get_qwen_prompt_template(self, commands_list, text):
         """Get prompt template optimized for Qwen models."""
@@ -407,120 +253,26 @@ Output:
                 "message": "LLM server not available for dynamic responses",
             }
 
-        # Select appropriate prompt based on model type
+        # Create appropriate system prompt based on model type
         if self.model_type == "qwen":
-            prompt = self._get_qwen_dynamic_prompt(transcription)
+            system_prompt = "You are a Mac OS voice assistant that determines if user inputs are computer commands."
+            prompt = f"The user said: \"{transcription}\"\n\nAnalyze this and tell me if it's a computer command. If it is, determine what action and parameters are needed."
         elif self.model_type == "deepseek":
-            prompt = self._get_deepseek_dynamic_prompt(transcription)
+            system_prompt = "You are a Mac OS voice assistant that analyzes user input."
+            prompt = f"Analyze this user voice input: \"{transcription}\"\n\nDetermine if this is intended as a computer command or just casual speech."
         else:
-            prompt = self._get_llama_dynamic_prompt(transcription)
+            system_prompt = "You are a Mac OS voice assistant."
+            prompt = f"The user said: \"{transcription}\"\n\nDetermine if this input is clearly intended as a computer command or just casual speech."
 
         try:
-            # Try OpenAI-compatible API first
-            try:
-                logger.info("Trying OpenAI-compatible API for dynamic response")
-                openai_headers = {
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json"
-                }
-                
-                openai_payload = {
-                    "model": self.model_name,
-                    "messages": [
-                        {"role": "system", "content": "You are a voice command analyzer for Mac OS X that determines if inputs are commands and how to process them."},
-                        {"role": "user", "content": f"Analyze this user input: '{transcription}'\n\nRespond with a JSON object containing is_command (boolean), command_type, action, parameters, and explanation fields."}
-                    ],
-                    "temperature": 0.2,
-                    "max_tokens": 512
-                }
-                
-                response = requests.post(
-                    f"{self.server_url}/v1/chat/completions",
-                    headers=openai_headers,
-                    json=openai_payload,
-                    timeout=15
-                )
-                
-                if response.status_code == 200:
-                    response_data = response.json()
-                    if "choices" in response_data and len(response_data["choices"]) > 0:
-                        response_text = response_data["choices"][0]["message"]["content"].strip()
-                        logger.debug(f"Dynamic response (OpenAI): {response_text}")
-                    else:
-                        raise Exception("Unexpected response format from OpenAI API")
-                else:
-                    raise Exception(f"OpenAI API returned status code {response.status_code}")
-            except Exception as e:
-                logger.info(f"OpenAI-compatible API not available for dynamic response: {e}")
-                
-                # Fall back to Text Generation Web UI format
-                logger.info("Trying Text Generation Web UI for dynamic response")
-                tgwui_payload = {
-                    "prompt": prompt,
-                    "max_new_tokens": 512,
-                    "temperature": 0.2,
-                    "top_p": 0.9,
-                    "stop": ["```", "User:", "<human>"],
-                    "seed": -1,
-                    "stream": False
-                }
-                
-                response = requests.post(
-                    f"{self.server_url}/api/v1/generate",
-                    json=tgwui_payload,
-                    timeout=15
-                )
-            
-            if response.status_code == 200:
-                # Parse Text Generation Web UI response
-                response_data = response.json()
-                if "results" in response_data and len(response_data["results"]) > 0:
-                    response_text = response_data["results"][0].get("text", "").strip()
-                    logger.debug(f"Dynamic response (TGWUI): {response_text}")
-                else:
-                    raise Exception("Unexpected response format from Text Generation Web UI API")
-            else:
-                # Try Gradio format
-                logger.info(f"Text Generation Web UI API not available, trying Gradio API")
-                gradio_payload = {
-                    "data": [
-                        prompt,     # prompt
-                        0.2,        # temperature
-                        512,        # max_tokens
-                        0.9,        # top_p
-                    ]
-                }
-                
-                response = requests.post(
-                    f"{self.server_url}/run/predict",  # Alternate Gradio endpoint
-                    json=gradio_payload,
-                    timeout=15
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"LLM server error: {response.status_code} - {response.text}")
-                    raise Exception(f"LLM server returned status code {response.status_code}")
-                
-                # Parse Gradio response
-                response_data = response.json()
-                if "data" in response_data and len(response_data["data"]) > 0:
-                    response_text = str(response_data["data"][0]).strip()
-                    logger.debug(f"Dynamic response (Gradio): {response_text}")
-                else:
-                    raise Exception("Unexpected response format from Gradio API")
-            
-            if response.status_code != 200:
-                logger.error(f"LLM server error: {response.status_code} - {response.text}")
-                raise Exception(f"LLM server returned status code {response.status_code}")
-                
-            # Parse the Gradio response format
-            response_data = response.json()
-            # Gradio returns data in a format like {"data": [generated_text]}
-            if "data" in response_data and isinstance(response_data["data"], list) and len(response_data["data"]) > 0:
-                response_text = str(response_data["data"][0]).strip()
-            else:
-                logger.error(f"Unexpected response format: {response_data}")
-                raise Exception("Unexpected response format from Gradio API")
+            # Generate the response using the unified LLM client
+            response_text = self.llm_client.generate(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                max_tokens=512,
+                temperature=0.2,
+                stop_sequences=["```", "User:", "<human>"]
+            )
 
             # Try to parse JSON response
             try:
@@ -741,7 +493,7 @@ def test_interpreter():
     """Test the command interpreter with sample commands."""
     # Load config
     from src.config.config import config
-    
+
     # Get server URL from environment or config
     server_url = os.getenv("LLM_SERVER_URL", config.get("LLM_SERVER_URL", "http://192.168.191.55:7860"))
     model_name = os.getenv("LLM_MODEL_NAME", config.get("LLM_MODEL_NAME", "unsloth/QwQ-32B-GGUF:Q4_K_M"))

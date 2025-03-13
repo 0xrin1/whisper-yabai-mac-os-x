@@ -15,6 +15,8 @@
     "BUFFER_SECONDS": 5,
 
     "USE_LLM": true,
+    "LLM_SERVER_URL": "http://192.168.191.55:7860",
+    "LLM_MODEL_NAME": "unsloth/QwQ-32B-GGUF:Q4_K_M",
 
     "NEURAL_VOICE_ID": "p230",
 
