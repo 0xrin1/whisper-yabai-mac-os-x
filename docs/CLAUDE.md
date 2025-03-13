@@ -3,8 +3,9 @@
 ## Commands
 
 - Run daemon: `python src/daemon.py`
-- Run simplified daemon: `python src/simple_dictation.py`
-- Run ultra simplified version: `python src/ultra_simple_dictation.py`
+- Run daemon with API: `python src/daemon.py --api`
+- Run onboarding: `python src/daemon.py --onboard`
+- Run simplified daemon: `python src/utils/simple_dictation.py`
 - Check permissions: `python src/permissions_check.py`
 - Run tests with pytest: `python -m pytest`
 - Run specific test module: `python -m pytest src/tests/audio/test_audio_processor.py`
@@ -12,6 +13,7 @@
 - Install deps: `pip install -r requirements.txt`
 - Run Speech API: `./scripts/run_speech_api.sh`
 - Run Cloud Code API: `./scripts/launch_cloud_api.sh`
+- Test LLM Greetings: `python src/utils/ollama_greeting_generator.py`
 - Your sudo password is: `claudecode`
 
 ## Code Style
@@ -70,15 +72,24 @@
 - `speech_recognition_client.py`: Client for the speech recognition API
 - `api_server.py`: Cloud Code API server
 
-## Recommended LLM Models
+## LLM Configuration
 
-- Qwen2-0.5B-Instruct: Lightweight, fast response
-- DeepSeek-Coder-1.3B-Instruct: Better command interpretation
+- OpenWebUI Server URL: (from environment) `LLM_SERVER_URL` (default: `http://192.168.191.55:7860`)
+- OpenWebUI API Key: (from environment) `OPENWEBUI_API_KEY`
+- Model Name: (from environment) `LLM_MODEL_NAME` (default: `unsloth/QwQ-32B-GGUF:Q4_K_M`)
+- Dynamic greeting generation using direct LLM API calls
+- Improved validation to detect and filter out internal "thinking" model responses
+- Custom Jarvis-style greetings with the LLM's personality
+
+### Recommended LLM Models
+
+- QwQ-32B-GGUF: Main remote model via OpenWebUI
+- Qwen2-0.5B-Instruct: Lightweight, fast response (local fallback)
+- DeepSeek-Coder-1.3B-Instruct: Better command interpretation (local fallback)
 
 ## Neural Voice Configuration
 
 - Server port: 6000 (default)
-- Environment variable: `NEURAL_SERVER=http://gpu-server-ip:6000`
 - IMPORTANT: Never implement fallback speech synthesis. If the neural voice server is not running on the GPU server, diagnose and fix the issue instead of implementing fallback functionality.
 
 ## Speech Recognition API Configuration
@@ -125,6 +136,7 @@
 ## Test Organization Guidelines
 
 - Tests are organized in module-specific directories:
+
   - `src/tests/api/`: Tests for API components
   - `src/tests/audio/`: Tests for audio processing
   - `src/tests/config/`: Tests for configuration
@@ -135,6 +147,7 @@
   - `src/tests/common/`: Shared utilities for tests
 
 - Use common test utilities:
+
   - `from src.tests.common.base import BaseTestCase` for standard test cases
   - `from src.tests.common.mocks import mock_speech_recognition_client` for mocks
   - `from src.tests.common.speech import synthesize_speech` for speech utilities

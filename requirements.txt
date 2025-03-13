@@ -1,5 +1,7 @@
 fastapi
 llama-cpp-python
+# For OpenWebUI integration using the OpenAI API
+openai==1.16.1
 openai-whisper
 pyaudio
 pyautogui

@@ -29,4 +29,3 @@
   - [hotkey_manager](utils/hotkey_manager.md)
   - [llm_interpreter](utils/llm_interpreter.md)
   - [simple_dictation](utils/simple_dictation.md)
-  - [ultra_simple_dictation](utils/ultra_simple_dictation.md)
