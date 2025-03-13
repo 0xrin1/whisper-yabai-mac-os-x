@@ -42,6 +42,7 @@ class StateManager:
         self.audio_buffer = []
         self.audio_buffer_seconds = 5
         self.audio_buffer_lock = threading.Lock()
+        self.speech_start_index = 0  # Track the start of speech in the buffer
 
         # Hotkey tracking
         self.key_states = {

@@ -72,6 +72,9 @@ class ContinuousRecorder:
         logger.info("Stopping continuous recording...")
         self.running = False
 
+        # Reset speech start index when stopping
+        state.speech_start_index = 0
+
         if self.thread:
             self.thread.join(2.0)  # Wait up to 2 seconds for thread to end
 
@@ -152,6 +155,10 @@ class ContinuousRecorder:
                                 f"Voice activity detected, energy: {energy:.0f}"
                             )
                             has_speech = True
+                            # Store the current buffer position as the speech start point
+                            with state.audio_buffer_lock:
+                                state.speech_start_index = max(0, len(state.audio_buffer) - 1)
+                                logger.debug(f"Speech start marked at buffer index {state.speech_start_index}")
                         silence_frames = 0
                     else:
                         # Low energy - might be silence
@@ -169,6 +176,7 @@ class ContinuousRecorder:
                                 )
                                 has_speech = False
                                 silence_frames = 0
+                                state.speech_start_index = 0  # Reset speech start index
                                 continue
 
                             logger.debug(
@@ -208,6 +216,9 @@ class ContinuousRecorder:
                         # Keep buffer at maximum size
                         while len(state.audio_buffer) > self.max_buffer_frames:
                             state.audio_buffer.pop(0)
+                            # Adjust speech_start_index if we're removing data
+                            if state.speech_start_index > 0:
+                                state.speech_start_index = max(0, state.speech_start_index - 1)
 
                 except Exception as e:
                     logger.error(f"Error in continuous recording: {e}")
@@ -236,7 +247,7 @@ class ContinuousRecorder:
             # Add a slight delay before processing to allow system to stabilize
             time.sleep(0.5)
 
-            # Make a copy of the buffer to process
+            # Make a copy of the buffer to process, starting from the speech start point
             with state.audio_buffer_lock:
                 if (
                     len(state.audio_buffer) < 10
@@ -244,9 +255,19 @@ class ContinuousRecorder:
                     logger.debug("Buffer too small to process")
                     # Reset recording flag since we're aborting
                     state.stop_recording()
+                    state.speech_start_index = 0  # Reset speech start index
                     return
 
-                buffer_copy = state.audio_buffer.copy()
+                # Use the speech_start_index to capture the entire spoken command
+                speech_start = state.speech_start_index
+                if speech_start > 0 and speech_start < len(state.audio_buffer):
+                    logger.debug(f"Using speech start index {speech_start} for processing")
+                    buffer_copy = state.audio_buffer[speech_start:].copy()
+                else:
+                    buffer_copy = state.audio_buffer.copy()
+
+                # Reset speech start index for next detection
+                state.speech_start_index = 0
 
             # Process buffer with trigger detector
             detection_result = self.trigger_detector.process_audio_buffer(buffer_copy)
@@ -271,5 +292,6 @@ class ContinuousRecorder:
 
             logger.error(traceback.format_exc())
 
-            # Always reset recording flag in case of error
+            # Always reset recording flag and speech start index in case of error
             state.stop_recording()
+            state.speech_start_index = 0
